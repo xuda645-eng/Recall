@@ -70,6 +70,9 @@ Pages 构建启动独立静态服务器，完成缓存后关闭服务器，并�
 RECALL_URL=https://xuda645-eng.github.io/Recall/ pnpm test:e2e
 ```
 
+本地验收每项限时 30 秒；设置 `RECALL_URL` 的公网验收每项限时
+120 秒，为首次下载和缓存应用资源留出时间，不跳过缓存就绪或离线检查。
+
 模拟浏览器结果不等于真机验收。实际 iPhone Safari 的主屏幕安装、
 动态安全区、系统键盘、离线冷启动和更新提示仍需在手机检查。
 原有 `scripts/verify-mobile.mjs`、`scripts/verify-chinese-mobile.mjs`

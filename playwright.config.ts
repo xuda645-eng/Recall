@@ -3,7 +3,7 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   testMatch: "memory-workspace.spec.ts",
-  timeout: 30000,
+  timeout: process.env.RECALL_URL ? 120000 : 30000,
   retries: 0,
   use: {
     baseURL: process.env.RECALL_URL || "http://127.0.0.1:4193/Recall/",
