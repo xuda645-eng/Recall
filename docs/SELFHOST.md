@@ -1,61 +1,32 @@
-# Recall Memory 首版部署与验证
+# Recall 中文版部署与验证
 
-## 体验入口
+正式入口：https://recall-memory.pages.dev/
 
-https://recall-memory.pages.dev/
+本项目为独立静态 Cloudflare Pages 部署，不修改 KidventureMap 或 WechatMoment，不启用设备通行码或云同步。卡片保存在当前浏览器的 localStorage，清除网站数据会删除卡片，请定期导出备份。
 
-使用 Safari 打开，分享菜单选择「添加到主屏幕」。第一次联网访问需等待静态缓存下载完成，之后才能离线使用。首次显示英文引导，中文卡片内容可以正常输入和阅读。
+## 中文与安全区
 
-## 当前范围
+- 使用 i18next + react-i18next，新增完整 zh-CN 语言包，保留英文和原有印尼语选择。
+- 这个个人部署默认中文，语言偏好使用 recall.ui.language，和卡片快照 recall.snapshot.v1 分离。
+- 菜单、按钮、提示、评分、时间单位、设置、状态与辅助名称已中文化；用户原文与内置语言学习卡片不会自动翻译。
+- 退出按钮显示明确文字，触控区域至少 72×48 CSS 像素；复习页面为顶部和底部安全区预留空间，通知避让顶部操作区。
+- 保留长卡片首段可读、长卡纵向滚动不评分、浏览器评分落盘和 Service Worker 接管的修复。
 
-- 独立 Cloudflare Pages 项目：recall-memory。
-- 不覆盖 KidAdventure 或其他项目，不绑定既有数据库、DNS 或付费资源。
-- 不启用云同步或设备通行码；这些功能留待下一轮。
-- 网站本身公开访问，但卡片与学习进度仅在当前浏览器设备本地。其他访客不能读取你的本地卡片。
-- 当前下载版本实际使用 localStorage，清除网站数据会丢失卡片，定期使用导出备份。
+## 验证
 
-## 已修复
+GitHub 源码独立解包后，类型检查、56 个测试文件共 816 项单测及生产构建通过。同一生产包通过 393×852 中文六组检查和英文十三组回归，包含创建、保存、评分、撤销、退出、语言切换、长段落和断网刷新继续复习。安全区使用 59/34 CSS 像素注入检验，不是实体 iPhone。
 
-1. 超长卡片内容居中导致第一段位于滚动起点之外。
-2. 上下阅读长卡片时误触发翻面或 FSRS 评分。
-3. 网页端评分只更新内存，未立即保存卡片调度与复习记录。
-4. Service Worker 首次安装后不主动接管已有页面。
+最终线上全流程在本环境受资源加载超时影响，不能宣称线上完整验收通过。实际 iOS 安装、系统键盘、后台回收仍待真机核验。上游 lint warning 保留，不宣称全项目零 warning。
 
-## 验证边界
-
-- 原始版本 807 项单测通过；增加手势与持久化回归后 813 项单测通过。
-- 生产构建通过；修改代码的定向 ESLint 无错误。上游全量 lint 有 131 条 warning，不宣称零 warning。
-- Chromium 在 390×844 CSS 像素、触控仿真、设备像素比 3 下，对同一生产包完成 13 项检查，含首次引导、建卡、中文长段落、刷新恢复、四档评分、撤销、总结、Service Worker 激活及断网刷新继续学习。
-- WebKit 同尺寸完成核心交互和 Service Worker 激活检查，但断网刷新触发测试运行时内部错误，不宣称 iOS 离线真机通过。
-- 线上早期版本核心交互已通过；最终完整线上复验遭遇本环境间歇性 502 和资源加载超时，不能将本地验证标作最终线上全通过。
-- 未使用实体 iPhone，未覆盖真实 Safari 键盘、系统后台回收和添加主屏安装弹窗。
-
-## 源码与复跑
+## 复跑与发布
 
 ```sh
 pnpm install --frozen-lockfile --registry=https://registry.npmjs.org
 pnpm test
-pnpm lint
 pnpm build
-pnpm exec playwright install chromium webkit
-node scripts/verify-mobile.mjs
-```
-
-验证本地生产包时先运行 `pnpm exec vite preview --host 127.0.0.1 --port 4185 --strictPort`，然后：
-
-```sh
-RECALL_URL=http://127.0.0.1:4185/ RECALL_QA_DIR=quality/local-production node scripts/verify-mobile.mjs
-```
-
-iPhone 15 尺寸补充验证可用 `RECALL_WIDTH=393 RECALL_HEIGHT=852`；测试引擎为 `RECALL_ENGINE=webkit`。浏览器依赖与运行环境必须可用。
-
-## 发布
-
-官方 Wrangler 账号授权，不把凭证放入源码。确认账号后发布独立项目：
-
-```sh
-pnpm build
+pnpm exec vite preview --host 127.0.0.1 --port 4185 --strictPort
+RECALL_URL=http://127.0.0.1:4185/ node scripts/verify-chinese-mobile.mjs
 npx wrangler@4.156.0 pages deploy dist --project-name recall-memory --branch main
 ```
 
-若出现 502，不应清除手机网站数据以排障，避免删除本地卡片。
+手机若仍为旧英文版本，联网重新打开并使用更新提示（旧版为 Update）。不要清除网站数据以更新。
