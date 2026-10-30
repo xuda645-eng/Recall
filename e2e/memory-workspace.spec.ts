@@ -216,6 +216,38 @@ test('复习计划配置保留既有排期，只改变未来评分', async ({ pa
   expect((await snapshot(page)).cards[0].nextReviewDate).toBe(at);
 });
 
+test('本机备份和迁移副本不携带同步密钥，保留卡片与复习计划', async ({ page }) => {
+  const data = fixture();
+  const testKey = 'a'.repeat(64);
+  data.settings.syncCode = testKey;
+  data.settings.syncEnabled = false;
+  data.settings.syncRelayUrl = 'https://example.invalid/test-relay';
+  data.cards[2].sourceRef = { provider: 'weread', bookId: 'test-book', bookmarkId: 'test-mark' };
+  await seedPage(page, data, 'settings');
+  const pendingDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: '备份', exact: true }).click();
+  const download = await pendingDownload;
+  const file = await download.path();
+  expect(file).not.toBeNull();
+  const text = await readFile(file!, 'utf8');
+  const exported = JSON.parse(text);
+  expect(text).not.toContain(testKey);
+  expect(exported.settings.syncCode).toBeNull();
+  expect(exported.settings.syncEnabled).toBe(false);
+  expect(exported.settings.syncRelayUrl).toBe('');
+  expect(exported.settings.reviewPlan).toEqual(data.settings.reviewPlan);
+  expect(exported.cards[2].archivedAt).toBe(at);
+  expect(exported.cards[2].sourceRef).toEqual(data.cards[2].sourceRef);
+  await navigate(page, '今日复习');
+  await startReading(page);
+  await page.getByRole('button', { name: '归档当前卡片', exact: true }).click();
+  await expect.poll(async () => !!(await snapshot(page)).cards[0].archivedAt).toBe(true);
+  const backup = await page.evaluate(() => JSON.parse(localStorage.getItem('recall.snapshot.pre-folders.v1') || 'null'));
+  expect(backup.settings.syncCode).toBeNull();
+  expect(backup.settings.syncEnabled).toBe(false);
+  expect(backup.settings.syncRelayUrl).toBe('');
+});
+
 test('旧卡片无效排期仅阻止评分，仍能阅读与归档且不改写进度', async ({ page }) => {
   const data = fixture();
   data.cards[1].difficulty = 0.8;

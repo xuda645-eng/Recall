@@ -44,7 +44,7 @@ beforeEach(async () => {
   ({ commitMemory } = await import('@/services/memory-actions'));
 });
 
-afterEach(() => { localStorage.clear(); });
+afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
 
 describe('commitMemory queued persistence', () => {
   it('does not mutate or publish store state when a save fails', async () => {
@@ -173,5 +173,131 @@ describe('commitMemory queued persistence', () => {
     expect(mocks.setState.mock.calls[0][0]).toEqual({ ...afterFirst, error: null });
     expect(mocks.setState.mock.calls[1][0]).toEqual({ ...expected, error: null });
     expect(store.view).toBe('settings');
+  });
+});
+
+describe('pre-folders backup credential safety', () => {
+  function rawSnapshot() {
+    return {
+      ...structuredClone(persisted),
+      decks: [
+        { ...persisted.decks[0], id: 'legacy-root', extraDeckData: { ordered: [3, 1, 2] } },
+        { ...persisted.decks[1], id: 'legacy-child', parentId: 'legacy-root', unknownChapterData: 'keep' },
+      ],
+      cards: [{ ...persisted.cards[0], deckId: 'legacy-child', back: '  Exact original.\r\n\t第二行。  ', archivedAt: '2026-10-01T00:00:00Z', extraCardData: { enabled: false, empty: '', missing: null } }],
+      settings: {
+        ...structuredClone(persisted.settings),
+        syncCode: 'SYNTHETIC-ONLY-PLAINTEXT',
+        syncEnabled: true,
+        syncRelayUrl: 'https://synthetic-only.invalid/relay',
+        syncFolder: '/synthetic/keep-folder',
+        syncLastAt: '2026-10-01T00:00:00Z',
+        syncAutoInterval: 23,
+        unknownSettings: { nested: ['keep', null, false, 0], text: '  spaces\n' },
+      },
+      unknownRoot: { version: 17, nested: [{ nullable: null, value: 1.25 }] },
+      originalTree: { root: 'legacy-root', children: ['legacy-child'] },
+    };
+  }
+
+  function safeSnapshot(raw: ReturnType<typeof rawSnapshot>) {
+    return { ...raw, settings: { ...raw.settings, syncCode: null, syncEnabled: false, syncRelayUrl: '' } };
+  }
+
+  it('creates a sanitized backup from raw plaintext without losing unknown fields, original text, tree or history', async () => {
+    const raw = rawSnapshot();
+    Reflect.deleteProperty(raw.decks[0], 'parentId');
+    const source = JSON.stringify(raw, null, 2);
+    localStorage.setItem('recall.snapshot.v1', source);
+    const write = vi.spyOn(localStorage, 'setItem');
+    const before = structuredClone(store);
+    await commitMemory(current => ({ ...current, cards: current.cards.map((card, index) => index === 0 ? { ...card, reps: card.reps + 1 } : card) }));
+    const stored = localStorage.getItem('recall.snapshot.pre-folders.v1')!;
+    expect(JSON.parse(stored)).toEqual(safeSnapshot(raw));
+    expect(JSON.parse(stored).decks[0]).not.toHaveProperty('parentId');
+    expect(JSON.parse(stored).cards[0].back).toBe(raw.cards[0].back);
+    expect(JSON.parse(stored).reviewLogs).toEqual(raw.reviewLogs);
+    expect(JSON.parse(stored).studySessions).toEqual(raw.studySessions);
+    expect(stored).not.toContain(raw.settings.syncCode);
+    expect(stored).not.toContain(raw.settings.syncRelayUrl);
+    expect(localStorage.getItem('recall.snapshot.v1')).toBe(source);
+    expect(write).toHaveBeenCalledExactlyOnceWith('recall.snapshot.pre-folders.v1', JSON.stringify(safeSnapshot(raw)));
+    expect(mocks.saveSnapshot.mock.calls[0][0].settings).toEqual(before.settings);
+    expect(store.settings).toEqual(before.settings);
+    expect(store.cards[0].reps).toBe(before.cards[0].reps + 1);
+    write.mockRestore();
+  });
+
+  it('sanitizes an existing legacy backup in place without replacing its original data with the current snapshot', async () => {
+    const legacy = rawSnapshot();
+    Reflect.deleteProperty(legacy.decks[0], 'parentId');
+    const source = JSON.stringify({ ...rawSnapshot(), unknownRoot: { currentOnly: true } });
+    localStorage.setItem('recall.snapshot.v1', source);
+    localStorage.setItem('recall.snapshot.pre-folders.v1', JSON.stringify(legacy));
+    const write = vi.spyOn(localStorage, 'setItem');
+    await commitMemory(current => current);
+    const safe = JSON.stringify(safeSnapshot(legacy));
+    expect(localStorage.getItem('recall.snapshot.pre-folders.v1')).toBe(safe);
+    expect(JSON.parse(safe).unknownRoot).toEqual(legacy.unknownRoot);
+    expect(JSON.parse(safe).decks[0]).not.toHaveProperty('parentId');
+    expect(localStorage.getItem('recall.snapshot.v1')).toBe(source);
+    expect(write).toHaveBeenCalledExactlyOnceWith('recall.snapshot.pre-folders.v1', safe);
+    await commitMemory(current => current);
+    expect(write).toHaveBeenCalledTimes(1);
+    write.mockRestore();
+  });
+
+  it('removes credentials from an existing backup even when the primary snapshot key is absent', async () => {
+    const legacy = rawSnapshot();
+    localStorage.setItem('recall.snapshot.pre-folders.v1', JSON.stringify(legacy));
+    await commitMemory(current => current);
+    expect(JSON.parse(localStorage.getItem('recall.snapshot.pre-folders.v1')!)).toEqual(safeSnapshot(legacy));
+    expect(localStorage.getItem('recall.snapshot.v1')).toBeNull();
+  });
+
+  it('sanitizes the backup even if the subsequent repository save fails, without publishing failed state', async () => {
+    const legacy = rawSnapshot(), before = structuredClone(store);
+    localStorage.setItem('recall.snapshot.pre-folders.v1', JSON.stringify(legacy));
+    mocks.saveSnapshot.mockRejectedValueOnce(new Error('disk write failed'));
+    await expect(commitMemory(current => current)).rejects.toThrow('disk write failed');
+    expect(JSON.parse(localStorage.getItem('recall.snapshot.pre-folders.v1')!)).toEqual(safeSnapshot(legacy));
+    expect(store).toEqual(before);
+    expect(mocks.setState).not.toHaveBeenCalled();
+  });
+
+  it.each(['source', 'backup'] as const)('preserves malformed %s JSON, aborts persistence and lets the queue recover after repair', async location => {
+    const raw = rawSnapshot(), before = structuredClone(store), beforeDisk = structuredClone(persisted);
+    const valid = JSON.stringify(raw), malformed = '{"settings":{"syncCode":"SYNTHETIC-ONLY-PLAINTEXT"';
+    localStorage.setItem('recall.snapshot.v1', location === 'source' ? malformed : valid);
+    if (location === 'backup') localStorage.setItem('recall.snapshot.pre-folders.v1', malformed);
+    const write = vi.spyOn(localStorage, 'setItem');
+    const remove = vi.spyOn(localStorage, 'removeItem');
+    const clear = vi.spyOn(localStorage, 'clear');
+    await expect(commitMemory(current => current)).rejects.toThrow('迁移备份不是有效 JSON，已保留原始数据');
+    expect(localStorage.getItem('recall.snapshot.v1')).toBe(location === 'source' ? malformed : valid);
+    expect(localStorage.getItem('recall.snapshot.pre-folders.v1')).toBe(location === 'backup' ? malformed : null);
+    expect(write).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+    expect(clear).not.toHaveBeenCalled();
+    expect(mocks.saveSnapshot).not.toHaveBeenCalled();
+    expect(mocks.setState).not.toHaveBeenCalled();
+    expect(store).toEqual(before);
+    expect(persisted).toEqual(beforeDisk);
+    write.mockRestore(); remove.mockRestore(); clear.mockRestore();
+    const key = location === 'source' ? 'recall.snapshot.v1' : 'recall.snapshot.pre-folders.v1';
+    localStorage.setItem(key, JSON.stringify(safeSnapshot(raw)));
+    await commitMemory(current => current);
+    expect(mocks.saveSnapshot).toHaveBeenCalledOnce();
+    expect(mocks.setState).toHaveBeenCalledOnce();
+  });
+
+  it.each([null, [], { settings: null }, { settings: [] }, { settings: 'invalid' }, {}])('preserves invalid backup structure rather than silently replacing it: %j', value => {
+    const source = JSON.stringify(value);
+    localStorage.setItem('recall.snapshot.pre-folders.v1', source);
+    return expect(commitMemory(current => current)).rejects.toThrow('已保留原始数据').then(() => {
+      expect(localStorage.getItem('recall.snapshot.pre-folders.v1')).toBe(source);
+      expect(mocks.saveSnapshot).not.toHaveBeenCalled();
+      expect(mocks.setState).not.toHaveBeenCalled();
+    });
   });
 });

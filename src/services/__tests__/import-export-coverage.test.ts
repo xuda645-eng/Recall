@@ -1235,7 +1235,7 @@ describe("buildExportPayload - additional coverage", () => {
     expect(payload.exportedAt <= after).toBe(true);
   });
 
-  it("preserves all snapshot fields in the payload", () => {
+  it("preserves snapshot data while clearing device sync credentials in the payload", () => {
     const session = makeStudySession();
     const log = makeReviewLog();
     const snapshot = makeSnapshot({
@@ -1247,6 +1247,7 @@ describe("buildExportPayload - additional coverage", () => {
 
     expect(payload.studySessions).toEqual([session]);
     expect(payload.reviewLogs).toEqual([log]);
-    expect(payload.settings).toEqual(snapshot.settings);
+    expect(payload.settings).not.toBe(snapshot.settings);
+    expect(payload.settings).toEqual({ ...snapshot.settings, syncCode: null, syncEnabled: false, syncRelayUrl: "" });
   });
 });

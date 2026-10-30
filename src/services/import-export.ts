@@ -3,7 +3,7 @@
  * @description Serialization, validation, and merge for .recall export files.
  * @entryPoints exportDeckToJson, parseImportPayload, mergeImportPayload, buildExportPayload, validateImportSnapshot
  * @crypto Calls crypto.encryptData/decryptData for image payloads.
- * @sideEffects Writes buildExportPayload(result) to disk (backup/sync). Never includes syncCode in exports — repo layer strips it.
+ * @sideEffects File helpers write backup/package data. buildExportPayload clears device sync credentials at the export boundary.
  */
 import { folderPath, validateTree } from '@/lib/memory-folders';
 import type { Card, Deck, RecallExportPayload, RecallStateSnapshot, ReviewLog, StudySession } from "@/types";
@@ -355,7 +355,12 @@ export function buildExportPayload(snapshot: RecallStateSnapshot, exportedAt = n
     cards: snapshot.cards,
     studySessions: snapshot.studySessions,
     reviewLogs: snapshot.reviewLogs,
-    settings: snapshot.settings,
+    settings: {
+      ...snapshot.settings,
+      syncCode: null,
+      syncEnabled: false,
+      syncRelayUrl: "",
+    },
   };
 }
 

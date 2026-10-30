@@ -76,6 +76,47 @@ describe("import/export", () => {
     expect(payload.cards).toHaveLength(1);
   });
 
+  it.each(["smart", "fixed"] as const)("redacts sync credentials while preserving ordinary data and the %s review plan", mode => {
+    const syncKey = "test-only-sync-key-do-not-use";
+    const live = structuredClone(snapshot);
+    live.settings = {
+      ...live.settings,
+      syncCode: syncKey,
+      syncEnabled: true,
+      syncRelayUrl: "https://test.invalid/relay",
+      dailyGoal: 42,
+      desiredRetention: 0.95,
+      ttsEnabled: true,
+      fsrsWeights: [1, 2, 3],
+      reviewPlan: {
+        mode,
+        intervals: { again: 60_000, hard: 86_400_000, good: 2_592_000_000, easy: 15_552_000_000 },
+      },
+    };
+    live.cards[0] = {
+      ...live.cards[0],
+      archivedAt: "2026-10-31T04:00:00.000Z",
+      source: "test-only source",
+      sourceRef: { provider: "weread", bookId: "test-book", bookmarkId: "test-bookmark", chapterUid: "test-chapter" },
+    };
+    const before = structuredClone(live);
+    const payload = buildExportPayload(live, new Date("2026-10-31T05:00:00.000Z"));
+    const json = JSON.stringify(payload);
+    const parsed = parseImportPayload(json);
+
+    expect(json).not.toContain(syncKey);
+    expect(payload.settings).not.toBe(live.settings);
+    expect(parsed.settings).toEqual({ ...before.settings, syncCode: null, syncEnabled: false, syncRelayUrl: "" });
+    expect(parsed.settings.reviewPlan).toEqual(before.settings.reviewPlan);
+    expect(parsed.cards).toEqual(before.cards);
+    expect(parsed.cards[0].archivedAt).toBe(before.cards[0].archivedAt);
+    expect(parsed.cards[0].sourceRef).toEqual(before.cards[0].sourceRef);
+    expect(parsed.decks).toEqual(before.decks);
+    expect(parsed.reviewLogs).toEqual(before.reviewLogs);
+    expect(parsed.studySessions).toEqual(before.studySessions);
+    expect(live).toEqual(before);
+  });
+
   it("rejects malformed import payloads", () => {
     expect(() => parseImportPayload('{"version":2,"decks":"bad"}')).toThrow("Invalid import file");
     expect(() =>
