@@ -4,7 +4,7 @@
 
 # Recall
 
-[![CI](https://github.com/Madlezz/Recall/actions/workflows/ci.yml/badge.svg)](https://github.com/Madlezz/Recall/actions/workflows/ci.yml)
+[![CI](https://github.com/xuda645-eng/Recall/actions/workflows/ci.yml/badge.svg)](https://github.com/xuda645-eng/Recall/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Madlezz/Recall)](https://github.com/Madlezz/Recall/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20PWA-blue)](https://github.com/Madlezz/Recall/releases/latest)
@@ -12,6 +12,18 @@
 **Recall** is FSRS-grade spaced repetition that makes you want to come back. No manual, no account, your data stays yours. Built-in streaks, XP, and focus rituals turn review into a habit - not a chore. Available as a desktop app (Windows / macOS / Linux) and a PWA on mobile.
 
 </div>
+
+## iPhone 15 中文 PWA
+
+此分支的浏览器入口按已确认的 v5 原型实现，优先适配 iPhone 15 的 393 x 852 CSS 像素竖屏。桌面 Tauri 保留原界面。
+
+- 在线入口：[Recall PWA](https://xuda645-eng.github.io/Recall/)。首次联网加载后支持离线温习，无须和电脑连接同一个 Wi-Fi。
+- 温习流程：先回忆，显示答案，再评分。可选择 FSRS 智能调度或自定义固定四档，默认固定档位为 1 分钟、1 天、30 天、180 天。
+- 归档当前卡片后不再安排复习，提供 3 秒撤销；独立归档库可以阅读原文和移出归档，保留原排期与历史。
+- 支持多级卡组、Markdown 增量导入和微信读书 Skill 导出的 JSON。微信读书划线原文不改写，章节是来源信息。
+- 数据保存在当前浏览器本机，不会随代码推送到 GitHub。换设备、换域名或清理浏览器前，请在设置中备份 `.recall` 文件。
+
+安装、导入与验证边界见 [PWA 使用说明](docs/PWA.md) 和 [微信读书导入契约](docs/WEREAD_IMPORT.md)。下方旧截图及部分功能说明对应保留的桌面界面，不代表当前手机 PWA。
 
 ## Documentation
 

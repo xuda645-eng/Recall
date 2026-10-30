@@ -61,6 +61,7 @@ function ClozeContent({ content, revealed }: { content: string; revealed: boolea
 
 /** Resolves recall:// images asynchronously with loading placeholder */
 function RecallImage({ filename, alt }: { filename: string; alt?: string }): JSX.Element {
+  const { t } = useTranslation();
   const [src, setSrc] = useState<string>("");
 
   useEffect(() => {
@@ -74,7 +75,7 @@ function RecallImage({ filename, alt }: { filename: string; alt?: string }): JSX
   if (!src) {
     return (
       <span className="inline-flex items-center gap-2 rounded border border-dashed border-muted-foreground/30 bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-        🖼️ {alt || "Loading image..."}
+        {alt || t("richCard.loadingImage", "正在加载图片")}
       </span>
     );
   }
@@ -159,7 +160,7 @@ export function RichCard({ content, isBack = false, cardType = "basic", revealed
             if (src && (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("//"))) {
               return (
                 <span className="inline-flex items-center gap-2 rounded border border-dashed border-muted-foreground/30 bg-muted/50 px-3 py-2 text-sm text-muted-foreground" title={src}>
-                  🚫 Remote image blocked (privacy)
+                  {t("richCard.remoteImageBlocked", "已阻止远程图片加载")}
                 </span>
               );
             }

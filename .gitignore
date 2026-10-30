@@ -2,6 +2,10 @@ node_modules
 dist
 src-tauri/target
 .env
+.env.*
+!.env.example
+*.credentials.env
+*.pem
 .DS_Store
 Thumbs.db
 *.local

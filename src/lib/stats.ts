@@ -12,11 +12,11 @@ export interface DeckStats {
 }
 
 export function isCardDue(card: Card, at = new Date()): boolean {
-  return !isAfter(parseISO(card.nextReviewDate), at);
+  return !card.archivedAt && !isAfter(parseISO(card.nextReviewDate), at);
 }
 
 export function isCardDueToday(card: Card, at = new Date()): boolean {
-  return !isAfter(parseISO(card.nextReviewDate), endOfDay(at));
+  return !card.archivedAt && !isAfter(parseISO(card.nextReviewDate), endOfDay(at));
 }
 
 export function getDeckStats(deck: Deck, cards: Card[]): DeckStats {

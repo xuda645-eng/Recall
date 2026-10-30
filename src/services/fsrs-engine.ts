@@ -98,7 +98,7 @@ export function previewIntervals(
 
 export function getDueCards(cards: Card[], now = new Date()): Card[] {
   return cards
-    .filter((card) => new Date(card.nextReviewDate) <= now)
+    .filter((card) => !card.archivedAt && new Date(card.nextReviewDate) <= now)
     .sort(
       (a, b) =>
         new Date(a.nextReviewDate).getTime() -

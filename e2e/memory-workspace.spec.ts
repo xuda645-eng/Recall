@@ -1,0 +1,401 @@
+import { test, expect, type Page } from '@playwright/test';
+import { createSeedSnapshot } from '../src/data/seed';
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { extname, resolve, sep } from 'node:path';
+
+const at = '2026-10-01T00:00:00.000Z';
+const longFront = '为什么主动回忆有帮助？\n\n' + '先隐藏答案，尝试用自己的话说明原理与条件。\n\n'.repeat(40);
+const longBack = '因为复述会暴露遗漏。\n\n' + '对照原文，找到概念之间的关系，再重新表达。\n\n'.repeat(45);
+function fixture() {
+  const seed = createSeedSnapshot();
+  const decks = [
+    { ...seed.decks[0], id: 'root', name: '回忆方法', parentId: null, importedAt: at },
+    { ...seed.decks[1], id: 'leaf', name: '阅读练习', parentId: 'root', importedAt: at },
+  ];
+  const cards = [
+    { ...seed.cards[0], id: 'first', deckId: 'leaf', cardType: 'basic' as const, contentKind: 'qa' as const, front: longFront, back: longBack, state: 'new' as const, lastReviewDate: null, nextReviewDate: at, stability: 0, difficulty: 0, reps: 0, lapses: 0, learningSteps: 0, scheduledDays: 0, importedAt: at },
+    { ...seed.cards[0], id: 'second', deckId: 'leaf', cardType: 'basic' as const, contentKind: 'qa' as const, front: '如何检查理解？', back: '合上材料，独立解释。', difficulty: 5, nextReviewDate: at, importedAt: at },
+    { ...seed.cards[0], id: 'archived', deckId: 'leaf', cardType: 'basic' as const, contentKind: 'qa' as const, front: '归档示例', back: '仍保留原文。', difficulty: 5, nextReviewDate: at, archivedAt: at, importedAt: at },
+  ];
+  return { ...seed, decks, cards, reviewLogs: [], studySessions: [], settings: { ...seed.settings, onboardingComplete: true, reviewPlan: { mode: 'fixed' as const, intervals: { again: 60000, hard: 86400000, good: 2592000000, easy: 15552000000 } } } };
+}
+async function snapshot(page: Page) {
+  return page.evaluate(() => JSON.parse(localStorage.getItem('recall.snapshot.v1') || 'null'));
+}
+async function seedPage(page: Page, data = fixture(), hash = 'home', entry = './') {
+  await page.goto(entry);
+  await expect(page.locator('.memory-app')).toBeVisible();
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+  await page.waitForLoadState('networkidle');
+  await page.evaluate(({ value, route }) => { localStorage.clear(); localStorage.setItem('recall.snapshot.v1', JSON.stringify(value)); window.location.hash = route; }, { value: data, route: hash });
+  await page.reload();
+  await expect(page.locator('.memory-app')).toBeVisible();
+  await page.waitForLoadState('networkidle');
+}
+async function serveIsolatedBuild() {
+  const root = resolve(process.cwd(), 'dist');
+  const mime: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff': 'font/woff', '.woff2': 'font/woff2' };
+  const server = createServer(async (request, response) => {
+    try {
+      const pathname = new URL(request.url || '/', 'http://localhost').pathname;
+      if (!pathname.startsWith('/Recall/')) { response.writeHead(404).end(); return; }
+      const file = resolve(root, pathname === '/Recall/' ? 'index.html' : decodeURIComponent(pathname.slice('/Recall/'.length)));
+      if (!file.startsWith(root + sep)) { response.writeHead(404).end(); return; }
+      const contents = await readFile(file);
+      response.writeHead(200, { 'Content-Type': mime[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' }).end(contents);
+    } catch { response.writeHead(404).end(); }
+  });
+  await new Promise<void>((ready, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', ready); });
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('隔离服务器未能启动');
+  let stopped = false;
+  return {
+    url: `http://127.0.0.1:${address.port}/Recall/`,
+    stop: async () => { if (stopped) return; stopped = true; server.closeAllConnections(); await new Promise<void>((done, reject) => server.close(error => error ? reject(error) : done())); },
+  };
+}
+async function navigate(page: Page, label: string) {
+  const drawer = page.locator('#memory-drawer');
+  if (await page.getByRole('button', { name: '打开项目菜单', exact: true }).isVisible()) await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
+  await drawer.getByRole('button', { name: label, exact: true }).click();
+  await expect(page.locator('.memory-shell')).not.toHaveClass(/is-open/);
+}
+async function noOverflow(page: Page) {
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+}
+async function startReading(page: Page) {
+  await page.getByRole('button', { name: '开始复习', exact: true }).click();
+  await expect(page.getByRole('button', { name: '显示答案', exact: true })).toBeVisible();
+}
+async function saveShot(page: Page, name: string) {
+  await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))));
+  await page.screenshot({ path: test.info().outputPath(`${name}.png`), scale: 'css' });
+}
+const runtimeErrors = new WeakMap<Page, string[]>();
+test.beforeEach(async ({ page }) => {
+  const errors: string[] = [];
+  runtimeErrors.set(page, errors);
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error' && /Error:|Minified React error|Maximum update depth/.test(message.text())) errors.push(message.text()); });
+});
+test.afterEach(async ({ page }) => {
+  if (await page.getByRole('heading', { name: '遇到一个问题', exact: true }).isVisible()) throw new Error(await page.locator('details').last().textContent() || '应用错误边界被触发');
+  expect(runtimeErrors.get(page)).toEqual([]);
+});
+
+test('新用户从空卡组开始，不自动展示个人或示例数据', async ({ page }) => {
+  await page.goto('./');
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+  await page.waitForLoadState('networkidle');
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '今天，温习一点。' })).toBeVisible();
+  expect((await snapshot(page)).cards).toEqual([]);
+  expect((await snapshot(page)).decks).toEqual([]);
+  await noOverflow(page);
+});
+
+test('iPhone15首页、48px共享Logo、静止抽屉和快速关闭恢复', async ({ page }) => {
+  await seedPage(page);
+  await saveShot(page, 'home');
+  const logo = page.locator('.m-brand');
+  const closed = await logo.boundingBox();
+  expect(closed?.width).toBe(48);
+  expect(closed?.height).toBe(48);
+  await logo.click();
+  await expect(page.locator('.memory-shell')).toHaveClass(/is-open/);
+  await expect.poll(async () => (await logo.boundingBox())!.x).toBeGreaterThan(300);
+  const drawer = await page.locator('#memory-drawer').boundingBox();
+  expect(drawer?.x).toBe(0);
+  expect(393 - drawer!.width).toBeGreaterThanOrEqual(64);
+  await saveShot(page, 'drawer');
+  await page.keyboard.press('Escape');
+  await expect.poll(async () => Math.round((await logo.boundingBox())!.x)).toBe(Math.round(closed!.x));
+  await expect(logo).toBeFocused();
+  for (let count = 0; count < 4; count++) { await logo.click(); await page.keyboard.press('Escape'); }
+  await expect.poll(async () => Math.round((await logo.boundingBox())!.x)).toBe(Math.round(closed!.x));
+  await noOverflow(page);
+});
+
+test('紧凑卡组目录、子树搜索、唯一筛选面板和底部复习入口', async ({ page }) => {
+  await seedPage(page, fixture(), 'folders');
+  const search = page.getByRole('searchbox', { name: '搜索当前范围及下级内容' });
+  expect((await search.boundingBox())!.y).toBeLessThan(95);
+  await page.locator('.m-folder-open').first().click();
+  await search.fill('独立解释');
+  await expect(page.locator('.memory-card-row')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: '筛选与排序', exact: true })).toHaveCount(1);
+  await page.getByRole('button', { name: '筛选与排序', exact: true }).click();
+  await page.getByRole('combobox', { name: '复习状态', exact: true }).selectOption('待复习');
+  await page.getByRole('button', { name: '应用', exact: true }).click();
+  await expect(page.locator('.m-library-dock')).toBeVisible();
+  await saveShot(page, 'library');
+  await noOverflow(page);
+});
+
+test('手动创建卡组与卡片，编辑不重置复习字段', async ({ page }) => {
+  await seedPage(page, fixture(), 'folders');
+  await page.getByRole('button', { name: '添加', exact: true }).first().click();
+  await page.getByRole('button', { name: '新建卡组', exact: true }).click();
+  await page.getByLabel('名称', { exact: true }).fill('新的知识');
+  await page.getByRole('button', { name: '保存修改', exact: true }).click();
+  await expect.poll(async () => (await snapshot(page)).decks.length).toBe(3);
+  await page.getByRole('button', { name: '添加', exact: true }).first().click();
+  await page.getByRole('button', { name: '添加卡片', exact: true }).click();
+  await page.getByLabel('问题或段落标题（摘录可空）', { exact: true }).fill('新的问题');
+  await page.getByLabel('正文', { exact: true }).fill('新的答案');
+  await page.getByRole('button', { name: '保存修改', exact: true }).click();
+  await expect.poll(async () => (await snapshot(page)).cards.length).toBe(4);
+  await navigate(page, '全部卡片');
+  await page.getByRole('button', { name: '管理卡片：如何检查理解？', exact: true }).click();
+  await page.getByRole('button', { name: '编辑卡片', exact: true }).click();
+  await page.getByRole('textbox', { name: '正文', exact: true }).fill('更新正文，但保留进度。');
+  await page.getByRole('button', { name: '保存修改', exact: true }).click();
+  const updated = (await snapshot(page)).cards.find((card: { id: string }) => card.id === 'second');
+  expect(updated.reps).toBe(fixture().cards[1].reps);
+  expect(updated.nextReviewDate).toBe(at);
+});
+
+test('长正反面仅卡片内部滚动，纵向手势不翻面或评分', async ({ page, browserName, context }) => {
+  await seedPage(page);
+  await startReading(page);
+  const face = page.locator('.m-reading[data-active="true"]');
+  expect(await face.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+  if (browserName === 'chromium') {
+    const client = await context.newCDPSession(page);
+    const box = (await face.boundingBox())!;
+    await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: box.x + 100, y: box.y + box.height - 40 }] });
+    for (let step = 1; step < 9; step++) { await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: box.x + 100, y: box.y + box.height - 40 - step * 24 }] }); await page.waitForTimeout(25); }
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } else {
+    await face.evaluate(element => { const box = element.getBoundingClientRect(); element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: box.x + 60, clientY: box.y + 250 })); element.scrollTop = 200; element.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: box.x + 62, clientY: box.y + 50 })); element.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: box.x + 62, clientY: box.y + 50 })); });
+  }
+  await expect.poll(async () => face.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  await expect(page.getByRole('button', { name: '显示答案', exact: true })).toBeVisible();
+  expect((await snapshot(page)).reviewLogs).toHaveLength(0);
+  await page.getByRole('button', { name: '显示答案', exact: true }).click();
+  expect(await face.evaluate(element => element.scrollTop)).toBe(0);
+  expect(await face.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+  await saveShot(page, 'reader');
+  await noOverflow(page);
+});
+
+test('固定四档预览、按点击时间调度、撤销评分与刷新持久化', async ({ page }) => {
+  await seedPage(page);
+  await startReading(page);
+  await page.getByRole('button', { name: '显示答案', exact: true }).click();
+  for (const [rating, text] of [['again', '1 分钟'], ['hard', '1 天'], ['good', '30 天'], ['easy', '180 天']]) {
+    await expect(page.locator(`[data-rating="${rating}"]`)).toContainText(text);
+    const box = (await page.locator(`[data-rating="${rating}"]`).boundingBox())!;
+    expect(box.width).toBeGreaterThanOrEqual(44);
+    expect(box.height).toBeGreaterThanOrEqual(44);
+  }
+  await page.waitForTimeout(1000);
+  const clickedAt = Date.now();
+  await page.locator('[data-rating="again"]').click();
+  await expect.poll(async () => (await snapshot(page)).reviewLogs.length).toBe(1);
+  const card = (await snapshot(page)).cards.find((item: { id: string }) => item.id === 'first');
+  expect(Date.parse(card.nextReviewDate) - clickedAt).toBeGreaterThanOrEqual(59000);
+  expect(Date.parse(card.nextReviewDate) - clickedAt).toBeLessThan(64000);
+  await page.getByRole('button', { name: '撤销上次评分', exact: true }).click();
+  await expect.poll(async () => (await snapshot(page)).reviewLogs.length).toBe(0);
+  expect((await snapshot(page)).cards.find((item: { id: string }) => item.id === 'first').reps).toBe(0);
+  await page.reload();
+  expect((await snapshot(page)).settings.reviewPlan.mode).toBe('fixed');
+});
+
+test('复习计划配置保留既有排期，只改变未来评分', async ({ page }) => {
+  await seedPage(page, fixture(), 'settings');
+  await page.getByRole('button', { name: '配置', exact: true }).click();
+  await saveShot(page, 'review-plan');
+  await page.getByRole('radio', { name: /智能/ }).check();
+  await page.getByRole('button', { name: /保存/ }).last().click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect((await snapshot(page)).settings.reviewPlan.mode).toBe('smart');
+  expect((await snapshot(page)).cards[0].nextReviewDate).toBe(at);
+});
+
+test('旧卡片无效排期仅阻止评分，仍能阅读与归档且不改写进度', async ({ page }) => {
+  const data = fixture();
+  data.cards[1].difficulty = 0.8;
+  await seedPage(page, data);
+  await startReading(page);
+  await page.getByRole('button', { name: '下一张', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('暂不能评分');
+  await page.getByRole('button', { name: '显示答案', exact: true }).click();
+  await expect(page.locator('.m-reading[data-active="true"]')).toContainText('合上材料，独立解释');
+  await expect(page.locator('[data-rating="good"]')).toBeDisabled();
+  await page.getByRole('button', { name: '归档当前卡片', exact: true }).click();
+  await expect.poll(async () => !!(await snapshot(page)).cards[1].archivedAt).toBe(true);
+  expect((await snapshot(page)).cards[1].difficulty).toBe(0.8);
+  expect((await snapshot(page)).reviewLogs).toHaveLength(0);
+});
+
+test('归档切到下一张，3秒内撤销回到原卡且保留进度历史', async ({ page }) => {
+  await seedPage(page);
+  await startReading(page);
+  await page.getByRole('button', { name: '归档当前卡片', exact: true }).click();
+  await expect.poll(async () => !!(await snapshot(page)).cards[0].archivedAt).toBe(true);
+  await expect(page.locator('.m-reading[data-active="true"]')).toContainText('如何检查理解');
+  await page.getByRole('button', { name: /撤销归档，剩余/ }).click();
+  await expect(page.locator('.m-reading[data-active="true"]')).toContainText('为什么主动回忆');
+  expect((await snapshot(page)).cards[0].archivedAt).toBeUndefined();
+  expect((await snapshot(page)).cards[0].reps).toBe(0);
+  expect((await snapshot(page)).reviewLogs).toHaveLength(0);
+});
+
+test('后悔药到期后通过独立归档库查看原文并恢复', async ({ page }) => {
+  await seedPage(page);
+  await startReading(page);
+  await page.getByRole('button', { name: '归档当前卡片', exact: true }).click();
+  await expect(page.locator('.m-archive-undo')).toBeVisible();
+  await expect(page.locator('.m-archive-undo')).toHaveCount(0, { timeout: 5000 });
+  await navigate(page, '已归档');
+  await expect(page.locator('.memory-card-row')).toHaveCount(2);
+  await page.locator('[data-card-id="first"] .m-card-open').click();
+  await expect(page.getByRole('dialog')).toContainText('因为复述会暴露遗漏');
+  await page.getByRole('dialog').getByRole('button', { name: '移出归档', exact: true }).click();
+  await expect.poll(async () => !!(await snapshot(page)).cards[0].archivedAt).toBe(false);
+  expect((await snapshot(page)).cards[0].nextReviewDate).toBe(at);
+  await saveShot(page, 'archive');
+});
+
+test('连续归档仅撤销最近一张，最后一张归档后可恢复', async ({ page }) => {
+  await seedPage(page);
+  await startReading(page);
+  await page.getByRole('button', { name: '归档当前卡片', exact: true }).click();
+  await expect(page.locator('.m-reading[data-active="true"]')).toContainText('如何检查理解');
+  await page.getByRole('button', { name: '归档当前卡片', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '本轮完成' })).toBeVisible();
+  await page.getByRole('button', { name: /撤销归档，剩余/ }).click();
+  await expect(page.locator('.m-reading[data-active="true"]')).toContainText('如何检查理解');
+  expect((await snapshot(page)).cards[0].archivedAt).toBeTruthy();
+  expect((await snapshot(page)).cards[1].archivedAt).toBeUndefined();
+});
+
+test('归档后继续评分再撤销归档，不覆盖新评分记录', async ({ page }) => {
+  await seedPage(page);
+  await startReading(page);
+  await page.getByRole('button', { name: '归档当前卡片', exact: true }).click();
+  await page.getByRole('button', { name: '显示答案', exact: true }).click();
+  await page.locator('[data-rating="good"]').click();
+  await page.getByRole('button', { name: /撤销归档，剩余/ }).click();
+  const data = await snapshot(page);
+  expect(data.cards[0].archivedAt).toBeUndefined();
+  expect(data.reviewLogs).toHaveLength(1);
+  expect(data.reviewLogs[0].cardId).toBe('second');
+});
+
+test('Markdown预览、增量更新与归档状态和排期保留', async ({ page }) => {
+  await seedPage(page, fixture(), 'import');
+  const file = (back: string) => ({ name: 'test.md', mimeType: 'text/markdown', buffer: Buffer.from(`# 测试书\n\n<!-- recall:card {"id":"markdown-card"} -->\n问题：测试问题\n\n${back}\n\n<!-- recall:end -->\n`) });
+  await page.locator('input[type="file"]').setInputFiles(file('原始正文'));
+  await expect(page.getByText('原始正文', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '确认导入', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
+  expect((await snapshot(page)).cards).toHaveLength(4);
+  const stored = await snapshot(page);
+  const imported = stored.cards.find((card: { front: string }) => card.front === '测试问题');
+  imported.archivedAt = at; imported.reps = 7; imported.nextReviewDate = '2027-01-01T00:00:00.000Z';
+  await seedPage(page, stored, 'import');
+  await page.locator('input[type="file"]').setInputFiles(file('更新正文'));
+  await expect(page.getByText('检测到变化', { exact: true })).toBeVisible();
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', { name: '确认导入', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
+  const updated = (await snapshot(page)).cards.find((card: { id: string }) => card.id === imported.id);
+  expect(updated.back).toBe('更新正文'); expect(updated.reps).toBe(7); expect(updated.archivedAt).toBe(at); expect(updated.nextReviewDate).toBe('2027-01-01T00:00:00.000Z');
+});
+
+test('微信读书按书导入、章节元数据、原文不改写及重复导入保留状态', async ({ page }) => {
+  await seedPage(page, fixture(), 'weread');
+  const markText = '  原文第一行。\n\n原文第二行。  ';
+  const file = { name: 'weread.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'recall-weread-export-v1', books: [{ bookId: 'book-test', title: '测试书', highlights: [{ bookmarkId: 'highlight-1', markText, chapterUid: 'chapter-1', chapterTitle: '第一章', question: '这个结论的条件是什么？', recallKind: 'qa' }] }] })) };
+  async function load() {
+    await page.locator('input[type="file"]').setInputFiles(file);
+    await page.getByRole('checkbox').check();
+    await page.getByRole('button', { name: '预览并编辑回忆卡', exact: true }).click();
+    await page.getByRole('button', { name: '检查导入变化', exact: true }).click();
+    await saveShot(page, 'weread-preview');
+    await page.getByRole('button', { name: '确认导入', exact: true }).click();
+    await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'folders');
+  }
+  await load();
+  const stored = await snapshot(page);
+  const imported = stored.cards.find((card: { sourceRef?: { bookId: string } }) => card.sourceRef?.bookId === 'book-test');
+  expect(imported.back).toBe(markText); expect(imported.chapter).toBe('第一章');
+  expect(stored.decks.filter((deck: { name: string }) => deck.name === '第一章')).toHaveLength(0);
+  imported.archivedAt = at; imported.reps = 8;
+  await seedPage(page, stored, 'weread');
+  await load();
+  const updated = (await snapshot(page)).cards.find((card: { id: string }) => card.id === imported.id);
+  expect(updated.back).toBe(markText); expect(updated.archivedAt).toBe(at); expect(updated.reps).toBe(8);
+  expect((await snapshot(page)).cards).toHaveLength(4);
+});
+
+test('带凭证的微信读书文件被拒绝，不落库', async ({ page }) => {
+  await seedPage(page, fixture(), 'weread');
+  await page.locator('input[type="file"]').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'recall-weread-export-v1', apiKey: 'test-only-not-a-real-key', books: [] })) });
+  await expect(page.getByRole('alert')).toBeVisible();
+  expect((await snapshot(page)).cards).toHaveLength(3);
+});
+
+test('安全区、窄屏、760断点、横屏和桌面无溢出或固定控件覆盖', async ({ page }) => {
+  await seedPage(page);
+  await startReading(page);
+  await page.getByRole('button', { name: '显示答案', exact: true }).click();
+  await page.locator('.memory-app').evaluate(element => { (element as HTMLElement).style.setProperty('--safe-top', '59px'); (element as HTMLElement).style.setProperty('--safe-bottom', '34px'); });
+  const button = (await page.locator('[data-rating="good"]').boundingBox())!;
+  expect(button.y + button.height).toBeLessThanOrEqual(852 - 34);
+  expect((await page.locator('.m-brand').boundingBox())!.y).toBe(59);
+  await saveShot(page, 'safe-areas');
+  for (const size of [{ width: 320, height: 568 }, { width: 760, height: 852 }, { width: 761, height: 852 }, { width: 852, height: 393 }, { width: 1440, height: 900 }]) {
+    await page.setViewportSize(size);
+    await noOverflow(page);
+    const footer = (await page.locator('.m-study-footer').boundingBox())!;
+    expect(footer.y + footer.height).toBeLessThanOrEqual(size.height + 1);
+    expect((await page.locator('.m-card-window').boundingBox())!.height).toBeGreaterThan(40);
+  }
+});
+
+test('表单焦点约束、Escape关闭和来源字号保留', async ({ page }) => {
+  await seedPage(page);
+  await startReading(page);
+  await page.getByRole('button', { name: '卡片与复习选项', exact: true }).click();
+  await page.getByRole('button', { name: '阅读字号', exact: true }).click();
+  await page.getByRole('combobox', { name: '正文字号', exact: true }).selectOption('22');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '卡片与复习选项', exact: true })).toBeFocused();
+  expect(await page.locator('.m-reading[data-active="true"]').evaluate(element => getComputedStyle(element).fontSize)).toBe('22px');
+});
+
+test('PWA子路径manifest、Service Worker及断网重开和复习持久化', async ({ page, context, browserName }) => {
+  const isolated = browserName === 'webkit' ? await serveIsolatedBuild() : null;
+  try {
+  await seedPage(page, fixture(), 'home', isolated?.url || './');
+  const url = new URL(await page.locator('link[rel="manifest"]').getAttribute('href') || '', page.url());
+  const response = await context.request.get(url.href);
+  const manifest = await response.json();
+  expect(manifest.display).toBe('standalone'); expect(manifest.theme_color).toBe('#353532');
+  const base = new URL('./', page.url()).pathname;
+  expect(manifest.start_url).toBe(base); expect(manifest.scope).toBe(base);
+  for (const icon of manifest.icons) expect((await context.request.get(new URL(icon.src, page.url()).href)).status()).toBe(200);
+  await page.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration())?.active, undefined, { timeout: 20000 });
+  await page.reload();
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+  await page.waitForLoadState('networkidle');
+  if (isolated) {
+    await isolated.stop();
+    await expect(context.request.get(isolated.url + 'uncached-offline-probe', { timeout: 1000 })).rejects.toThrow();
+  } else await context.setOffline(true);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '今天，温习一点。' })).toBeVisible();
+  await startReading(page);
+  await page.getByRole('button', { name: '显示答案', exact: true }).click();
+  await page.locator('[data-rating="good"]').click();
+  await expect.poll(async () => (await snapshot(page)).reviewLogs.length).toBe(1);
+  await saveShot(page, 'offline');
+  } finally { await context.setOffline(false); await isolated?.stop(); }
+});

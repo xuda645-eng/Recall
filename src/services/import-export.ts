@@ -5,6 +5,7 @@
  * @crypto Calls crypto.encryptData/decryptData for image payloads.
  * @sideEffects Writes buildExportPayload(result) to disk (backup/sync). Never includes syncCode in exports — repo layer strips it.
  */
+import { folderPath, validateTree } from '@/lib/memory-folders';
 import type { Card, Deck, RecallExportPayload, RecallStateSnapshot, ReviewLog, StudySession } from "@/types";
 import { isCardState, isDeckColor, isReviewRating } from "@/lib/domain";
 import { createId, normalizeName } from "@/lib/utils";
@@ -375,8 +376,10 @@ export function parseImportPayload(raw: string): RecallExportPayload {
 }
 
 export function mergeImportPayload(current: RecallStateSnapshot, incoming: RecallExportPayload): RecallStateSnapshot {
+  validateTree(incoming.decks);
   const deckIdMap = new Map<string, string>();
-  const decksByName = new Map(current.decks.map((deck) => [normalizeName(deck.name).toLowerCase(), deck]));
+  const deckPathKey = (decks:Deck[],deck:Deck):string => JSON.stringify(folderPath(decks,deck.id).map(d=>normalizeName(d.name).toLowerCase()));
+  const decksByName = new Map(current.decks.map((deck) => [deckPathKey(current.decks,deck), deck]));
   const nextDecks = [...current.decks];
   const nextCards = [...current.cards];
   const nextStudySessions = [...current.studySessions];
@@ -386,20 +389,22 @@ export function mergeImportPayload(current: RecallStateSnapshot, incoming: Recal
   const existingCardKeys = new Set(
     current.cards.map((card) => {
       const deck = currentDecksById.get(card.deckId);
-      return duplicateKey(deck?.name ?? "", card.front);
+      return JSON.stringify([deck?.id ?? '', normalizeName(card.front).toLowerCase(), card.contentKind==='excerpt'?card.back:'']);
     }),
   );
 
-  for (const incomingDeck of incoming.decks) {
-    const existing = decksByName.get(normalizeName(incomingDeck.name).toLowerCase());
+  const orderedDecks=incoming.decks.slice().sort((a,b)=>folderPath(incoming.decks,a.id).length-folderPath(incoming.decks,b.id).length);
+  for (const incomingDeck of orderedDecks) {
+    const key=deckPathKey(incoming.decks,incomingDeck);
+    const existing = decksByName.get(key);
     if (existing) {
       deckIdMap.set(incomingDeck.id, existing.id);
       continue;
     }
 
-    const nextDeck = ensureDeckId(incomingDeck, nextDecks);
+    const nextDeck = ensureDeckId({...incomingDeck,parentId:incomingDeck.parentId?deckIdMap.get(incomingDeck.parentId)??null:null}, nextDecks);
     nextDecks.push(nextDeck);
-    decksByName.set(normalizeName(nextDeck.name).toLowerCase(), nextDeck);
+    decksByName.set(key, nextDeck);
     deckIdMap.set(incomingDeck.id, nextDeck.id);
   }
 
@@ -410,7 +415,7 @@ export function mergeImportPayload(current: RecallStateSnapshot, incoming: Recal
       continue;
     }
 
-    const key = duplicateKey(deck.name, incomingCard.front);
+    const key = JSON.stringify([deck.id,normalizeName(incomingCard.front).toLowerCase(),incomingCard.contentKind==='excerpt'?incomingCard.back:'']);
     if (existingCardKeys.has(key)) {
       continue;
     }
@@ -472,9 +477,6 @@ export function mergeImportPayload(current: RecallStateSnapshot, incoming: Recal
   };
 }
 
-function duplicateKey(deckName: string, front: string): string {
-  return `${normalizeName(deckName).toLowerCase()}::${normalizeName(front).toLowerCase()}`;
-}
 
 function ensureDeckId(deck: Deck, decks: Deck[]): Deck {
   if (!decks.some((item) => item.id === deck.id)) {

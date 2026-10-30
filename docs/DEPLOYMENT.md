@@ -4,8 +4,7 @@
 
 ### Prerequisites
 
-- Node.js 22 (`.node-version` pins `24.18.0` during active development; CI
-  uses `setup-node@22` at release time).
+- Node.js 22 or newer. `.node-version` pins `24.18.0`, and CI reads that file.
 - Rust stable toolchain.
 - Package manager: `pnpm`.
 - `pnpm install`, then `pnpm tauri build` to produce platform installers.
@@ -51,8 +50,29 @@ GitHub Pages, Cloudflare Pages, etc.).
 
 ### GitHub Pages
 
-`pages.yml` workflow deploys the `dist/` build to a `gh-pages` branch on push
-to `main`. Favicon, manifest, and icons are in `public/`.
+This fork publishes to `https://xuda645-eng.github.io/Recall/` using the
+`pages.yml` workflow on push to `main`. Configure repository Pages with
+**GitHub Actions** as the source, not a `gh-pages` branch. The workflow validates
+the web application, builds `dist/`, uploads a Pages artifact, and deploys it
+using GitHub's OIDC-backed Pages action. No third-party hosting, paid service,
+or API key is required for this static PWA.
+
+```bash
+pnpm install --frozen-lockfile
+pnpm exec tsc -b
+pnpm exec vite build --mode pages
+pnpm exec vite preview --mode pages --host 127.0.0.1 --port 4193 --strictPort
+```
+
+Pages mode sets the asset base, manifest start URL, scope, and icon paths to
+`/Recall/`. Default development mode uses `/`. Always use Pages mode for both
+the build and its preview. See `docs/PWA.md` for the primary mobile browser
+acceptance suite and physical iPhone checks.
+
+Do not upload `.env*`, credentials, private card batches, test snapshots, or
+internal handoff files. The production site starts with empty data and stores
+cards on the device. Changing host or origin does not migrate local browser
+data; export a `.recall` backup before switching URLs.
 
 ### PWA update prompt
 

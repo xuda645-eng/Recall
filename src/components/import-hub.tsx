@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { useRecallStore } from "@/stores/recall-store";
 import { toast } from "sonner";
 
-export function ImportHub(): JSX.Element {
+export function ImportHub({ onClose }: { onClose?: () => void } = {}): JSX.Element {
   const { t } = useTranslation();
   const showDashboard = useRecallStore((state) => state.showDashboard);
   const decks = useRecallStore((state) => state.decks);
@@ -104,7 +104,7 @@ export function ImportHub(): JSX.Element {
           {t("importHub.title")}
         </h1>
         <button
-          onClick={showDashboard}
+          onClick={onClose ?? showDashboard}
           aria-label={t("common.close")}
           className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container-low active:scale-95 transition-all"
         >

@@ -4,6 +4,8 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { PWAUpdatePrompt } from "@/components/pwa-update-prompt";
 import { useState, useEffect, lazy, Suspense } from "react";
 import { AppShell } from "@/components/app-shell";
+import { isTauriRuntime } from "@/db/client";
+const MemoryWorkspace = lazy(() => import("@/components/memory-workspace").then(m => ({ default: m.MemoryWorkspace })));
 import { Dashboard } from "@/components/dashboard";
 import { QuickAddDialog } from "@/components/quick-add";
 import { useRecallStore } from "@/stores/recall-store";
@@ -40,6 +42,7 @@ export function App(): JSX.Element {
   }, [initialize]);
 
   useEffect(() => {
+    if (!isTauriRuntime()) return;
     function handleKeyDown(event: KeyboardEvent): void {
       // Ignore if typing in an input/textarea
       const target = event.target as HTMLElement;
@@ -114,6 +117,10 @@ export function App(): JSX.Element {
         </div>
       </main>
     );
+  }
+
+  if (!isTauriRuntime()) {
+    return <ErrorBoundary><Suspense fallback={<main className="p-6">正在加载</main>}><MemoryWorkspace /></Suspense><Toaster richColors closeButton position="top-right" mobileOffset={{top:"calc(max(24px, env(safe-area-inset-top)) + 72px)",left:"16px",right:"16px"}}/></ErrorBoundary>;
   }
 
   return (

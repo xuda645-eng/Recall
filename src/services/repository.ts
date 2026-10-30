@@ -27,6 +27,8 @@ import { createSeedSnapshot } from "@/data/seed";
 import { isCardState, isCardType, isDeckColor, isReviewRating } from "@/lib/domain";
 import { normalizeName } from "@/lib/utils";
 import { mergeImportPayload } from "@/services/import-export";
+import { migrateFolders, validateTree } from "@/lib/memory-folders";
+import { normalizeMemoryReviewPlan } from "@/services/memory-review";
 import { DEFAULT_SHORTCUTS } from "@/lib/shortcuts";
 import { isWrappedSyncCode, sealSettingsSecrets, unsealSettingsSecrets } from "@/services/sync-secret";
 import type { Card, Deck, RecallExportPayload, RecallStateSnapshot, ReviewLog, StudySession, Theme } from "@/types";
@@ -118,7 +120,7 @@ export function validateImportSnapshot(snapshot: RecallStateSnapshot): void {
   const deckNames = new Set<string>();
 
   for (const deck of snapshot.decks) {
-    const deckName = normalizeName(deck.name).toLowerCase();
+    const deckName = JSON.stringify([deck.parentId ?? null, normalizeName(deck.name).toLowerCase()]);
     if (!deck.name.trim()) {
       throw new Error("Deck name is required");
     }
@@ -135,12 +137,13 @@ export function validateImportSnapshot(snapshot: RecallStateSnapshot): void {
     deckNames.add(deckName);
   }
 
+  validateTree(snapshot.decks);
   const cardIds = new Set<string>();
   for (const card of snapshot.cards) {
     if (!deckIds.has(card.deckId)) {
       throw new Error("Card references missing deck");
     }
-    if (!card.front.trim()) {
+    if (!card.front.trim() && card.contentKind !== "excerpt") {
           throw new Error("Card front is required");
         }
         const isCloze = /\{\{c\d+::[^}]+\}\}/.test(card.front);
@@ -180,6 +183,9 @@ export function validateImportSnapshot(snapshot: RecallStateSnapshot): void {
     if (card.lastReviewDate && isNaN(Date.parse(card.lastReviewDate))) {
       throw new Error(`Card ${card.id}: invalid lastReviewDate`);
     }
+    if (card.archivedAt && (typeof card.archivedAt !== 'string' || !Number.isFinite(Date.parse(card.archivedAt)))) {
+      throw new Error(`Card ${card.id}: invalid archivedAt`);
+    }
     // Tag count limit
     if (card.tags.length > 50) {
       throw new Error(`Card ${card.id}: too many tags (max 50)`);
@@ -188,8 +194,9 @@ export function validateImportSnapshot(snapshot: RecallStateSnapshot): void {
     if (card.front.length > 10000) {
       throw new Error(`Card ${card.id}: front content exceeds 10,000 characters`);
     }
-    if (card.back.length > 10000) {
-      throw new Error(`Card ${card.id}: back content exceeds 10,000 characters`);
+    const maxBack = card.contentKind ? 20000 : 10000;
+    if (card.back.length > maxBack) {
+      throw new Error(`Card ${card.id}: back content exceeds ${maxBack.toLocaleString('en-US')} characters`);
     }
     cardIds.add(card.id);
   }
@@ -623,7 +630,10 @@ class LocalStorageRecallRepository implements RecallRepository {
       return snapshot;
     }
 
-    return this.resetToSeedData();
+    const defaults = createSeedSnapshot();
+    const empty = { ...defaults, decks: [], cards: [], reviewLogs: [], studySessions: [], settings: { ...defaults.settings, onboardingComplete: true } };
+    await this.saveSnapshot(empty);
+    return empty;
   }
 
   async saveSnapshot(snapshot: RecallStateSnapshot): Promise<void> {
@@ -780,6 +790,7 @@ function migrateSettings(settings: Partial<RecallStateSnapshot["settings"]> & { 
         soundVolume: typeof settings.soundVolume === "number" ? settings.soundVolume : 100,
     allowHtml: typeof settings.allowHtml === "boolean" ? settings.allowHtml : false,
     desiredRetention: typeof settings.desiredRetention === "number" && settings.desiredRetention >= 0.7 && settings.desiredRetention <= 0.99 ? settings.desiredRetention : 0.9,
+    reviewPlan: settings.reviewPlan ? normalizeMemoryReviewPlan(settings.reviewPlan) : undefined,
         backupFolder: typeof settings.backupFolder === "string" ? settings.backupFolder : null,
         backupSchedule: (settings.backupSchedule === "daily" || settings.backupSchedule === "weekly") ? settings.backupSchedule : "never",
                 lastBackupAt: typeof settings.lastBackupAt === "string" ? settings.lastBackupAt : null,
@@ -815,12 +826,10 @@ function loadLocalSnapshot(): RecallStateSnapshot | null {
         validateImportSnapshot(snapshot);
         // Migrate settings to fill in fields added after the user's last save
         snapshot.settings = migrateSettings(snapshot.settings);
-        return snapshot;
+        return migrateFolders(snapshot);
   } catch (error) {
     // CRITICAL: Don't silently delete corrupted data - user loses everything
     console.error("Failed to load localStorage data:", error);
-    // Keep corrupted data in localStorage for potential recovery
-    // Return null to trigger seed data load, but user can export/import backup
-    return null;
+    throw new Error('本机数据无法读取，已保留原始数据。请先导出备份后恢复，不会用示例覆盖。', { cause: error });
   }
 }

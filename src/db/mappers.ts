@@ -1,5 +1,6 @@
 import type { Achievement, Card, CardState, CardType, Deck, DeckColor, RecallSettings, ReviewLog, ReviewRating, StudySession } from "@/types";
 import { SCHEMA_VERSION, isCardState, isCardType, isDeckColor, isReviewRating } from "@/lib/domain";
+import { normalizeMemoryReviewPlan } from "@/services/memory-review";
 
 export interface DeckRow {
   id: string;
@@ -206,6 +207,16 @@ export function settingsFromRows(rows: SettingRow[]): RecallSettings {
     if (raw) achievements = JSON.parse(raw);
   } catch { /* keep empty */ }
 
+  const reviewPlanRaw = values.get("review_plan");
+  let reviewPlan: RecallSettings["reviewPlan"] = undefined;
+  if (reviewPlanRaw) {
+    try {
+      reviewPlan = normalizeMemoryReviewPlan(JSON.parse(reviewPlanRaw));
+    } catch {
+      reviewPlan = normalizeMemoryReviewPlan(undefined);
+    }
+  }
+
   return {
       theme,
       accentColor: (values.get("accent_color") ?? "zinc") as RecallSettings["accentColor"],
@@ -221,6 +232,7 @@ export function settingsFromRows(rows: SettingRow[]): RecallSettings {
             soundVolume: parseInt(values.get("sound_volume") ?? "100", 10),
             allowHtml: values.get("allow_html") === "true",
     desiredRetention: Number(values.get("desired_retention")) || 0.9,
+    reviewPlan,
             backupFolder: values.get("backup_folder") || null,
                         backupSchedule: (values.get("backup_schedule") ?? "never") as "daily" | "weekly" | "never",
                                                 lastBackupAt: values.get("last_backup_at") || null,
@@ -258,6 +270,7 @@ export function settingsToRows(settings: RecallSettings): SettingRow[] {
     { key: "sound_volume", value: String(settings.soundVolume) },
     { key: "allow_html", value: String(settings.allowHtml) },
     { key: "desired_retention", value: String(settings.desiredRetention) },
+    { key: "review_plan", value: settings.reviewPlan === undefined ? "" : JSON.stringify(normalizeMemoryReviewPlan(settings.reviewPlan)) },
         { key: "backup_folder", value: settings.backupFolder ?? "" },
         { key: "backup_schedule", value: settings.backupSchedule },
                 { key: "last_backup_at", value: settings.lastBackupAt ?? "" },

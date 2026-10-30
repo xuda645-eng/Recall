@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { createSeedSnapshot } from "@/data/seed";
+import { DEFAULT_FIXED_INTERVALS } from "@/services/memory-review";
 import type { CardRow, DeckRow, ReviewLogRow, StudySessionRow } from "@/db/mappers";
 import {
   cardFromRow,
@@ -12,7 +14,7 @@ import {
   studySessionFromRow,
   studySessionToRow,
 } from "@/db/mappers";
-import type { Card, Deck, RecallSettings, ReviewLog, StudySession } from "@/types";
+import type { Card, Deck, MemoryReviewPlan, RecallSettings, ReviewLog, StudySession } from "@/types";
 
 describe("database mappers", () => {
   it("round-trips card rows with JSON tags and nullable review date", () => {
@@ -141,5 +143,70 @@ desiredRetention: 0.9,
 
     expect(() => cardFromRow(cardRow)).toThrow("Invalid card state");
     expect(() => reviewLogFromRow(reviewLogRow)).toThrow("Invalid review rating");
+  });
+});
+
+describe("review plan settings rows", () => {
+  const minute = 60_000;
+  const day = 86_400_000;
+  const defaults = { mode: "smart", intervals: DEFAULT_FIXED_INTERVALS };
+  const settings = createSeedSnapshot(new Date("2026-10-31T04:00:00.000Z")).settings;
+
+  it.each(["smart", "fixed"] as const)("round-trips a custom %s plan without changing other settings", mode => {
+    const reviewPlan = { mode, intervals: { again: minute, hard: 90 * minute, good: 30 * day, easy: 365 * day } };
+    const source = { ...settings, reviewPlan, desiredRetention: 0.95, fsrsWeights: [1, 2, 3] };
+    const before = structuredClone(source);
+    const rows = settingsToRows(source);
+    expect(rows).toContainEqual({ key: "review_plan", value: JSON.stringify(reviewPlan) });
+    const restored = settingsFromRows(rows);
+    expect(restored.reviewPlan).toEqual(reviewPlan);
+    expect(restored.desiredRetention).toBe(source.desiredRetention);
+    expect(restored.fsrsWeights).toEqual(source.fsrsWeights);
+    expect(source).toEqual(before);
+    expect(settingsToRows(restored)).toEqual(rows);
+  });
+
+  it("keeps legacy missing rows and explicitly absent plans undefined", () => {
+    expect(settingsFromRows([]).reviewPlan).toBeUndefined();
+    const rows = settingsToRows({ ...settings, reviewPlan: undefined });
+    expect(rows).toContainEqual({ key: "review_plan", value: "" });
+    expect(settingsFromRows(rows).reviewPlan).toBeUndefined();
+  });
+
+  it("clears an existing plan when settings are upserted with an absent plan", () => {
+    const existing = settingsToRows({ ...settings, reviewPlan: { mode: "fixed", intervals: DEFAULT_FIXED_INTERVALS } });
+    const upserted = new Map(existing.map(row => [row.key, row.value]));
+    for (const row of settingsToRows({ ...settings, reviewPlan: undefined })) upserted.set(row.key, row.value);
+    expect(settingsFromRows(Array.from(upserted, ([key, value]) => ({ key, value }))).reviewPlan).toBeUndefined();
+  });
+
+  it.each(["{broken", "undefined", " ", '{"mode":"fixed"'])("falls back safely for invalid JSON %j", value => {
+    const rows = settingsToRows({ ...settings, desiredRetention: 0.95 }).filter(row => row.key !== "review_plan");
+    const restored = settingsFromRows([...rows, { key: "review_plan", value }]);
+    expect(restored.reviewPlan).toEqual(defaults);
+    expect(restored.desiredRetention).toBe(0.95);
+  });
+
+  it.each([null, [], true, "fixed", { mode: "unknown" }])("normalizes invalid persisted plan shapes %j", plan => {
+    expect(settingsFromRows([{ key: "review_plan", value: JSON.stringify(plan) }]).reviewPlan).toEqual(defaults);
+  });
+
+  it.each([
+    { again: minute - 1 }, { again: minute + 0.5 }, { hard: minute },
+    { easy: 365 * day + 1 }, { hard: "86400000" }, { hard: undefined },
+  ])("uses fixed defaults for invalid persisted intervals %j", invalid => {
+    const plan = { mode: "fixed", intervals: { ...DEFAULT_FIXED_INTERVALS, ...invalid } };
+    expect(settingsFromRows([{ key: "review_plan", value: JSON.stringify(plan) }]).reviewPlan)
+      .toEqual({ mode: "fixed", intervals: DEFAULT_FIXED_INTERVALS });
+  });
+
+  it("normalizes outgoing invalid plans without mutating the caller", () => {
+    const reviewPlan = { mode: "fixed", intervals: { ...DEFAULT_FIXED_INTERVALS, hard: minute } } as MemoryReviewPlan;
+    const source = { ...settings, reviewPlan };
+    const before = structuredClone(source);
+    const rows = settingsToRows(source);
+    expect(JSON.parse(rows.find(row => row.key === "review_plan")!.value))
+      .toEqual({ mode: "fixed", intervals: DEFAULT_FIXED_INTERVALS });
+    expect(source).toEqual(before);
   });
 });

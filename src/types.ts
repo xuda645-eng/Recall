@@ -4,6 +4,18 @@ export type Theme = "dark" | "light" | "high-contrast";
 export type DeckColor = "blue" | "green" | "amber" | "rose" | "violet" | "slate";
 export type CardType = "basic" | "cloze" | "image-occlusion";
 
+export interface MemoryReviewPlan {
+  mode: "smart" | "fixed";
+  intervals: Record<ReviewRating, number>;
+}
+
+export interface WeReadSource {
+  provider: "weread";
+  bookId: string;
+  bookmarkId: string;
+  chapterUid?: string;
+}
+
 export interface OcclusionShape {
   id: string;
   x: number; // percentage 0-100
@@ -24,6 +36,8 @@ export interface Deck {
   description: string;
   color: DeckColor;
   examDeadline?: string;
+  parentId?: string | null;
+  importedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -37,6 +51,15 @@ export interface Card {
   source: string;
   tags: string[];
   cardType: CardType;
+  contentKind?: "qa" | "excerpt";
+  bookTitle?: string;
+  chapter?: string;
+  importedAt?: string;
+  lastImportedAt?: string;
+  archivedAt?: string;
+  sourceRef?: WeReadSource;
+  recallKind?: "question" | "task";
+  aiSummary?: string;
 
   // FSRS fields
   state: CardState;
@@ -90,6 +113,7 @@ export interface RecallSettings {
   soundVolume: number; // 0-100
   allowHtml: boolean; // Render raw HTML in cards (default: false)
   desiredRetention: number; // 0.70-0.99, FSRS target retention (default: 0.90)
+  reviewPlan?: MemoryReviewPlan;
   backupFolder: string | null;
   backupSchedule: BackupSchedule;
   lastBackupAt: string | null;

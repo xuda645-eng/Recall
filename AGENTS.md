@@ -1,5 +1,17 @@
 # AGENTS.md - Recall Flashcard App
 
+## Primary target: iPhone 15 PWA (user confirmed 2026-10-31)
+
+The product direction is to refine the existing optimized PWA prototype, implement it, and deploy it. The user's primary usage is **Safari-installed home-screen PWA on iPhone 15, portrait**. Do not use the old Tauri UI or a desktop screenshot as the design baseline.
+
+- **Validate mobile first:** use a **393 x 852 CSS-pixel viewport, device pixel ratio 3**. These are CSS dimensions, not physical screenshot dimensions. Desktop and Tauri checks follow the primary mobile checks.
+- **Safe areas:** preserve `viewport-fit=cover`, all four `env(safe-area-inset-*)` values, dynamic viewport height, and sufficient space for the status bar and home indicator. Include inset stress tests (for example, 59px top and 34px bottom), but do not assume these sample values cover every iOS/browser state.
+- **Shared shell:** retain the series guideline's 48 x 48 Logo, 48px-high three-slot appbar, 8px gaps, 14px control radii, and the stationary bottom-layer drawer with the same Logo and whole foreground page moving together. Check the first visible animation frame, rapid toggles, all closing paths, focus restoration, and reduced motion.
+- **Mobile acceptance:** check the home page, folder hierarchy, card list, Markdown preview/import/update, long question/answer reading, rating/undo, statistics, and editing sheets. Require no page-level horizontal overflow, no fixed controls covering content, readable text, and core touch targets of at least 44 x 44 CSS pixels. Vertical reading must not accidentally rate or switch cards.
+- **Secondary checks:** after the iPhone 15 baseline, check narrow widths, the 760px breakpoint, landscape, text enlargement, keyboard behavior, and desktop layout. Desktop improvements must not regress the primary PWA experience.
+- **Installed PWA acceptance:** verify the real iPhone Safari home-screen launch, safe areas, app name/icon/theme, standalone behavior, offline reopening, refresh persistence, and update behavior before claiming phone/PWA acceptance. State clearly which checks are simulated, which were physically tested, and which remain unverified.
+- **Design references:** the canonical PWA series guideline and Kidventure supplement remain in the parent workspace at `../prototypes/recall-v5/reference/`. The shipped implementation contract and acceptance commands are in `docs/PWA.md`. Keep prototype demo storage separate from production data; an interactive preview is not a shipped, installable PWA.
+
 ## HARD GATE: session bootstrap (do this before coding)
 
 **Obsidian vault + Graphify exist so agents burn fewer tokens.** Soft "efficiency notes" are not enough. **Skipping this gate is a process failure.**
@@ -99,7 +111,7 @@ pnpm test:e2e      # playwright (starts pnpm dev via config)
 
 ## GitHub account
 
-This repo is **Madlezz/Recall**. Prefer `gh` as user `Madlezz` for PRs/issues/pushes that affect this repo.
+The original upstream is **Madlezz/Recall**. This workspace's user-owned fork is **xuda645-eng/Recall**. Publish this PWA to the user fork only, using authenticated HTTPS. Preserve the fork's history and never force-push or publish private card batches, credentials, or internal handoff documents.
 
 ## Cost / infra (HARD)
 
