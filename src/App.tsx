@@ -120,7 +120,7 @@ export function App(): JSX.Element {
       <ErrorBoundary>
         <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-muted-foreground">{t("app.loadingView")}</div>}>
           {view === "study" || view === "match" ? (
-            <main className="min-h-screen bg-background px-4 py-5 text-foreground sm:px-6 lg:px-8">
+            <main className="focus-page min-h-screen bg-background px-4 text-foreground sm:px-6 lg:px-8">
               {view === "study" ? (
                 <ErrorBoundary viewName="StudyMode" onRecover={recoverToDashboard}>
                   <StudyMode />
@@ -191,12 +191,10 @@ export function App(): JSX.Element {
             </AppShell>
           )}
         </Suspense>
-        <Toaster richColors closeButton position="top-right" />
+        <Toaster richColors closeButton position="top-right" offset={{ top: "calc(max(24px, env(safe-area-inset-top, 0px)) + 72px)", right: "16px" }} mobileOffset={{ top: "calc(max(24px, var(--recall-safe-top)) + 72px)", right: "16px", left: "16px" }} />
         <QuickAddDialog open={showQuickAdd} onClose={() => setShowQuickAdd(false)} />
         <ShortcutHelp open={showShortcuts} onClose={() => setShowShortcuts(false)} />
         <PWAUpdatePrompt />
-
-        {/* Screen reader announcements for view changes */}
         <div aria-live="polite" aria-atomic="true" className="sr-only">
           {view === "dashboard" && t("app.dashboardView")}
           {view === "deck" && t("app.deckDetailView")}
