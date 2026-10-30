@@ -1,15 +1,5 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import en from "@/locales/en.json";
-
-// Load English translations for tests
-i18n.use(initReactI18next).init({
-  lng: "en",
-  fallbackLng: "en",
-  resources: {
-    en: { translation: en },
-  },
-  interpolation: {
-    escapeValue: false,
-  },
-});
+import zhCN from "@/locales/zh-CN.json";
+i18n.use(initReactI18next).init({ lng: "en", fallbackLng: "en", resources: { en: { translation: en }, "zh-CN": { translation: zhCN } }, interpolation: { escapeValue: false } });
