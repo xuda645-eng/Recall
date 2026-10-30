@@ -1,0 +1,4 @@
+/* Preserve the first paragraph of content taller than a study card. */
+.study-card-face {
+  justify-content: safe center;
+}
