@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => ({
       registerType: "prompt",
       includeAssets: ["favicon.svg", "icons/icon-192.png", "icons/icon-512.png"],
       workbox: {
+        clientsClaim: true,
         globPatterns: ["**/*.{js,css,html,svg,png,woff,woff2}"],
         // Don't cache KaTeX CSS from CDN - let browser handle it
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
@@ -30,40 +31,17 @@ export default defineConfig(({ mode }) => ({
         lang: "en",
         categories: ["education", "productivity"],
         icons: [
-          {
-            src: "/icons/icon-192.png",
-            sizes: "192x192",
-            type: "image/png",
-            purpose: "any",
-          },
-          {
-            src: "/icons/icon-512.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "any",
-          },
-          {
-            src: "/icons/icon-maskable-512.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "maskable",
-          },
+          { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "/icons/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
     }),
   ],
   build: {
     target: "es2021",
-    rollupOptions: {
-      output: {
-        manualChunks: undefined,
-      },
-    },
+    rollupOptions: { output: { manualChunks: undefined } },
   },
   optimizeDeps: {},
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
+  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
 }));
