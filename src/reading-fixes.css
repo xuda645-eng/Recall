@@ -1,4 +1,28 @@
 /* Preserve the first paragraph of content taller than a study card. */
-.study-card-face {
-  justify-content: safe center;
+.study-card-face { justify-content: safe center; }
+:root {
+  --recall-safe-top: env(safe-area-inset-top, 0px);
+  --recall-safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+.focus-page {
+  box-sizing: border-box;
+  padding-top: max(12px, var(--recall-safe-top));
+  padding-bottom: max(16px, var(--recall-safe-bottom));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.study-layout {
+  min-height: calc(100dvh - max(12px, var(--recall-safe-top)) - max(16px, var(--recall-safe-bottom)));
+}
+.study-layout > header { flex-shrink: 0; }
+.study-layout > footer { flex-shrink: 0; }
+@media (display-mode: standalone) {
+  /* Conservative fallback when an installed browser reports a zero inset. */
+  .focus-page { padding-top: max(24px, var(--recall-safe-top)); }
+  .study-layout { min-height: calc(100dvh - max(24px, var(--recall-safe-top)) - max(16px, var(--recall-safe-bottom))); }
+}
+@media (max-width: 760px) {
+  html[lang="zh-CN"] { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif; }
+  .study-layout > footer button { min-height: 44px; }
+  .study-layout > footer p { font-size: 12px; }
 }

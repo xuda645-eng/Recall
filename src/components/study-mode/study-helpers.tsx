@@ -1,3 +1,6 @@
+import { useTranslation } from "react-i18next";
+import { localizeInterval } from "@/lib/display-language";
+
 type AnswerVariant = "again" | "hard" | "good" | "easy";
 
 // Default palette using semantic review tokens from the design system.
@@ -18,61 +21,27 @@ const answerStylesColorBlind: Record<AnswerVariant, string> = {
 };
 
 const answerGlyphs: Record<AnswerVariant, string> = {
-  again: "✕",
-  hard: "◑",
-  good: "✓",
-  easy: "★",
+  again: "✕", hard: "◑", good: "✓", easy: "★",
 };
 
-export function AnswerButton({
-  label,
-  keyHint,
-  variant,
-  interval,
-  onClick,
-  colorBlind = false,
-}: {
-  label: string;
-  keyHint: string;
-  variant: AnswerVariant;
-  interval?: string;
-  onClick: () => void;
-  colorBlind?: boolean;
+export function AnswerButton({ label, keyHint, variant, interval, onClick, colorBlind = false }: {
+  label: string; keyHint: string; variant: AnswerVariant; interval?: string; onClick: () => void; colorBlind?: boolean;
 }): JSX.Element {
-  const variantDescriptions: Record<AnswerVariant, string> = {
-    again: "Rate as Again - forgot completely",
-    hard: "Rate as Hard - remembered with difficulty",
-    good: "Rate as Good - remembered with moderate effort",
-    easy: "Rate as Easy - remembered easily",
-  };
-
+  const { t } = useTranslation();
+  const displayInterval = interval ? localizeInterval(interval) : undefined;
   const styles = colorBlind ? answerStylesColorBlind[variant] : answerStyles[variant];
-
   return (
-    <button
-      onClick={onClick}
-      aria-label={variantDescriptions[variant]}
-      className={`flex flex-col items-center gap-0.5 rounded-lg border px-4 py-3 min-h-[56px] text-sm font-semibold transition-colors sm:py-2 sm:min-h-0 ${styles}`}
-    >
+    <button onClick={onClick} aria-label={t(`ratingAria.${variant}`)} className={`flex flex-col items-center gap-0.5 rounded-lg border px-4 py-3 min-h-[56px] text-sm font-semibold transition-colors sm:py-2 sm:min-h-0 ${styles}`}>
       <span className="flex items-center gap-2">
-        {colorBlind && (
-          <span className="text-base leading-none" aria-hidden="true">{answerGlyphs[variant]}</span>
-        )}
+        {colorBlind && <span className="text-base leading-none" aria-hidden="true">{answerGlyphs[variant]}</span>}
         <span className="text-xs font-medium opacity-70 w-4" aria-hidden="true">{keyHint}</span>
         {label}
       </span>
-      {interval && (
-        <span className="text-xs font-normal opacity-70" aria-label={`Next interval: ${interval}`}>{interval}</span>
-      )}
+      {interval && <span className="text-xs font-normal opacity-70" aria-label={t("ratingAria.interval", { interval: displayInterval })}>{displayInterval}</span>}
     </button>
   );
 }
 
 export function CompletionStat({ label, value }: { label: string; value: number }): JSX.Element {
-  return (
-<div className="rounded-lg bg-surface-container-low py-2.5 px-1 dark:bg-surface-container">
-	      <div className="text-lg font-bold tabular-nums text-text-primary">{value}</div>
-	      <div className="mt-0.5 text-xs font-medium text-on-surface-variant">{label}</div>
-    </div>
-  );
+  return <div className="rounded-lg bg-surface-container-low py-2.5 px-1 dark:bg-surface-container"><div className="text-lg font-bold tabular-nums text-text-primary">{value}</div><div className="mt-0.5 text-xs font-medium text-on-surface-variant">{label}</div></div>;
 }
