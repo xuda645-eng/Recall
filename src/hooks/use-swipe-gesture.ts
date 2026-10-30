@@ -43,6 +43,7 @@ export function useSwipeGesture(
     onTouchStart: (e: React.TouchEvent) => void;
     onTouchMove: (e: React.TouchEvent) => void;
     onTouchEnd: () => void;
+    onTouchCancel: () => void;
   };
 } {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -52,6 +53,9 @@ export function useSwipeGesture(
   const startTime = useRef<number>(0);
   const lastPoint = useRef<TouchPoint | null>(null);
   const handlersRef = useRef(handlers);
+  const scrollingRef = useRef(false);
+  const scrollableRef = useRef<HTMLElement | null>(null);
+  const scrollStartRef = useRef(0);
 
   // Keep handlers ref current via effect (not during render)
   useEffect(() => {
@@ -60,7 +64,20 @@ export function useSwipeGesture(
 
   const onTouchStart = useCallback(
     (e: React.TouchEvent) => {
-      if (!enabled) return;
+      if (!enabled || e.touches.length !== 1) return;
+      scrollingRef.current = false;
+      scrollableRef.current = null;
+      let element = e.target instanceof HTMLElement ? e.target : null;
+      while (element) {
+        const overflow = getComputedStyle(element).overflowY;
+        if (element.scrollHeight > element.clientHeight + 1 && /auto|scroll/.test(overflow)) {
+          scrollableRef.current = element;
+          scrollStartRef.current = element.scrollTop;
+          break;
+        }
+        if (element === e.currentTarget) break;
+        element = element.parentElement;
+      }
       const touch = e.touches[0];
       startPoint.current = { x: touch.clientX, y: touch.clientY };
       lastPoint.current = { x: touch.clientX, y: touch.clientY };
@@ -77,6 +94,15 @@ export function useSwipeGesture(
       const dx = touch.clientX - startPoint.current.x;
       const dy = touch.clientY - startPoint.current.y;
       lastPoint.current = { x: touch.clientX, y: touch.clientY };
+      // Reading takes precedence for a vertically scrollable card, including
+      // at its edges. Never turn a reading gesture into a real FSRS review.
+      if (scrollingRef.current || (scrollableRef.current &&
+        (Math.abs(dy) > Math.abs(dx) || scrollableRef.current.scrollTop !== scrollStartRef.current))) {
+        scrollingRef.current = true;
+        setOffset({ x: 0, y: 0 });
+        setIsSwiping(false);
+        return;
+      }
       setOffset({ x: dx, y: dy });
       handlersRef.current.onDrag?.({ x: dx, y: dy });
     },
@@ -84,9 +110,13 @@ export function useSwipeGesture(
   );
 
   const onTouchEnd = useCallback(() => {
-    if (!enabled || !startPoint.current) {
+    if (!enabled || !startPoint.current || scrollingRef.current ||
+      (scrollableRef.current && scrollableRef.current.scrollTop !== scrollStartRef.current)) {
       setOffset({ x: 0, y: 0 });
       setIsSwiping(false);
+      startPoint.current = null;
+      lastPoint.current = null;
+      scrollableRef.current = null;
       return;
     }
 
@@ -136,6 +166,14 @@ export function useSwipeGesture(
       onTouchStart,
       onTouchMove,
       onTouchEnd,
+      onTouchCancel: () => {
+        startPoint.current = null;
+        lastPoint.current = null;
+        scrollableRef.current = null;
+        scrollingRef.current = false;
+        setOffset({ x: 0, y: 0 });
+        setIsSwiping(false);
+      },
     },
   };
 }

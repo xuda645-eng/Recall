@@ -590,8 +590,18 @@ class SqliteRecallRepository implements RecallRepository {
   }
 
 class LocalStorageRecallRepository implements RecallRepository {
-  async recordReview(_updatedCard: Card, _reviewLog: ReviewLog, _session: StudySession | null): Promise<void> {
-    // localStorage can't do targeted updates; only used in tests
+  async recordReview(updatedCard: Card, reviewLog: ReviewLog, session: StudySession | null): Promise<void> {
+    const snapshot = await this.loadAppData();
+    const index = snapshot.cards.findIndex((card) => card.id === updatedCard.id);
+    if (index < 0) throw new Error("Cannot review a missing card");
+    snapshot.cards[index] = updatedCard;
+    if (!snapshot.reviewLogs.some((log) => log.id === reviewLog.id)) {
+      snapshot.reviewLogs.push(reviewLog);
+    }
+    if (session && !snapshot.studySessions.some((existing) => existing.id === session.id)) {
+      snapshot.studySessions.push(session);
+    }
+    await this.saveSnapshot(snapshot);
   }
 
   async loadReviewLogs(since?: string): Promise<ReviewLog[]> {
