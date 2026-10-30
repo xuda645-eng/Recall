@@ -11,107 +11,17 @@ import { CardDialog } from "@/components/card-dialog";
 import { cn } from "@/lib/utils";
 import { useRecallStore } from "@/stores/recall-store";
 import type { Card } from "@/types";
-
-interface CardRowProps {
-  card: Card;
-  deckId: string;
-  isSelected: boolean;
-  onToggle: (cardId: string) => void;
-}
-
+interface CardRowProps { card: Card; deckId: string; isSelected: boolean; onToggle: (cardId: string) => void; }
 export function CardRow({ card, deckId, isSelected, onToggle }: CardRowProps): JSX.Element {
-  const { t } = useTranslation();
-  const [isDeleting, setIsDeleting] = useState(false);
-  const deleteCard = useRecallStore((s) => s.deleteCard);
-  const leechThreshold = useRecallStore((s) => s.settings.leechThreshold);
-  const isLeech = card.lapses >= leechThreshold;
-
-  async function handleDelete(): Promise<void> {
-    setIsDeleting(true);
-    try {
-      await deleteCard(card.id);
-      toast.success(t("deckDetail.cardDeleted"));
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("deckDetail.cardDeleteFailed"));
-    } finally {
-      setIsDeleting(false);
-    }
-  }
-
-  return (
-    <article
-      className={cn(
-        "rounded-lg border bg-card p-4 transition-colors",
-        isSelected && "ring-2 ring-primary/50",
-      )}
-    >
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="min-w-0 flex-1">
-          {/* Badges row */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => onToggle(card.id)}
-              className="flex h-5 w-5 items-center justify-center rounded border border-input transition-colors hover:bg-muted"
-              aria-label={isSelected ? t("deckDetail.deselectCard") : t("deckDetail.selectCard")}
-            >
-              {isSelected ? (
-                <CheckSquare className="h-4 w-4 text-primary" />
-              ) : (
-                <Square className="h-4 w-4 text-muted-foreground" />
-              )}
-            </button>
-            <Badge
-              tone={
-                card.state === "review"
-                  ? "success"
-                  : card.state === "learning" || card.state === "relearning"
-                    ? "warning"
-                    : "muted"
-              }
-            >
-              {card.state}
-            </Badge>
-            {isLeech && (
-              <Badge
-                tone="warning"
-                title={t("deckDetail.leechTitle", { lapses: card.lapses, threshold: leechThreshold })}
-              >
-                {t("deckDetail.leech")}
-              </Badge>
-            )}
-            {card.tags.map((tag) => (
-              <Badge key={tag} tone="muted">
-                {tag}
-              </Badge>
-            ))}
-          </div>
-
-          {/* Card content */}
-          <div className="mt-3 prose prose-sm prose-invert max-w-none line-clamp-1">
-            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-              {card.front}
-            </ReactMarkdown>
-          </div>
-          <div className="mt-1 prose prose-sm prose-invert max-w-none line-clamp-2 text-muted-foreground">
-            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-              {card.back}
-            </ReactMarkdown>
-          </div>
-          {card.hint && <p className="mt-2 text-xs text-muted-foreground">{t("deckDetail.hintLabel")}: {card.hint}</p>}
-        </div>
-
-        {/* Actions */}
-        <div className="flex shrink-0 flex-wrap gap-2">
-          <CardDialog
-            deckId={deckId}
-            card={card}
-            trigger={<button className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface px-4 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low active:scale-95 transition-all">{t("deckDetail.edit")}</button>}
-          />
-          <button className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container-low active:scale-95 transition-all" onClick={() => void handleDelete()} disabled={isDeleting}>
-            {t("deckDetail.delete")}
-          </button>
-        </div>
-      </div>
-    </article>
-  );
+  const { t } = useTranslation(); const [isDeleting, setIsDeleting] = useState(false);
+  const deleteCard = useRecallStore((s) => s.deleteCard); const leechThreshold = useRecallStore((s) => s.settings.leechThreshold); const isLeech = card.lapses >= leechThreshold;
+  async function handleDelete(): Promise<void> { setIsDeleting(true); try { await deleteCard(card.id); toast.success(t("deckDetail.cardDeleted")); } catch (error) { toast.error(error instanceof Error ? error.message : t("deckDetail.cardDeleteFailed")); } finally { setIsDeleting(false); } }
+  return <article className={cn("rounded-lg border bg-card p-4 transition-colors", isSelected && "ring-2 ring-primary/50")}><div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2">
+    <button onClick={() => onToggle(card.id)} className="flex h-5 w-5 items-center justify-center rounded border border-input transition-colors hover:bg-muted" aria-label={isSelected ? t("deckDetail.deselectCard") : t("deckDetail.selectCard")}>{isSelected ? <CheckSquare className="h-4 w-4 text-primary" /> : <Square className="h-4 w-4 text-muted-foreground" />}</button>
+    <Badge tone={card.state === "review" ? "success" : card.state === "learning" || card.state === "relearning" ? "warning" : "muted"}>{t(`cardBrowser.state.${card.state}`)}</Badge>
+    {isLeech && <Badge tone="warning" title={t("deckDetail.leechTitle", { lapses: card.lapses, threshold: leechThreshold })}>{t("deckDetail.leech")}</Badge>}
+    {card.tags.map((tag) => <Badge key={tag} tone="muted">{tag}</Badge>)}
+  </div><div className="mt-3 prose prose-sm prose-invert max-w-none line-clamp-1"><ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{card.front}</ReactMarkdown></div><div className="mt-1 prose prose-sm prose-invert max-w-none line-clamp-2 text-muted-foreground"><ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{card.back}</ReactMarkdown></div>{card.hint && <p className="mt-2 text-xs text-muted-foreground">{t("deckDetail.hintLabel")}: {card.hint}</p>}</div>
+    <div className="flex shrink-0 flex-wrap gap-2"><CardDialog deckId={deckId} card={card} trigger={<button className="inline-flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface px-4 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low active:scale-95 transition-all">{t("deckDetail.edit")}</button>} /><button className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container-low active:scale-95 transition-all" onClick={() => void handleDelete()} disabled={isDeleting}>{t("deckDetail.delete")}</button></div>
+  </div></article>;
 }
