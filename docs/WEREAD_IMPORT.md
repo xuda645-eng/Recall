@@ -108,7 +108,7 @@ and a seven-day question cache, separate from cards/sync entities.
 - No automatic whole-book sync, paid infrastructure, external knowledge,
   model tools, or automatic card-library writes.
 
-## Bounded 48-Hour Smoke
+## Bounded 24-Hour Smoke
 
 Run `node scripts/weread-ai-smoke.mjs` from the app repository. It reads existing
 private credential files without printing their contents, requests one notebook
@@ -116,11 +116,15 @@ page, and sends only synthetic original text to the real Ark endpoint. It never
 writes the production library. The private state lives outside the source repo
 at `../exports/weread/ai-smoke-state.json`; do not commit it.
 
-The guard permits one probe every six hours for 48 hours, at most nine attempts
-including the initial probe, one model call/probe and 384 output tokens/call.
+The guard permits one probe every six hours within 24 hours, at most four
+attempts including the initial probe (approximately hour 0, 6, 12 and 18),
+one model call/probe and 384 output tokens/call. At hour 24 only the summary
+is due, not another model call. The user's shortened window retains the
+original `startedAt` and existing results; it does not restart the clock.
 At the first failure it stops further calls; investigate before any explicit
 new run. A scheduled chat follow-up executes the guard, reports only actionable
-failures or final results, and then disables itself. The machine and desktop app
+failures or final results, and then disables itself. A final summary may arrive
+on the first scheduled wake after the deadline. The machine and desktop app
 must remain running; missed wakes do not prove continuous uptime. Do not delete
 or reset the state to bypass the limits. All elapsed observations are reported
 separately from the scheduled window.

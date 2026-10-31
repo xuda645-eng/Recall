@@ -20,7 +20,7 @@ async function credentials(path) {
 try {
   const now = Date.now();
   const state = JSON.parse(await readFile(statePath, 'utf8').catch(() => JSON.stringify({ startedAt: now, attempts: 0, results: [] })));
-  if (now - state.startedAt >= 48 * 3600000 || state.attempts >= 9 || state.stopped) {
+  if (now - state.startedAt >= 24 * 3600000 || state.attempts >= 4 || state.stopped) {
     console.log(JSON.stringify({ status: 'complete', attempts: state.attempts, results: state.results }));
   } else if (state.lastAttempt && now - state.lastAttempt < 6 * 3600000) {
     console.log(JSON.stringify({ status: 'not_due', attempts: state.attempts }));
