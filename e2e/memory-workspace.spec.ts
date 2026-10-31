@@ -306,12 +306,18 @@ test('不透明固定顶栏与正文滚动分离，设置页、暗色和阅读�
           backdropFilter: style.backdropFilter,
           edgeInBar: element.contains(document.elementFromPoint(innerWidth / 2, 1)),
           appPosition: getComputedStyle(app).position,
+          ancestorTransforms: (() => {
+            const transforms: string[] = [];
+            for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) transforms.push(getComputedStyle(ancestor).transform);
+            return transforms;
+          })(),
           contentTop: document.querySelector('.memory-content')!.getBoundingClientRect().y,
           bottom: box.bottom,
         };
       });
       expect(surface.position).toBe('fixed');
       expect(surface.appPosition).toBe('fixed');
+      expect(surface.ancestorTransforms.every(transform => transform === 'none')).toBe(true);
       expect(surface.background).toBe(dark ? 'rgb(36, 36, 32)' : 'rgb(246, 245, 239)');
       expect(surface.backgroundImage).toBe('none');
       expect(surface.filter).toBe('none');

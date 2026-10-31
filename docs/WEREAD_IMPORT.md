@@ -108,6 +108,17 @@ and a seven-day question cache, separate from cards/sync entities.
 - No automatic whole-book sync, paid infrastructure, external knowledge,
   model tools, or automatic card-library writes.
 
+## Runtime Compatibility
+
+Cloudflare Workers rejects `redirect: 'error'` before sending an upstream
+request. The server uses `redirect: 'manual'` instead and rejects every
+non-success response, including redirects, without following `Location` or
+forwarding credentials. This applies to both WeRead and Ark requests.
+See [Cloudflare Request documentation](https://developers.cloudflare.com/workers/runtime-apis/request/).
+Node-only fetch mocks cannot establish Workers compatibility; validate the
+deployed server logic in local workerd as well. A local runtime pass does not
+prove production egress or successful connection from the installed iPhone PWA.
+
 ## Bounded 24-Hour Smoke
 
 The user canceled scheduled smoke on 2026-10-31 after shortening its window.

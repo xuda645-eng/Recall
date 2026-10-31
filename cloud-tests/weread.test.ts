@@ -38,6 +38,22 @@ describe('authenticated online WeRead and AI', () => {
     const response = await api('weread/books', {});
     expect(await response.json()).toEqual({ books: [{ bookId: 'book-1', title: '原创书', author: '作者', highlightCount: 2 }], cursor: 123 });
     expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ api_name: '/user/notebooks', skill_version: '1.0.5', count: 20 });
+    expect(fetcher.mock.calls[0][1].redirect).toBe('manual');
+  });
+  it('rejects redirects without forwarding keys, reading the body or following Location', async () => {
+    for (const status of [301, 302, 303, 307, 308]) {
+      const response = new Response('synthetic-weread', { status, headers: { Location: 'https://evil.test/collect' } });
+      const cancel = vi.spyOn(response.body!, 'cancel');
+      const fetcher = vi.fn().mockResolvedValue(response);
+      vi.stubGlobal('fetch', fetcher);
+      const result = await api('weread/books', {});
+      expect(result.status).toBe(502);
+      expect(await result.text()).not.toMatch(/synthetic-weread|evil\.test/);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect(fetcher.mock.calls[0][0]).toBe('https://i.weread.qq.com/api/agent/gateway');
+      expect(fetcher.mock.calls[0][1].redirect).toBe('manual');
+      expect(cancel).toHaveBeenCalledOnce();
+    }
   });
   it('preserves exact original and excludes bookmarks', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ book: { title: '原创书' }, chapters: [{ chapterUid: 1, title: '第一章' }], updated: [

@@ -18,7 +18,7 @@ async function upstream(url: string, key: string, body: unknown): Promise<unknow
   try {
     const response = await fetch(url, {
       method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body), signal: AbortSignal.timeout(45000), redirect: 'error',
+      body: JSON.stringify(body), signal: AbortSignal.timeout(45000), redirect: 'manual',
     });
     if (!response.ok) {
       await response.body?.cancel();
