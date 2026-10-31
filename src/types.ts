@@ -9,6 +9,12 @@ export interface MemoryReviewPlan {
   intervals: Record<ReviewRating, number>;
 }
 
+export interface MemoryStudyPreferences {
+  newCardRatio: number;
+  batchSize: number;
+  sessionMinutes: number;
+}
+
 export interface WeReadSource {
   provider: "weread";
   bookId: string;
@@ -114,6 +120,7 @@ export interface RecallSettings {
   allowHtml: boolean; // Render raw HTML in cards (default: false)
   desiredRetention: number; // 0.70-0.99, FSRS target retention (default: 0.90)
   reviewPlan?: MemoryReviewPlan;
+  studyPreferences?: MemoryStudyPreferences;
   backupFolder: string | null;
   backupSchedule: BackupSchedule;
   lastBackupAt: string | null;

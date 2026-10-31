@@ -4,11 +4,15 @@
 
 - Release ID: `20261031T232024+0800-topbar-weread-runtime`.
 - Scope: mobile shell CSS, shared upstream transport, regression tests and docs.
-- Status: local validation passed; commit, push and production deployment pending.
+- Status: validated source pushed and deployed; public verification in progress,
+  physical iOS 27 acceptance unverified.
 - User target: iPhone 15 home-screen PWA, portrait; user reports iOS 27.
 - First regression run: `2026-10-31T23:14:22+08:00`.
 - Local validation completed and record created: `2026-10-31T23:20:24+08:00`.
-- Commit/push, deployment, public verification and completion times: pending.
+- Implementation commit: `2026-10-31T23:22:51+08:00`; normal push completed
+  before the deployment started at `2026-10-31T23:24:07+08:00`.
+- Deployment completed: `2026-10-31T23:24:23.351+08:00`, from Wrangler log.
+- Public verification and completion times: pending.
 
 ## Changes And Diagnosis
 
@@ -98,14 +102,25 @@ WebKit here is not a simulation of the user's exact iOS 27 build.
   assertions. The pre-fix assertion failures above were genuine, separate runs.
 - Windows vault paths and Graphify are unavailable on this Mac; used the
   previously checked handoff/architecture map and targeted source inspection.
+- Initial temporary public probe failed `ERR_MODULE_NOT_FOUND` for a direct
+  `playwright-core` import. Recovered using the installed `@playwright/test`
+  entry. Its serial native Node network checks produced no final result within
+  the bounded observation window; stopped that probe and switched to bounded
+  curl transfers. This is not an app regression or a passed public check.
+- The isolated Pages HTTPS server logged self-signed certificate handshake
+  alerts during local acceptance. The existing local test configuration uses
+  `ignoreHTTPSErrors`; both D1 scenarios passed. Production TLS/auth settings
+  were not changed. All temporary local servers were stopped; the temporary
+  probe credential copy was removed, preserving the original private file.
 
 ## Source, Production And Recovery
 
 - Repository: `xuda645-eng/Recall`, branch `main`.
 - Starting HEAD: `47cfcbd604f79d3f4dfe3669970e77b73586b7ad`.
-- Implementation commit locator: the commit first adding this record together
-  with the listed source/test changes; exact SHA to be appended after commit.
-- Source push outcome: pending. Evidence follow-up: pending.
+- Implementation SHA: `dfed39774da0e7bc0ed5c98fb4ed83c6ca4ca51d`.
+- Source push outcome: succeeded, `47cfcbd..dfed397 main -> main`.
+- Evidence follow-up locator: subsequent documentation-only commit updating this
+  record and `docs/RELEASES.md`; push outcome reported at task completion.
 - Production origin: `https://recall-memory.pages.dev/` (unchanged).
 - Cloudflare account: `751b9fca4f5173fd70e0dfb69cff81e2`; existing Pages project
   `recall-memory`, main production branch, verified by whoami/project/deployment
@@ -115,7 +130,14 @@ WebKit here is not a simulation of the user's exact iOS 27 build.
   `https://0f97f0c9.recall-memory.pages.dev/`.
   It is the available schema-compatible baseline, not a claim that its reported
   Logo/WeRead defects or physical-device behavior were verified good.
-- New deployment ID/URL and deployed source SHA: pending.
+- New production deployment ID: `2abbe90f-669c-42b8-9047-61f5228cfc9a`.
+- Deployment URL: `https://2abbe90f.recall-memory.pages.dev/`.
+- Deployed source SHA: `dfed39774da0e7bc0ed5c98fb4ed83c6ca4ca51d`, also
+  confirmed as `dfed397` in production deployment listing at
+  `2026-10-31T23:25:44+08:00`.
+- Command: `CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2 npx --yes wrangler@4.156.0 pages deploy dist --project-name recall-memory --branch main --commit-hash dfed39774da0e7bc0ed5c98fb4ed83c6ca4ca51d --commit-message 'fix: idle topbar transform and Workers WeRead transport'`.
+  Worktree was clean; exact validated production bundle uploaded with Functions
+  and existing bindings. No dirty override, new resources or migrations.
 
 If this release introduces a regression, first recheck production so a newer
 session's release is not overwritten. In the existing Pages project, roll back
@@ -131,3 +153,12 @@ Physical iPhone 15/iOS 27 blur, home-screen launch and update remain unverified.
 The local real-gateway workerd pass does not establish Cloudflare production
 egress or an authenticated WeRead connection on the user's installed PWA.
 Public post-deployment checks and their limitations will be appended here.
+
+## Integration Handoff
+
+At `2026-11-01T01:15:57+08:00`, the integration chat reviewed and preserved this
+inherited uncommitted deployment evidence. Historical public verification not
+captured above remains unverified, not retroactively passed. The runtime source
+is already in main/production; it is not applied again. Current combined
+validation and production publication are recorded separately in
+[main integration](./20261101T010911+0800-main-integration.md).

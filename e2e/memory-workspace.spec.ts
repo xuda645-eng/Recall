@@ -18,7 +18,7 @@ function fixture() {
     { ...seed.cards[0], id: 'second', deckId: 'leaf', cardType: 'basic' as const, contentKind: 'qa' as const, front: '如何检查理解？', back: '合上材料，独立解释。', difficulty: 5, nextReviewDate: at, importedAt: at },
     { ...seed.cards[0], id: 'archived', deckId: 'leaf', cardType: 'basic' as const, contentKind: 'qa' as const, front: '归档示例', back: '仍保留原文。', difficulty: 5, nextReviewDate: at, archivedAt: at, importedAt: at },
   ];
-  return { ...seed, decks, cards, reviewLogs: [], studySessions: [], settings: { ...seed.settings, onboardingComplete: true, reviewPlan: { mode: 'fixed' as const, intervals: { again: 60000, hard: 86400000, good: 2592000000, easy: 15552000000 } } } };
+  return { ...seed, decks, cards, reviewLogs: [], studySessions: [], settings: { ...seed.settings, onboardingComplete: true, studyPreferences: { newCardRatio: 1, batchSize: 10, sessionMinutes: 30 }, reviewPlan: { mode: 'fixed' as const, intervals: { again: 60000, hard: 86400000, good: 2592000000, easy: 15552000000 } } } };
 }
 async function snapshot(page: Page) {
   return page.evaluate(() => JSON.parse(localStorage.getItem('recall.snapshot.v1') || 'null'));
@@ -333,7 +333,7 @@ test('不透明固定顶栏与正文滚动分离，设置页、暗色和阅读�
     (element as HTMLElement).style.setProperty('--safe-inset-top', '59px');
     (element as HTMLElement).style.setProperty('--safe-bottom', '34px');
   });
-  for (const [route, label] of [['home', '今日复习'], ['folders', '我的卡组'], ['settings', '设置与数据'], ['advanced', '设置与数据'], ['stats', '统计'], ['import', '导入']]) {
+  for (const [route, label] of [['home', '今日复习'], ['folders', '卡组目录'], ['settings', '设置与数据'], ['advanced', '设置与数据'], ['stats', '统计'], ['import', '导入']]) {
     await navigate(page, label);
     if (route === 'advanced') await page.locator('.m-top-action').click();
     await expect(page.locator('.memory-content')).toHaveAttribute('data-route', route);
@@ -416,14 +416,14 @@ test('手动创建卡组与卡片，编辑不重置复习字段', async ({ page 
   await expect.poll(async () => (await snapshot(page)).decks.length).toBe(3);
   await page.getByRole('button', { name: '添加', exact: true }).first().click();
   await page.getByRole('button', { name: '添加卡片', exact: true }).click();
-  await page.getByLabel('问题或段落标题（摘录可空）', { exact: true }).fill('新的问题');
-  await page.getByLabel('正文', { exact: true }).fill('新的答案');
-  await page.getByRole('button', { name: '保存修改', exact: true }).click();
+  await page.getByLabel('问题', { exact: true }).fill('新的问题');
+  await page.getByLabel('答案', { exact: true }).fill('新的答案');
+  await page.getByRole('button', { name: '保存卡片', exact: true }).click();
   await expect.poll(async () => (await snapshot(page)).cards.length).toBe(4);
   await navigate(page, '全部卡片');
   await page.getByRole('button', { name: '管理卡片：如何检查理解？', exact: true }).click();
   await page.getByRole('button', { name: '编辑卡片', exact: true }).click();
-  await page.getByRole('textbox', { name: '正文', exact: true }).fill('更新正文，但保留进度。');
+  await page.getByRole('textbox', { name: '答案', exact: true }).fill('更新正文，但保留进度。');
   await page.getByRole('button', { name: '保存修改', exact: true }).click();
   const updated = (await snapshot(page)).cards.find((card: { id: string }) => card.id === 'second');
   expect(updated.reps).toBe(fixture().cards[1].reps);

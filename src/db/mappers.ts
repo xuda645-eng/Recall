@@ -1,6 +1,7 @@
 import type { Achievement, Card, CardState, CardType, Deck, DeckColor, RecallSettings, ReviewLog, ReviewRating, StudySession } from "@/types";
 import { SCHEMA_VERSION, isCardState, isCardType, isDeckColor, isReviewRating } from "@/lib/domain";
 import { normalizeMemoryReviewPlan } from "@/services/memory-review";
+import { normalizeMemoryStudyPreferences } from "@/services/memory-study";
 
 export interface DeckRow {
   id: string;
@@ -208,6 +209,13 @@ export function settingsFromRows(rows: SettingRow[]): RecallSettings {
   } catch { /* keep empty */ }
 
   const reviewPlanRaw = values.get("review_plan");
+  let studyPreferences = normalizeMemoryStudyPreferences(undefined);
+  const studyPreferencesRaw = values.get("study_preferences");
+  if (studyPreferencesRaw) {
+    try {
+      studyPreferences = normalizeMemoryStudyPreferences(JSON.parse(studyPreferencesRaw));
+    } catch { /* keep defaults */ }
+  }
   let reviewPlan: RecallSettings["reviewPlan"] = undefined;
   if (reviewPlanRaw) {
     try {
@@ -233,6 +241,7 @@ export function settingsFromRows(rows: SettingRow[]): RecallSettings {
             allowHtml: values.get("allow_html") === "true",
     desiredRetention: Number(values.get("desired_retention")) || 0.9,
     reviewPlan,
+    studyPreferences,
             backupFolder: values.get("backup_folder") || null,
                         backupSchedule: (values.get("backup_schedule") ?? "never") as "daily" | "weekly" | "never",
                                                 lastBackupAt: values.get("last_backup_at") || null,
@@ -271,6 +280,7 @@ export function settingsToRows(settings: RecallSettings): SettingRow[] {
     { key: "allow_html", value: String(settings.allowHtml) },
     { key: "desired_retention", value: String(settings.desiredRetention) },
     { key: "review_plan", value: settings.reviewPlan === undefined ? "" : JSON.stringify(normalizeMemoryReviewPlan(settings.reviewPlan)) },
+    { key: "study_preferences", value: JSON.stringify(normalizeMemoryStudyPreferences(settings.studyPreferences)) },
         { key: "backup_folder", value: settings.backupFolder ?? "" },
         { key: "backup_schedule", value: settings.backupSchedule },
                 { key: "last_backup_at", value: settings.lastBackupAt ?? "" },

@@ -6,7 +6,8 @@
 - Repository/branch: `xuda645-eng/Recall`, `main`.
 - Record created: `2026-11-01T00:27:27+08:00`. Initial implementation start was
   not captured; the final validation sequence began at `00:17:37+08:00`.
-- Status: local validation passed; source publication and production deployment pending.
+- Status: initial source published; final correction on main, combined publication
+  owned by the main integration release below.
 - Implementation source locator: the commit adding this record. Actual SHA,
   commit/push, deployment, verification and completion times appended below.
 - Production origin remains <https://recall-memory.pages.dev/>.
@@ -171,6 +172,13 @@ CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2 npx --yes wrangler@4.156.
   The probe retains a five-minute budget and does not replace failed SW assertions.
 
 ## Limits And Recovery
+
+Final correction source is `4af5d3a1af95dc6bb869c0f6c478aa02b2fc6663`, already on
+main at integration inventory. At `2026-11-01T01:15:57+08:00`, the combined app
+passed 1341 unit tests, 187 cloud tests, 64 main/study mobile checks, 38 WeRead
+mobile checks and 2 local D1 scenarios. The final publication replaces the
+initial-candidate status without rewriting historical failures; deployment and
+public evidence belong to [main integration](./20261101T010911+0800-main-integration.md).
 
 - Physical iPhone Safari/home-screen installation, dynamic keyboard/safe areas,
   OS blur, background suspension, update and offline cold start are unverified.

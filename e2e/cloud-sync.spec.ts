@@ -72,7 +72,9 @@ test('isolated D1: shared devices, offline archive, durable replay, conflicts an
     }).toBe(1);
     await deviceB.getByRole('button', { name: '立即同步', exact: true }).click();
     await expect.poll(async () => (await disk(deviceB)).reviewLogs.length).toBe(1);
-    await deviceA.getByRole('button', { name: '撤销评分', exact: true }).click();
+    await expect(deviceA.getByRole('heading', { name: '本轮完成', exact: true })).toBeVisible();
+    await deviceA.getByRole('button', { name: '撤销上次评分', exact: true }).click();
+    await expect(deviceA.locator('.m-reading[data-active="true"]')).toBeVisible();
     await expect.poll(async () => (await disk(deviceA)).reviewLogs.length).toBe(0);
     await expect.poll(async () => {
       const state = await (await first.request.get(origin + '/api/sync')).json() as CloudState;
