@@ -75,6 +75,10 @@ npx --yes wrangler@4.156.0 pages deploy dist --project-name recall-memory --bran
 
 Commit and push the validated source before deployment. Publish only `dist/`,
 using the root-path production build, not the `/Recall/` GitHub Pages build.
+The user has standing-approved testing, normal commits/pushes and releases of
+requested Recall changes; do not ask again at each delivery step. Follow
+[`RELEASES.md`](./RELEASES.md) for the mandatory per-release record, validation
+blockers, documentation-only handling and history-preserving rollback policy.
 After publishing, verify the public address, root-path manifest and icons,
 Service Worker activation, and mobile operations:
 

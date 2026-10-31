@@ -24,6 +24,7 @@ Quick map of the documentation in this folder and the repo root.
 |---|---|
 | [`./card-formatting.md`](./card-formatting.md) | Markdown syntax supported in card faces. |
 | [`./DEPLOYMENT.md`](./DEPLOYMENT.md) | CI/CD, release pipeline, Tauri signing, PWA host, relay deploy. |
+| [`./RELEASES.md`](./RELEASES.md) | Standing-approved delivery workflow, per-release records, validation evidence and rollback. |
 | [`./TROUBLESHOOTING.md`](./TROUBLESHOOTING.md) | Common failure modes (build, sync, tests, emulator). |
 
 ## Quality / QA
