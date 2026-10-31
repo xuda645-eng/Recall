@@ -5,7 +5,7 @@ import { createSeedSnapshot } from '@/data/seed';
 import { newMemoryCard } from '@/lib/memory-folders';
 import { snapshotFingerprint } from '@/lib/memory-markdown';
 import type { RecallStateSnapshot } from '@/types';
-import { MemoryWereadImport } from '@/components/memory-weread-import';
+import { MemoryWereadManualImport as MemoryWereadImport } from '@/components/memory-weread-import';
 import { applyWereadImport, buildWereadDrafts, parseWereadExport, planWereadImport, wereadSourceId, WEREAD_MAX_BYTES, type WereadBook } from './memory-weread';
 
 const runtime = vi.hoisted(() => ({ snapshot: null as RecallStateSnapshot | null, commit: vi.fn() }));

@@ -5,6 +5,7 @@ import { commitMemory } from '@/services/memory-actions';
 import { applyWereadImport, buildWereadDrafts, parseWereadExport, planWereadImport, WEREAD_MAX_BYTES, type WereadBook, type WereadDraft, type WereadImportPlan, type WereadImportResult, type WereadKind } from '@/lib/memory-weread';
 import { generateWereadQuestion, loadOnlineBook, loadOnlineBooks } from '@/services/weread-online';
 import './memory-weread-import.css';
+import { MemoryWereadOnlineImport } from './memory-weread-online-import';
 
 export interface MemoryWereadImportProps {
   onClose: () => void;
@@ -25,7 +26,12 @@ const originalSample = {
   ],
 };
 
-export function MemoryWereadImport({ onClose, onComplete, onBusy }: MemoryWereadImportProps): JSX.Element {
+export function MemoryWereadImport(props: MemoryWereadImportProps): JSX.Element {
+  const [manual, setManual] = useState(false);
+  return manual ? <MemoryWereadManualImport {...props} onClose={() => setManual(false)}/>
+    : <MemoryWereadOnlineImport {...props} onLocal={() => setManual(true)}/>;
+}
+export function MemoryWereadManualImport({ onClose, onComplete, onBusy }: MemoryWereadImportProps): JSX.Element {
   const { t } = useTranslation();
   const [stage, setStage] = useState<Stage>('load');
   const [books, setBooks] = useState<WereadBook[]>([]);

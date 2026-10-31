@@ -51,6 +51,25 @@ async function gateway(env: ServerEnv, name: string, params: Record<string, unkn
   return value;
 }
 
+function notebookCount(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+function notebookCover(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > 2048 || !/^https:\/\//i.test(value) || /[\s\\<>]/.test(value)
+    || Array.from(value).some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password ? url.href : null;
+  } catch { return null; }
+}
+
+function notebookDate(value: unknown): string | null {
+  const seconds = notebookCount(value);
+  if (seconds === null || seconds > 253402300799) return null;
+  return new Date(seconds * 1000).toISOString().slice(0, 10);
+}
+
 export async function wereadBooks(request: Request, env: ServerEnv, auth: AuthenticatedDevice): Promise<Response> {
   const input = await readJson(request, 1024);
   if (!isRecord(input) || Object.keys(input).some(key => key !== 'cursor')
@@ -60,12 +79,28 @@ export async function wereadBooks(request: Request, env: ServerEnv, auth: Authen
   if (!Array.isArray(value.books) || value.books.length > 200) throw new ApiError(502, '微信读书列表无效');
   const books = value.books.map(item => {
     if (!isRecord(item) || !isRecord(item.book) || !Number.isSafeInteger(item.noteCount) || (item.noteCount as number) < 0) throw new ApiError(502, '微信读书列表无效');
-    return { bookId: text(item.bookId, 200), title: text(item.book.title, 80), author: typeof item.book.author === 'string' ? text(item.book.author || '作者未提供', 200) : '', highlightCount: item.noteCount };
+    const highlightCount = item.noteCount as number;
+    const thoughtsCount = notebookCount(item.reviewCount), bookmarkCount = notebookCount(item.bookmarkCount);
+    const totalNoteCount = thoughtsCount === null || bookmarkCount === null ? null : notebookCount(highlightCount + thoughtsCount + bookmarkCount);
+    return { bookId: text(item.bookId, 200), title: text(item.book.title, 80), author: typeof item.book.author === 'string' ? text(item.book.author || '作者未提供', 200) : '',
+      highlightCount, cover: notebookCover(item.book.cover), markedFinished: item.markedStatus === 1 ? true : item.markedStatus === 0 ? false : null,
+      thoughtsCount, bookmarkCount, totalNoteCount, lastNoteAt: notebookDate(item.sort), readingProgress: null };
   });
   const last = value.books.at(-1);
   const cursor = value.hasMore === 1 || value.hasMore === true ? isRecord(last) ? last.sort : undefined : null;
-  if (cursor !== null && (!Number.isSafeInteger(cursor) || cursor === input.cursor)) throw new ApiError(502, '微信读书分页无效');
+  if (cursor !== null && (notebookCount(cursor) === null || cursor === input.cursor)) throw new ApiError(502, '微信读书分页无效');
   return json({ books, cursor });
+}
+
+export async function wereadProgress(request: Request, env: ServerEnv, auth: AuthenticatedDevice): Promise<Response> {
+  const input = await readJson(request, 1024);
+  if (!isRecord(input) || Object.keys(input).join(',') !== 'bookId' || typeof input.bookId !== 'string'
+    || !/^[A-Za-z0-9_-]{1,200}$/.test(input.bookId)) throw new ApiError(400, 'Invalid request');
+  await limit(env, auth.session.spaceId, 'weread', 120, 3600000);
+  const value = await gateway(env, '/book/getprogress', { bookId: input.bookId });
+  if (value.bookId !== undefined && value.bookId !== input.bookId) throw new ApiError(502, '微信读书进度来源不一致');
+  const progress = isRecord(value.book) ? notebookCount(value.book.progress) : null;
+  return json({ bookId: input.bookId, readingProgress: progress !== null && progress <= 100 ? progress : null });
 }
 
 export async function wereadBook(request: Request, env: ServerEnv, auth: AuthenticatedDevice): Promise<Response> {

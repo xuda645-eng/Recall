@@ -5,12 +5,14 @@ import { assertBrowserLaunchAllowed } from '../scripts/browser-runtime.mjs';
 assertBrowserLaunchAllowed();
 
 const outputRoot = '/tmp/recall-weread-online-e2e';
-const baseURL = 'http://127.0.0.1:4197/';
+const port = Number(process.env.RECALL_WEREAD_PORT || 4197);
+if (!Number.isSafeInteger(port) || port < 1024 || port > 65535) throw new Error('Invalid local WeRead test port');
+const baseURL = `http://127.0.0.1:${port}/`;
 
 export default defineConfig({
   globalSetup: '../scripts/playwright-global-setup.mjs',
   testDir: '.',
-  testMatch: 'weread-online.spec.ts',
+  testMatch: ['weread-online.spec.ts', 'weread-automatic.spec.ts'],
   outputDir: `${outputRoot}/results`,
   reporter: [
     ['line'],
@@ -41,7 +43,7 @@ export default defineConfig({
   ],
   webServer: {
     cwd: fileURLToPath(new URL('..', import.meta.url)),
-    command: `node node_modules/vite/bin/vite.js build --mode production --outDir ${outputRoot}/build --emptyOutDir && node node_modules/vite/bin/vite.js preview --mode production --outDir ${outputRoot}/build --host 127.0.0.1 --port 4197 --strictPort`,
+    command: `node node_modules/vite/bin/vite.js build --mode production --outDir ${outputRoot}/build --emptyOutDir && node node_modules/vite/bin/vite.js preview --mode production --outDir ${outputRoot}/build --host 127.0.0.1 --port ${port} --strictPort`,
     url: baseURL,
     reuseExistingServer: false,
     timeout: 120000,

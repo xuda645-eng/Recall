@@ -571,6 +571,7 @@ test('Markdown预览、增量更新与归档状态和排期保留', async ({ pag
 
 test('微信读书按书导入、章节元数据、原文不改写及重复导入保留状态', async ({ page }) => {
   await seedPage(page, fixture(), 'weread');
+  await page.getByRole('button', { name: '其他导入方式', exact: true }).click();
   const markText = '  原文第一行。\n\n原文第二行。  ';
   const file = { name: 'weread.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'recall-weread-export-v1', books: [{ bookId: 'book-test', title: '测试书', highlights: [{ bookmarkId: 'highlight-1', markText, chapterUid: 'chapter-1', chapterTitle: '第一章', question: '这个结论的条件是什么？', recallKind: 'qa' }] }] })) };
   async function load() {
@@ -589,6 +590,7 @@ test('微信读书按书导入、章节元数据、原文不改写及重复导�
   expect(stored.decks.filter((deck: { name: string }) => deck.name === '第一章')).toHaveLength(0);
   imported.archivedAt = at; imported.reps = 8;
   await seedPage(page, stored, 'weread');
+  await page.getByRole('button', { name: '其他导入方式', exact: true }).click();
   await load();
   const updated = (await snapshot(page)).cards.find((card: { id: string }) => card.id === imported.id);
   expect(updated.back).toBe(markText); expect(updated.archivedAt).toBe(at); expect(updated.reps).toBe(8);
@@ -597,6 +599,7 @@ test('微信读书按书导入、章节元数据、原文不改写及重复导�
 
 test('带凭证的微信读书文件被拒绝，不落库', async ({ page }) => {
   await seedPage(page, fixture(), 'weread');
+  await page.getByRole('button', { name: '其他导入方式', exact: true }).click();
   await page.locator('input[type="file"]').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'recall-weread-export-v1', apiKey: 'test-only-not-a-real-key', books: [] })) });
   await expect(page.getByRole('alert')).toBeVisible();
   expect((await snapshot(page)).cards).toHaveLength(3);
