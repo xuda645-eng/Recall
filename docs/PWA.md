@@ -74,6 +74,8 @@ RECALL_URL=https://recall-memory.pages.dev/ pnpm test:e2e
 
 本地验收每项限时 30 秒；设置 `RECALL_URL` 的公网验收每项限时
 120 秒，为首次下载和缓存应用资源留出时间，不跳过缓存就绪或离线检查。
+界面断言本地限时 5 秒，公网限时 30 秒，以覆盖首次懒加载；浏览器运行
+错误与应用错误边界检查不变，不通过延长等待来忽略加载失败。
 
 只有明确检查 GitHub Pages 备用预览时才使用
 `RECALL_BUILD_MODE=pages pnpm test:e2e`。备用构建使用 `/Recall/` 子路径，

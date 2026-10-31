@@ -7,6 +7,7 @@ export default defineConfig({
   testDir: "./e2e",
   testMatch: "memory-workspace.spec.ts",
   timeout: process.env.RECALL_URL ? 120000 : 30000,
+  expect: { timeout: process.env.RECALL_URL ? 30000 : 5000 },
   retries: 0,
   use: {
     baseURL: process.env.RECALL_URL || localURL,
