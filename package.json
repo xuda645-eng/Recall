@@ -21,8 +21,8 @@
     "test:coverage": "vitest run --coverage",
     "test:cloud": "vitest run --config cloud-tests/vitest.config.ts",
     "typecheck:cloud": "tsc -p tsconfig.cloud.json",
-    "test:e2e": "playwright test",
-    "test:e2e:cloud": "playwright test --config e2e/cloud.config.ts"
+    "test:e2e": "node scripts/run-playwright.mjs",
+    "test:e2e:cloud": "node scripts/run-playwright.mjs --config e2e/cloud.config.ts"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",

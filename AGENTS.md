@@ -114,6 +114,14 @@ pnpm lint          # eslint
 pnpm test:e2e      # playwright (starts pnpm dev via config)
 ```
 
+### macOS browser launch safety
+
+- Never launch Chromium/WebKit/Firefox from a Codex Seatbelt shell or sandboxed `node_repl`. Even headless browsers register with macOS GUI services; blocked registration can abort with repeated "Playwright" and "Google Chrome for Testing" crash dialogs.
+- Use `pnpm test:e2e` for app and custom prototype configs. The launcher and shipped configs reject `CODEX_SANDBOX=seatbelt` on macOS before starting browsers. Shipped configs also run one startup preflight per project before test workers, so a broken installation/launch fails the suite once instead of crashing per test.
+- On `RECALL_BROWSER_SANDBOX`, rerun the same task-scoped command through `exec_command` with `sandbox_permissions=require_escalated`. Approval remains required. Do not unset sandbox markers, weaken OS security, disable crash reporting, or repeatedly relaunch in a restricted tool.
+- New prototype/browser configs must import `assertBrowserLaunchAllowed` from `scripts/browser-runtime.mjs` and use `scripts/playwright-global-setup.mjs`, with paths relative to that config. Ad hoc screenshot/browser scripts must call the guard before launch. Do not call a custom config directly through the raw Playwright CLI without this protection.
+- Browser startup failures are failed/unverified validation, never a passing check or a reason to deploy. Keep private data and screenshots out of public evidence.
+
 ## Agent efficiency (after bootstrap)
 
 - Avoid re-reading files you just edited. Edit tool confirms success from context.

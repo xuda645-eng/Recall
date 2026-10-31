@@ -7,6 +7,9 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { chromium } from "@playwright/test";
+import { assertBrowserLaunchAllowed } from "./browser-runtime.mjs";
+
+assertBrowserLaunchAllowed();
 
 const BASE = process.env.RECALL_URL ?? "http://localhost:5173";
 const OUT = "docs/screenshots";

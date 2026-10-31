@@ -1,6 +1,10 @@
 import { defineConfig } from '@playwright/test';
+import { assertBrowserLaunchAllowed } from '../scripts/browser-runtime.mjs';
+
+assertBrowserLaunchAllowed();
 
 export default defineConfig({
+  globalSetup: '../scripts/playwright-global-setup.mjs',
   testDir: '.',
   testMatch: 'cloud-sync.spec.ts',
   timeout: 120000,

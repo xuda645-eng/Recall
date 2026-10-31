@@ -69,6 +69,27 @@ Pages 生产地址一致。主套件是
 窄屏、断点、横屏、桌面及 PWA 离线持久化。测试只写独立浏览器上下文
 中的临时本机数据，不向服务器保存卡片。
 
+### macOS 测试浏览器启动保护
+
+macOS 上的 Codex Seatbelt 沙箱不能正常完成测试浏览器的系统 GUI 注册，
+即使使用 headless 也可能在页面加载前崩溃。系统显示的“Playwright”是
+WebKit 测试宿主，不是 Recall；“Google Chrome for Testing”是 Chromium
+测试宿主。每个测试再次启动浏览器会产生新的崩溃报告，点“忽略”不能
+阻止下一次启动。不要关闭 macOS 崩溃报告、删除缓存或重装普通 Chrome
+来掩盖这个权限问题。
+
+`pnpm test:e2e`、正式配置和旧截图脚本会在启动前拒绝该沙箱环境，输出
+`RECALL_BROWSER_SANDBOX` 并失败退出，不启动浏览器、不计为验收通过。
+Codex 应通过 `exec_command` 的 `sandbox_permissions=require_escalated`
+重新执行同一条命令并遵守工具审批；也可以在普通 macOS 终端执行。
+不要手动清除 `CODEX_SANDBOX`，也不要在沙箱 `node_repl` 中反复重试。
+
+正式套件还会在 worker 启动前逐项验证浏览器启动、独立移动上下文和
+空白页渲染；任何引擎失败会以 `RECALL_BROWSER_PREFLIGHT` 终止整套测试，
+避免损坏的浏览器安装引发逐测试崩溃。此检查不访问生产数据，不替代
+iPhone 15 功能测试或真机验收。新原型配置应复用相同保护，并通过
+`pnpm test:e2e --config <原型配置路径>` 运行。
+
 Chromium 使用浏览器离线模式验证原站点重开。当前 macOS Playwright
 WebKit 的离线开关会在导航时产生引擎内部错误，因此 WebKit 以相同
 生产构建启动独立静态服务器，完成缓存后关闭服务器，并验证无网络

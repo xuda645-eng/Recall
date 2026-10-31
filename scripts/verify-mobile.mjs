@@ -1,6 +1,9 @@
 import { chromium, webkit, expect } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { assertBrowserLaunchAllowed } from './browser-runtime.mjs';
+
+assertBrowserLaunchAllowed();
 const url = process.env.RECALL_URL || 'https://recall-memory.pages.dev/';
 const out = resolve(process.env.RECALL_QA_DIR || 'quality/mobile');
 mkdirSync(out,{recursive:true});

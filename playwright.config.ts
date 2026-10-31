@@ -1,9 +1,13 @@
 import { defineConfig } from "@playwright/test";
+import { assertBrowserLaunchAllowed } from "./scripts/browser-runtime.mjs";
+
+assertBrowserLaunchAllowed();
 
 const buildMode = process.env.RECALL_BUILD_MODE === "pages" ? "pages" : "production";
 const localURL = `http://127.0.0.1:4193/${buildMode === "pages" ? "Recall/" : ""}`;
 
 export default defineConfig({
+  globalSetup: "./scripts/playwright-global-setup.mjs",
   testDir: "./e2e",
   testMatch: "memory-workspace.spec.ts",
   timeout: process.env.RECALL_URL ? 300000 : 30000,

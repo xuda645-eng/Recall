@@ -1,10 +1,14 @@
 import { defineConfig } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
+import { assertBrowserLaunchAllowed } from '../scripts/browser-runtime.mjs';
+
+assertBrowserLaunchAllowed();
 
 const outputRoot = '/tmp/recall-weread-online-e2e';
 const baseURL = 'http://127.0.0.1:4197/';
 
 export default defineConfig({
+  globalSetup: '../scripts/playwright-global-setup.mjs',
   testDir: '.',
   testMatch: 'weread-online.spec.ts',
   outputDir: `${outputRoot}/results`,

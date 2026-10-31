@@ -1,5 +1,8 @@
 import { chromium, expect } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { assertBrowserLaunchAllowed } from './browser-runtime.mjs';
+
+assertBrowserLaunchAllowed();
 const url=process.env.RECALL_URL||'http://127.0.0.1:4185/';
 const out=process.env.RECALL_QA_DIR||'quality/chinese-mobile';mkdirSync(out,{recursive:true});
 const browser=await chromium.launch({executablePath:process.env.RECALL_CHROMIUM||'/usr/local/bin/chromium',headless:true,args:['--no-sandbox']});
