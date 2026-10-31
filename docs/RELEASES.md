@@ -4,6 +4,16 @@ The user approved this workflow on 2026-10-31. Testing and delivery are default
 parts of completing requested Recall work, not questions to ask at the end.
 `AGENTS.md` defines the standing authorization and its safety boundaries.
 
+The explicit-only parallel delivery exception in `AGENTS.md` applies only when
+the user enables `$recall-parallel-delivery` for the current chat. Developers
+still validate, commit task branches, deliver applicable previews and keep unique
+pending task records, but do not push main or deploy production. The integration
+owner updates this shared index and completes the combined main/production
+delivery. Safe previews on existing authorized infrastructure do not require
+repeated business confirmation and must remain separate from production/data.
+Without explicit activation, the normal delivery loop below is unchanged;
+maintaining or installing the Skill does not activate it.
+
 ## Delivery Loop
 
 1. Inspect the worktree, current branch/remotes and applicable agent rules.
@@ -88,6 +98,7 @@ retroactively marked verified just because a deployment still exists.
 
 | Release | Scope | Result | Record |
 |---|---|---|---|
+| `20261101T020208+0800-preview-delivery-policy` | Skill preview handoff / explicit parallel authorization / docs | Source validated; installation and publication pending, no app deployment | [Preview delivery and explicit parallel authorization](./releases/20261101T020208+0800-preview-delivery-policy.md) |
 | `20261101T015717+0800-status-sampling-safe-area` | Installed WebKit PWA sampling region / mobile regression checks | 1341 unit and 46 mobile checks passed; publication next, native iPhone result pending | [Safe-area status sampling](./releases/20261101T015717+0800-status-sampling-safe-area.md) |
 | `20261101T014756+0800-explicit-parallel-skill` | Explicit-only Skill / local installation / docs | Validated, installed and source `12457e6` pushed; no app deployment | [Explicit-only parallel delivery Skill](./releases/20261101T014756+0800-explicit-parallel-skill.md) |
 | `20261101T010911+0800-main-integration` | Combined study queue / WeRead final correction / iOS shell / release reconciliation | Main `b198189` pushed/deployed; 1341 app, 187 cloud, 106 local mobile/update checks passed; public assets/auth and 8 mobile checks passed across attempts, full public/physical acceptance not claimed | [Main integration and production release](./releases/20261101T010911+0800-main-integration.md) |
