@@ -88,6 +88,7 @@ retroactively marked verified just because a deployment still exists.
 
 | Release | Scope | Result | Record |
 |---|---|---|---|
+| `20261031T210732+0800-publish-pending` | Combined PWA / WeRead AI / additive D1 / config / docs | Local checks passed; public release gate in progress | [Publish reviewed pending work](./releases/20261031T210732+0800-publish-pending.md) |
 | `20261031T204601+0800-smoke-once` | Automation / one manual live probe / docs | Automation paused; current probe passed; source publication remains held | [One current smoke round](./releases/20261031T204601+0800-smoke-once.md) |
 | `20261031T204352+0800-smoke-24h` | Local smoke automation / script / docs | Updated to 24 hours; source publication held with unfinished release | [24-hour smoke window](./releases/20261031T204352+0800-smoke-24h.md) |
 | `20261031T202802+0800-weread-ai` | App / protected API / additive D1 | Validated; publication pending | [WeRead online import and AI questions](./releases/20261031T202802+0800-weread-ai.md) |

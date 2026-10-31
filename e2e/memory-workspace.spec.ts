@@ -118,6 +118,156 @@ test('iPhone15首页、48px共享Logo、静止抽屉和快速关闭恢复', asyn
   await noOverflow(page);
 });
 
+test('状态栏安全区与Logo行保留10px间距，滚动和抽屉不改变同行位置', async ({ page }) => {
+  await seedPage(page);
+  const logo = page.locator('.m-brand');
+  const context = page.locator('.memory-bar .m-context');
+  const action = page.locator('.m-top-action');
+  for (const inset of [0, 59, 80]) {
+    await page.locator('.memory-app').evaluate((element, value) => {
+      (element as HTMLElement).style.setProperty('--safe-inset-top', `${value}px`);
+    }, inset);
+    const logoBox = (await logo.boundingBox())!;
+    const contextBox = (await context.boundingBox())!;
+    const actionBox = (await action.boundingBox())!;
+    expect(logoBox.y).toBe(inset + 10);
+    expect(logoBox.width).toBe(48);
+    expect(logoBox.height).toBe(48);
+    expect(contextBox.y).toBe(logoBox.y);
+    expect(contextBox.height).toBe(48);
+    expect(actionBox.y).toBe(logoBox.y);
+    expect(actionBox.width).toBe(48);
+    expect(actionBox.height).toBe(48);
+    expect(contextBox.x - logoBox.x - logoBox.width).toBe(8);
+    expect(actionBox.x - contextBox.x - contextBox.width).toBe(8);
+    const barBox = (await page.locator('.memory-bar').boundingBox())!;
+    expect(barBox.y).toBe(0);
+    expect(barBox.x).toBe(0);
+    expect(barBox.width).toBe(393);
+    expect(barBox.height).toBe(inset + 72);
+    expect((await page.locator('.memory-content').boundingBox())!.y).toBe(barBox.height);
+    expect((await page.locator('.m-intro').boundingBox())!.y).toBeGreaterThan(logoBox.y + logoBox.height);
+    await noOverflow(page);
+    if (inset === 59) await saveShot(page, 'home-status-bar-gap');
+  }
+  await page.locator('.memory-content').evaluate(element => { element.scrollTop = 180; });
+  expect(await page.locator('.memory-content').evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  expect((await logo.boundingBox())!.y).toBe(90);
+  const firstFrame = await logo.evaluate(button => new Promise<{ logoTop: number; logoLeft: number; contextTop: number; actionTop: number; drawerVisible: boolean }>(resolveFrame => {
+    const shell = button.closest('.memory-shell')!;
+    const captureFrame = () => {
+      if (shell.getBoundingClientRect().x <= 0) { requestAnimationFrame(captureFrame); return; }
+      const logoBox = button.getBoundingClientRect();
+      resolveFrame({
+        logoTop: logoBox.y,
+        logoLeft: logoBox.x,
+        contextTop: shell.querySelector('.m-context')!.getBoundingClientRect().y,
+        actionTop: shell.querySelector('.m-top-action')!.getBoundingClientRect().y,
+        drawerVisible: getComputedStyle(document.querySelector('#memory-drawer')!).visibility === 'visible',
+      });
+    };
+    (button as HTMLButtonElement).click();
+    requestAnimationFrame(captureFrame);
+  }));
+  expect(firstFrame.logoTop).toBe(90);
+  expect(firstFrame.contextTop).toBe(90);
+  expect(firstFrame.actionTop).toBe(90);
+  expect(firstFrame.logoLeft).toBeGreaterThan(14);
+  expect(firstFrame.logoLeft).toBeLessThan(300);
+  expect(firstFrame.drawerVisible).toBe(true);
+  await expect(page.locator('.memory-shell')).toHaveClass(/is-open/);
+  await expect.poll(async () => (await logo.boundingBox())!.x).toBeGreaterThan(300);
+  expect((await logo.boundingBox())!.y).toBe(90);
+  expect((await context.boundingBox())!.y).toBe(90);
+  expect((await action.boundingBox())!.y).toBe(90);
+  await saveShot(page, 'drawer-status-bar-gap');
+  await page.getByRole('button', { name: '关闭项目菜单', exact: true }).click();
+  await expect.poll(async () => (await logo.boundingBox())!.x).toBe(14);
+  expect((await logo.boundingBox())!.y).toBe(90);
+  await expect(logo).toBeFocused();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await logo.click();
+  expect(await page.locator('.memory-shell').evaluate(element => getComputedStyle(element).transitionDuration)).toBe('0s');
+  expect((await logo.boundingBox())!.y).toBe(90);
+  await page.getByRole('button', { name: '关闭菜单', exact: true }).click({ position: { x: 35, y: 220 } });
+  await expect(page.locator('.memory-shell')).not.toHaveClass(/is-open/);
+  await expect(logo).toBeFocused();
+  expect((await logo.boundingBox())!.y).toBe(90);
+  await logo.click();
+  await page.mouse.move(365, 250);
+  await page.mouse.down();
+  await page.mouse.move(220, 250, { steps: 6 });
+  expect((await logo.boundingBox())!.y).toBe(90);
+  await page.mouse.up();
+  await expect(page.locator('.memory-shell')).not.toHaveClass(/is-open/);
+  await expect(logo).toBeFocused();
+  await navigate(page, '统计');
+  await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'stats');
+  expect((await logo.boundingBox())!.y).toBe(90);
+  await logo.click();
+  await page.setViewportSize({ width: 761, height: 852 });
+  await expect(page.locator('.memory-shell')).not.toHaveClass(/is-open/);
+  await noOverflow(page);
+});
+
+test('不透明固定顶栏与正文滚动分离，设置页、暗色和阅读保持安全区', async ({ page }) => {
+  await seedPage(page);
+  await page.locator('.memory-app').evaluate(element => {
+    (element as HTMLElement).style.setProperty('--safe-inset-top', '59px');
+    (element as HTMLElement).style.setProperty('--safe-bottom', '34px');
+  });
+  for (const [route, label] of [['home', '今日复习'], ['folders', '我的卡组'], ['settings', '设置与数据'], ['advanced', '设置与数据'], ['stats', '统计'], ['import', '导入']]) {
+    await navigate(page, label);
+    if (route === 'advanced') await page.locator('.m-top-action').click();
+    await expect(page.locator('.memory-content')).toHaveAttribute('data-route', route);
+    await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))));
+    for (const dark of [false, true]) {
+      await page.locator('html').evaluate((element, value) => element.classList.toggle('dark', value), dark);
+      const surface = await page.locator('.memory-bar').evaluate(element => {
+        const style = getComputedStyle(element);
+        const box = element.getBoundingClientRect();
+        const app = document.querySelector('.memory-app')!;
+        return {
+          position: style.position,
+          background: style.backgroundColor,
+          backgroundImage: style.backgroundImage,
+          filter: style.filter,
+          backdropFilter: style.backdropFilter,
+          edgeInBar: element.contains(document.elementFromPoint(innerWidth / 2, 1)),
+          appPosition: getComputedStyle(app).position,
+          contentTop: document.querySelector('.memory-content')!.getBoundingClientRect().y,
+          bottom: box.bottom,
+        };
+      });
+      expect(surface.position).toBe('fixed');
+      expect(surface.appPosition).toBe('fixed');
+      expect(surface.background).toBe(dark ? 'rgb(36, 36, 32)' : 'rgb(246, 245, 239)');
+      expect(surface.backgroundImage).toBe('none');
+      expect(surface.filter).toBe('none');
+      expect(surface.backdropFilter).toBe('none');
+      expect(surface.edgeInBar).toBe(true);
+      expect(surface.contentTop).toBe(surface.bottom);
+      expect(surface.bottom).toBe(131);
+      expect((await page.locator('.m-brand').boundingBox())!.y).toBe(69);
+      await page.locator('.memory-content').evaluate(element => { element.scrollTop = element.scrollHeight; });
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+      expect((await page.locator('.memory-content').boundingBox())!.y).toBe(131);
+      expect((await page.locator('.m-brand').boundingBox())!.y).toBe(69);
+      await noOverflow(page);
+      if (route === 'advanced') await saveShot(page, `settings-top-surface-${dark ? 'dark' : 'light'}`);
+    }
+  }
+  await page.locator('html').evaluate(element => element.classList.remove('dark'));
+  await navigate(page, '今日复习');
+  await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'home');
+  await startReading(page);
+  expect((await page.locator('.m-study').boundingBox())!.y).toBe(131);
+  const readingBox = (await page.locator('.m-reading[data-active="true"]').boundingBox())!;
+  expect(readingBox.y).toBeGreaterThanOrEqual(131);
+  expect(readingBox.y + readingBox.height).toBeLessThanOrEqual(852 - 34);
+  await noOverflow(page);
+});
+
 test('紧凑卡组目录、子树搜索、唯一筛选面板和底部复习入口', async ({ page }) => {
   await seedPage(page, fixture(), 'folders');
   const search = page.getByRole('searchbox', { name: '搜索当前范围及下级内容' });
@@ -378,10 +528,10 @@ test('安全区、窄屏、760断点、横屏和桌面无溢出或固定控件�
   await seedPage(page);
   await startReading(page);
   await page.getByRole('button', { name: '显示答案', exact: true }).click();
-  await page.locator('.memory-app').evaluate(element => { (element as HTMLElement).style.setProperty('--safe-top', '59px'); (element as HTMLElement).style.setProperty('--safe-bottom', '34px'); });
+  await page.locator('.memory-app').evaluate(element => { (element as HTMLElement).style.setProperty('--safe-inset-top', '59px'); (element as HTMLElement).style.setProperty('--safe-bottom', '34px'); });
   const button = (await page.locator('[data-rating="good"]').boundingBox())!;
   expect(button.y + button.height).toBeLessThanOrEqual(852 - 34);
-  expect((await page.locator('.m-brand').boundingBox())!.y).toBe(59);
+  expect((await page.locator('.m-brand').boundingBox())!.y).toBe(69);
   await saveShot(page, 'safe-areas');
   for (const size of [{ width: 320, height: 568 }, { width: 760, height: 852 }, { width: 761, height: 852 }, { width: 852, height: 393 }, { width: 1440, height: 900 }]) {
     await page.setViewportSize(size);

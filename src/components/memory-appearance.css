@@ -7,7 +7,8 @@
   --muted: #737368;
   --card-paper: #fffef9;
   --drawer-paper: #eeede5;
-  --safe-top: max(10px, env(safe-area-inset-top, 0px));
+  --safe-inset-top: env(safe-area-inset-top, 0px);
+  --safe-top: max(10px, var(--safe-inset-top));
   --safe-bottom: max(16px, env(safe-area-inset-bottom, 0px));
   --safe-left: max(14px, env(safe-area-inset-left, 0px));
   --safe-right: max(12px, env(safe-area-inset-right, 0px));
@@ -232,11 +233,16 @@
 .dark .m-source-notice, .dark .m-original-highlight, .dark .m-archive-undo { background: #363d2a; color: #d0d6c2; }
 .dark .m-review-modes > label:has(input:checked), .dark .m-book-choice:has(input:checked) { background: #353d2c; }
 @media (max-width: 760px) {
+  .memory-app { --safe-top: calc(var(--safe-inset-top) + 10px); position: fixed; inset: 0; height: 100dvh; min-height: 0; overflow: hidden; }
   .memory-shell { position: fixed; inset: 0; width: 100%; height: 100dvh; min-height: 0; transform: translate3d(0,0,0); }
+  .memory-bar { top: 0; left: 0; right: 0; height: calc(var(--safe-top) + 62px); padding: var(--safe-top) var(--safe-right) 12px var(--safe-left); box-sizing: border-box; grid-template-rows: 48px; background: var(--paper); }
+  .memory-content, .is-reading .memory-content { position: absolute; top: calc(var(--safe-top) + 62px); bottom: 0; width: 100%; height: auto; }
+  .m-main { padding-top: 12px; }
+  .is-reading .m-main { margin-top: 0; height: 100%; }
   .memory-drawer { visibility: hidden; }
   .memory-drawer[data-visible="true"] { visibility: visible; }
   .memory-app[data-drawer="true"] .memory-content { overflow: hidden; }
-  .memory-content[data-route="folders"] .m-main, .memory-content[data-route="cards"] .m-main, .memory-content[data-route="archived"] .m-main { padding-top: calc(var(--safe-top) + 65px); padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+  .memory-content[data-route="folders"] .m-main, .memory-content[data-route="cards"] .m-main, .memory-content[data-route="archived"] .m-main { padding-top: 3px; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
 }
 @media (max-width: 359px) {
   .m-main { padding-left: 15px; padding-right: 15px; }
