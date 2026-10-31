@@ -28,6 +28,9 @@ jobs:
       - name: Unit tests with coverage
         run: pnpm test:coverage
 
+      - name: Pages Functions typecheck
+        run: pnpm typecheck:cloud
+
       - name: Build
         run: pnpm build
 

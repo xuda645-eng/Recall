@@ -195,3 +195,20 @@ Folder/file sync still works with zero cloud.
 
 ### Still open
 See AUDIT.md backlog: S1 (syncCode at rest), S4 (relay concurrency), T1 full merge-path tests, Dependabot #47–#49
+
+## 2026-10-31 - Personal Device Auth And D1 Sync
+
+- Added Recall-specific revocable device authentication and a private shared D1
+  space, retaining the existing production origin and local-only access.
+- Local-first persistence now includes an atomic sync journal, idempotent
+  mutation replay, explicit conflict backup/selection and safe first migration.
+- Verified the existing Recall account is Workers Free. Created a dedicated
+  Recall D1 with incremental migration; no paid upgrade, R2 or DNS changes.
+- Local validation: 1,131 tests with coverage gates, including 58 SQLite backend
+  tests; app/Functions typechecks; lint 0 errors and 131 existing warnings;
+  production build; 38 mobile PWA checks; two real local D1 browser flows with
+  two devices each, including review/undo, offline edits, conflicts and revocation.
+- Browser validation is simulated. Physical iPhone installation, cookie
+  retention and live offline reopening remain unverified.
+- Deployment/recovery/free-limit instructions: `docs/CLOUD_SYNC.md`. Private
+  recovery credentials, card batches and internal handoffs are not source files.

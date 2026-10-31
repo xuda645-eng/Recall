@@ -19,6 +19,11 @@ Thumbs.db
 .vscode/
 .idea/
 coverage/
+.wrangler/
+.dev.vars
+handoffs/
+/card-imports/
+/quality/
 
 # Temporary files
 gen-key.py

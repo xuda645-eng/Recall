@@ -115,6 +115,11 @@ The original upstream is **Madlezz/Recall**. This workspace's user-owned fork is
 
 **Production hosting is Cloudflare Pages, not GitHub Pages.** Reuse the existing **recall-memory** project, production branch **main**, and **https://recall-memory.pages.dev/**. GitHub is the source host, not permission to choose a different production platform. Read `docs/SELFHOST.md` and `docs/DEPLOYMENT.md` before deploying, verify the authenticated Cloudflare account and existing project, then build and test the root-path production bundle. Do not create another project, enable databases or paid bindings, or change DNS as part of a static PWA release. Keep the origin stable to preserve access to existing device-local cards. The GitHub Pages workflow is a manual-only fallback preview, not the production release path.
 
+The user-approved 2026-10-31 device-auth/private D1 milestone is an exception to
+the static-only database restriction above, not to the no-paid-infrastructure
+rule. See `docs/CLOUD_SYNC.md`; use only the verified Free account, dedicated
+Recall DB and production-only secret. Never seed production with test data.
+
 ## Cost / infra (HARD)
 
 **Maintainer does not pay for hosted infra on this open-source project.**

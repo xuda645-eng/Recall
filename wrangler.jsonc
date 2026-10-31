@@ -1,0 +1,27 @@
+{
+  "name": "recall-memory",
+  "compatibility_date": "2026-10-30",
+  "pages_build_output_dir": "./dist",
+  "vars": { "RECALL_SPACE_ID": "local-only" },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "recall-local-test",
+    "database_id": "00000000-0000-4000-8000-000000000001",
+    "migrations_dir": "migrations"
+  }],
+  "env": {
+    "production": {
+      "vars": { "RECALL_SPACE_ID": "personal" },
+      "d1_databases": [{
+        "binding": "DB",
+        "database_name": "recall-memory-data",
+        "database_id": "7e0289a3-30a4-479a-a60a-58eabea71507",
+        "migrations_dir": "migrations"
+      }]
+    },
+    "preview": {
+      "vars": { "RECALL_SPACE_ID": "preview-disabled" },
+      "d1_databases": []
+    }
+  }
+}

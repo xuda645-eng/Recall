@@ -57,7 +57,9 @@ host. The original deployment record is in `docs/SELFHOST.md`.
 
 Use the existing Wrangler OAuth login. Verify the account and project before
 publishing. Do not create another Pages project, change DNS, enable a sync relay,
-or add database, R2, or paid bindings for this static PWA.
+or add R2 or paid bindings. The separately approved private D1/device-auth
+milestone is documented in `docs/CLOUD_SYNC.md`; it reuses this project and
+keeps local-only use available without a paid plan.
 
 ```bash
 npx --yes wrangler@4.156.0 whoami
@@ -85,7 +87,8 @@ iPhone checks. Browser simulations do not prove real iPhone installation.
 
 Do not upload `.env*`, credentials, private card batches, test snapshots, or
 internal handoff files. The production site starts with empty data and stores
-cards on the device. Changing host or origin does not migrate local browser
+cards on the device until authorization. Authorized devices share the private
+D1 library with an offline cache. Changing host or origin does not migrate local browser
 data; export a `.recall` backup before switching URLs.
 
 ### GitHub Pages (Manual Fallback Only)

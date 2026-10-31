@@ -32,6 +32,7 @@ import { normalizeMemoryReviewPlan } from "@/services/memory-review";
 import { DEFAULT_SHORTCUTS } from "@/lib/shortcuts";
 import { isWrappedSyncCode, sealSettingsSecrets, unsealSettingsSecrets } from "@/services/sync-secret";
 import type { Card, Deck, RecallExportPayload, RecallStateSnapshot, ReviewLog, StudySession, Theme } from "@/types";
+import { writeCachedSnapshot, type CloudJournal } from '@/services/cloud-cache';
 
 const STORAGE_KEY = "recall.snapshot.v1";
 
@@ -74,7 +75,7 @@ async function migratePlaintextSyncCode(
 
 export interface RecallRepository {
   loadAppData(): Promise<RecallStateSnapshot>;
-  saveSnapshot(snapshot: RecallStateSnapshot): Promise<void>;
+  saveSnapshot(snapshot: RecallStateSnapshot, journal?: CloudJournal): Promise<void>;
     recordReview(updatedCard: Card, reviewLog: ReviewLog, session: StudySession | null): Promise<void>;
     resetToSeedData(): Promise<RecallStateSnapshot>;
   replaceDataFromImport(payload: RecallExportPayload): Promise<RecallStateSnapshot>;
@@ -636,11 +637,11 @@ class LocalStorageRecallRepository implements RecallRepository {
     return empty;
   }
 
-  async saveSnapshot(snapshot: RecallStateSnapshot): Promise<void> {
+  async saveSnapshot(snapshot: RecallStateSnapshot, journal?: CloudJournal): Promise<void> {
     validateImportSnapshot(snapshot);
     if (typeof localStorage !== "undefined") {
       const disk = await sealSnapshotForDisk(snapshot);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(disk));
+      writeCachedSnapshot(disk, journal);
     }
   }
 
@@ -822,7 +823,7 @@ function loadLocalSnapshot(): RecallStateSnapshot | null {
   }
 
   try {
-    const snapshot = JSON.parse(raw) as RecallStateSnapshot;
+    const { cloudJournal: _cloudJournal, ...snapshot } = JSON.parse(raw) as RecallStateSnapshot & { cloudJournal?: unknown };
         validateImportSnapshot(snapshot);
         // Migrate settings to fill in fields added after the user's last save
         snapshot.settings = migrateSettings(snapshot.settings);

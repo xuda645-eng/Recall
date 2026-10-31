@@ -313,6 +313,7 @@ test('归档后继续评分再撤销归档，不覆盖新评分记录', async ({
   await page.getByRole('button', { name: '显示答案', exact: true }).click();
   await page.locator('[data-rating="good"]').click();
   await page.getByRole('button', { name: /撤销归档，剩余/ }).click();
+  await expect.poll(async () => (await snapshot(page)).cards[0].archivedAt).toBeUndefined();
   const data = await snapshot(page);
   expect(data.cards[0].archivedAt).toBeUndefined();
   expect(data.reviewLogs).toHaveLength(1);

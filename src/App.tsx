@@ -10,6 +10,7 @@ import { Dashboard } from "@/components/dashboard";
 import { QuickAddDialog } from "@/components/quick-add";
 import { useRecallStore } from "@/stores/recall-store";
 import { toast } from "sonner";
+import { startCloudSync } from '@/services/cloud-sync';
 
 const DeckBrowser = lazy(() => import("@/components/deck-browser").then(m => ({ default: m.DeckBrowser })));
 const DeckDetail = lazy(() => import("@/components/deck-detail").then(m => ({ default: m.DeckDetail })));
@@ -40,6 +41,11 @@ export function App(): JSX.Element {
   useEffect(() => {
     void initialize();
   }, [initialize]);
+
+  useEffect(() => {
+    if (isTauriRuntime() || isLoading || error) return;
+    return startCloudSync();
+  }, [isLoading, error]);
 
   useEffect(() => {
     if (!isTauriRuntime()) return;
