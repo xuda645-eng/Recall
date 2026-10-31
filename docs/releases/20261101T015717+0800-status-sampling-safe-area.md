@@ -3,7 +3,7 @@
 ## Status And Scope
 
 - Started and recorded: `2026-11-01T01:57:17+08:00` (Asia/Shanghai).
-- Status: candidate passed local validation; commit/push and publication next.
+- Status: committed, normally pushed and deployed; publication checks in progress.
 - Local validation and production build completed: `2026-11-01T02:03:49+08:00`.
 - User confirmed that the installed iPhone still blurred the Logo's upper edge
   after applying the available update and reopening from the home screen.
@@ -108,7 +108,57 @@ file hashes are retained locally to compare the committed rebuild before upload.
 
 The remote main tip was read as the starting SHA. Existing documentation/skill
 edits in the separate main worktree are also excluded from this clean release.
-Committed SHA and publication outcomes will be appended after execution.
+## Publication And Post-Deploy Checks
+
+- Implementation commit: `3e6a08ed133169541ce3aa48f9f79f3533360091`.
+  Normal push `git push origin HEAD:main` succeeded:
+  `a9ce6d8..3e6a08e HEAD -> main`. The clean detached copy avoids publishing
+  either chat-worktree or main-worktree dirty documentation/skill changes.
+- Rebuilt the committed production bundle and checked all validated file hashes
+  with `shasum -a 256 -c /tmp/recall-edge-validated.sha256`; all matched.
+  `git status --porcelain` was empty before upload. No dirty override was used.
+- Rechecked production immediately before upload: it still pointed at the
+  recorded previous deployment. Used the verified account and command
+  `npx --yes wrangler@4.156.0 pages deploy dist --project-name recall-memory
+  --branch main --commit-hash 3e6a08ed133169541ce3aa48f9f79f3533360091
+  --commit-message 'fix: extend iOS status sampling through the safe area'`.
+- Publication succeeded, uploading 26 new files / 167 existing, Functions and
+  the existing route manifest. Deployment ID:
+  `2d0c437c-ef6b-4f0a-98ae-3a3c0b8aa3b5`,
+  `https://2d0c437c.recall-memory.pages.dev/`. Authenticated deployment listing
+  verified production/main/source `3e6a08e` at `2026-11-01T02:08:17+08:00`.
+- Root production HTML and manifest returned 200 and matched committed bytes.
+  Initial sequential curl verification used `--connect-timeout 10 --max-time 30`
+  and stopped on a TLS timeout fetching `sw.js`. One unsandboxed 20s/60s retry
+  also timed out. An independent parallel Node fetch probe (60s signal budget)
+  matched two icons and confirmed anonymous `/api/sync` returned 401, but other
+  connections timed out. Its identical unsandboxed retry succeeded for `sw.js`,
+  all three manifest icons and `assets/memory-workspace-JtOBCVMR.css`: every file
+  returned 200 and matched the committed bytes; anonymous API remained 401.
+  Original transport failures remain failures, not retrospectively passes.
+- The existing in-app browser could be listed but tab binding failed with
+  `browser.user is unavailable`. A fresh URL/ID lookup and the documented direct
+  binding did not recover it. No real-data page reload/update was performed.
+  Public acceptance uses separate anonymous browser contexts instead.
+- Public command: exported `RECALL_URL=https://recall-memory.pages.dev/` and
+  both cached executables, then
+  `node scripts/run-playwright.mjs --grep '顶部采样层\|不透明固定' --workers=2
+  --output=/tmp/recall-edge-public`. Both WebKit checks passed (42.8s and 1.1m),
+  including actual new CSS, SW control/cache readiness, safe-area geometry,
+  drawer, light/dark, sheets, route navigation and reading.
+- Additional local update check:
+  `node scripts/run-playwright.mjs --config /tmp/recall-edge-update.config.mts
+  --workers=2 --output=/tmp/recall-edge-update`, with both cached executables.
+  Two checks passed in 12.0s. The previous bundle's index matched pre-release
+  production; a local server switched to the exact committed candidate bundle.
+  Both engines displayed and clicked the actual update prompt, loaded a new
+  CSS URL containing the safe-area rule, and retained synthetic cards, decks,
+  review logs, sessions and an unrelated preference. No page errors. The guarded
+  temporary config imports this checkout's preflight; no browser safety bypass.
+  This proves a local update transition, not the user's physical update delivery.
+
+No regression has been demonstrated and no rollback has been performed. Final
+public Chromium outcome and verification completion will be appended below.
 
 ## Production And Recovery
 
