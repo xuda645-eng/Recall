@@ -1,13 +1,13 @@
 import { useTranslation } from "react-i18next";
 import { Toaster } from "sonner";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { PWAUpdatePrompt } from "@/components/pwa-update-prompt";
+import { PWAUpdatePrompt, PWAUpdateProvider } from "@/components/pwa-update-prompt";
 import { useState, useEffect, lazy, Suspense } from "react";
-import { AppShell } from "@/components/app-shell";
 import { isTauriRuntime } from "@/db/client";
 const MemoryWorkspace = lazy(() => import("@/components/memory-workspace").then(m => ({ default: m.MemoryWorkspace })));
-import { Dashboard } from "@/components/dashboard";
-import { QuickAddDialog } from "@/components/quick-add";
+const AppShell = lazy(() => import("@/components/app-shell").then(module => ({ default: module.AppShell })));
+const Dashboard = lazy(() => import("@/components/dashboard").then(module => ({ default: module.Dashboard })));
+const QuickAddDialog = lazy(() => import("@/components/quick-add").then(module => ({ default: module.QuickAddDialog })));
 import { useRecallStore } from "@/stores/recall-store";
 import { toast } from "sonner";
 import { startCloudSync } from '@/services/cloud-sync';
@@ -26,6 +26,10 @@ const ImportHub = lazy(() => import("@/components/import-hub").then(m => ({ defa
 const FocusTimer = lazy(() => import("@/components/focus-timer").then(m => ({ default: m.FocusTimer })));
 
 export function App(): JSX.Element {
+  return <PWAUpdateProvider><Application /></PWAUpdateProvider>;
+}
+
+function Application(): JSX.Element {
   const { t } = useTranslation();
   const view = useRecallStore((state) => state.view);
   const isLoading = useRecallStore((state) => state.isLoading);
@@ -89,6 +93,7 @@ export function App(): JSX.Element {
 
       // Listen for global shortcut (Ctrl+Shift+N) from Tauri - works even when app is in background
       useEffect(() => {
+        if (!isTauriRuntime()) return;
         let unlisten: (() => void) | undefined;
         void (async () => {
           try {
@@ -205,8 +210,10 @@ export function App(): JSX.Element {
           )}
         </Suspense>
         <Toaster richColors closeButton position="top-right" offset={{ top: "calc(max(24px, env(safe-area-inset-top, 0px)) + 72px)", right: "16px" }} mobileOffset={{ top: "calc(max(24px, var(--recall-safe-top)) + 72px)", right: "16px", left: "16px" }} />
-        <QuickAddDialog open={showQuickAdd} onClose={() => setShowQuickAdd(false)} />
-        <ShortcutHelp open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+        <Suspense fallback={null}>
+          <QuickAddDialog open={showQuickAdd} onClose={() => setShowQuickAdd(false)} />
+          <ShortcutHelp open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+        </Suspense>
         <PWAUpdatePrompt />
         <div aria-live="polite" aria-atomic="true" className="sr-only">
           {view === "dashboard" && t("app.dashboardView")}

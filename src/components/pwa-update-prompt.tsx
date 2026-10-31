@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Download, Loader2, X } from "lucide-react";
 import { useRegisterSW } from "virtual:pwa-register/react";
@@ -10,11 +10,15 @@ export interface PWAUpdatePromptProps {
   hidden?: boolean;
 }
 
-export function PWAUpdatePrompt({ className, hidden = false }: PWAUpdatePromptProps = {}): JSX.Element {
-  const { t } = useTranslation();
-  const [updating, setUpdating] = useState(false);
-  const [updateError, setUpdateError] = useState(false);
-  const updateLock = useRef(false);
+interface PWAUpdateState {
+  needRefresh: boolean;
+  setNeedRefresh: (value: boolean) => void;
+  updateServiceWorker: (reloadPage?: boolean) => Promise<void>;
+}
+
+const PWAUpdateContext = createContext<PWAUpdateState | null>(null);
+
+export function PWAUpdateProvider({ children }: { children: ReactNode }): JSX.Element {
   const mounted = useRef(true);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -30,6 +34,7 @@ export function PWAUpdatePrompt({ className, hidden = false }: PWAUpdatePromptPr
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
+    immediate: true,
     onRegisteredSW(_swUrl, r) {
       if (r && mounted.current) {
         if (pollTimer.current !== null) clearInterval(pollTimer.current);
@@ -42,6 +47,18 @@ export function PWAUpdatePrompt({ className, hidden = false }: PWAUpdatePromptPr
       console.error("SW registration error", error);
     },
   });
+
+  return <PWAUpdateContext.Provider value={{ needRefresh, setNeedRefresh, updateServiceWorker }}>{children}</PWAUpdateContext.Provider>;
+}
+
+export function PWAUpdatePrompt({ className, hidden = false }: PWAUpdatePromptProps = {}): JSX.Element {
+  const { t } = useTranslation();
+  const state = useContext(PWAUpdateContext);
+  const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState(false);
+  const updateLock = useRef(false);
+  if (!state) throw new Error("PWAUpdatePrompt requires PWAUpdateProvider");
+  const { needRefresh, setNeedRefresh, updateServiceWorker } = state;
 
   async function handleUpdate(): Promise<void> {
     if (updateLock.current) return;

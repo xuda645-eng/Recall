@@ -23,15 +23,61 @@ function fixture() {
 async function snapshot(page: Page) {
   return page.evaluate(() => JSON.parse(localStorage.getItem('recall.snapshot.v1') || 'null'));
 }
+async function readinessState(page: Page) {
+  const state = await page.evaluate(async () => {
+    const supported = 'serviceWorker' in navigator;
+    const registration = supported ? await navigator.serviceWorker.getRegistration() : undefined;
+    const cacheNames = 'caches' in window ? await caches.keys() : [];
+    const cacheEntries = await Promise.all(cacheNames.map(async name => (await caches.open(name)).keys()));
+    const cachedPaths = new Set(cacheEntries.flat().map(request => new URL(request.url)).filter(url => url.origin === location.origin).map(url => url.pathname));
+    const loadedAssets = performance.getEntriesByType('resource').map(entry => entry.name);
+    const shellAssets = Array.from(document.querySelectorAll<HTMLScriptElement | HTMLLinkElement>('script[src], link[rel="stylesheet"], link[rel="modulepreload"]')).map(element => element instanceof HTMLScriptElement ? element.src : element.href);
+    const requiredPaths = new Set([
+      new URL('index.html', new URL('./', location.href)).pathname,
+      ...[...shellAssets, ...loadedAssets].map(value => new URL(value, location.href)).filter(url => url.origin === location.origin && /\/assets\/.*\.(?:js|css)$/.test(url.pathname)).map(url => url.pathname),
+    ]);
+    return {
+      documentReadyState: document.readyState,
+      serviceWorker: {
+        supported,
+        registered: !!registration,
+        installing: registration?.installing?.state ?? null,
+        waiting: registration?.waiting?.state ?? null,
+        active: registration?.active?.state ?? null,
+        controller: supported ? navigator.serviceWorker.controller?.state ?? null : null,
+      },
+      cacheEntryCounts: cacheEntries.map(entries => entries.length),
+      requiredShellEntries: requiredPaths.size,
+      missingShellEntries: [...requiredPaths].filter(path => !cachedPaths.has(path)).length,
+    };
+  });
+  return { ...state, appVisible: await page.locator('.memory-app').isVisible() };
+}
+async function waitForReadiness(page: Page, phase: string, ready: (state: Awaited<ReturnType<typeof readinessState>>) => boolean, timeout?: number) {
+  let diagnostics: Awaited<ReturnType<typeof readinessState>> | undefined;
+  await test.step(`Readiness: ${phase}`, async () => {
+    try {
+      await expect.poll(async () => {
+        diagnostics = await readinessState(page);
+        return ready(diagnostics);
+      }, { message: `Readiness: ${phase}`, ...(timeout === undefined ? {} : { timeout: Math.min(timeout, test.info().timeout) }) }).toBe(true);
+    } catch (error) {
+      await test.info().attach(`readiness-${phase}`, { body: JSON.stringify({ phase, diagnostics: diagnostics ?? 'No readiness sample completed' }), contentType: 'application/json' });
+      throw error;
+    }
+  });
+}
+async function waitForAppReady(page: Page) {
+  await waitForReadiness(page, 'visible-app', state => state.appVisible);
+  await waitForReadiness(page, 'sw-control', state => state.serviceWorker.controller === 'activated', test.info().timeout);
+  await waitForReadiness(page, 'cache-ready', state => state.requiredShellEntries > 1 && state.missingShellEntries === 0, test.info().timeout);
+}
 async function seedPage(page: Page, data = fixture(), hash = 'home', entry = './') {
-  await page.goto(entry);
-  await expect(page.locator('.memory-app')).toBeVisible();
-  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
-  await page.waitForLoadState('networkidle');
+  await page.goto(entry, { waitUntil: 'domcontentloaded' });
+  await waitForAppReady(page);
   await page.evaluate(({ value, route }) => { localStorage.clear(); localStorage.setItem('recall.snapshot.v1', JSON.stringify(value)); window.location.hash = route; }, { value: data, route: hash });
-  await page.reload();
-  await expect(page.locator('.memory-app')).toBeVisible();
-  await page.waitForLoadState('networkidle');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForAppReady(page);
 }
 async function serveIsolatedBuild(basePath: string) {
   const root = resolve(process.cwd(), 'dist');
@@ -85,15 +131,40 @@ test.afterEach(async ({ page }) => {
 });
 
 test('新用户从空卡组开始，不自动展示个人或示例数据', async ({ page }) => {
-  await page.goto('./');
-  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
-  await page.waitForLoadState('networkidle');
+  await page.goto('./', { waitUntil: 'domcontentloaded' });
+  await waitForAppReady(page);
   await page.evaluate(() => localStorage.clear());
-  await page.reload();
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForAppReady(page);
   await expect(page.getByRole('heading', { name: '今天，温习一点。' })).toBeVisible();
   expect((await snapshot(page)).cards).toEqual([]);
   expect((await snapshot(page)).decks).toEqual([]);
   await noOverflow(page);
+});
+
+test('Service Worker注册先于懒加载memory-workspace脚本完成', async ({ page, baseURL }) => {
+  const base = new URL(baseURL || 'http://127.0.0.1:4193/');
+  test.skip(!['localhost', '127.0.0.1', '[::1]'].includes(base.hostname), 'Synthetic chunk delay is local-only; never intercept public app assets');
+  const workspaceAsset = (url: URL) => url.origin === base.origin && /\/assets\/memory-workspace-[^/]+\.js$/.test(url.pathname);
+  let releaseWorkspace: () => void = () => {};
+  const workspaceReleased = new Promise<void>(release => { releaseWorkspace = release; });
+  let heldRequests = 0;
+  await page.route(workspaceAsset, async route => {
+    heldRequests += 1;
+    await workspaceReleased;
+    await route.continue();
+  });
+  try {
+    await page.goto('./', { waitUntil: 'domcontentloaded' });
+    await waitForReadiness(page, 'held-workspace-request', () => heldRequests > 0);
+    await expect(page.locator('.memory-app')).not.toBeVisible();
+    await waitForReadiness(page, 'sw-registration-before-workspace', state => state.serviceWorker.registered);
+    await expect(page.locator('.memory-app')).not.toBeVisible();
+  } finally {
+    releaseWorkspace();
+    await page.unrouteAll({ behavior: 'wait' });
+  }
+  await waitForAppReady(page);
 });
 
 test('iPhone15首页、48px共享Logo、静止抽屉和快速关闭恢复', async ({ page }) => {
@@ -351,7 +422,8 @@ test('固定四档预览、按点击时间调度、撤销评分与刷新持久�
   await page.getByRole('button', { name: '撤销上次评分', exact: true }).click();
   await expect.poll(async () => (await snapshot(page)).reviewLogs.length).toBe(0);
   expect((await snapshot(page)).cards.find((item: { id: string }) => item.id === 'first').reps).toBe(0);
-  await page.reload();
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForAppReady(page);
   expect((await snapshot(page)).settings.reviewPlan.mode).toBe('fixed');
 });
 
@@ -558,7 +630,9 @@ test('PWA部署路径manifest、Service Worker及断网重开和复习持久化'
   const basePath = new URL('./', baseURL || 'http://127.0.0.1:4193/').pathname;
   const isolated = browserName === 'webkit' ? await serveIsolatedBuild(basePath) : null;
   try {
-  await seedPage(page, fixture(), 'home', isolated?.url || './');
+  const offlineFixture = fixture();
+  offlineFixture.cards[0].front += '\n\n$$\\frac{x^2}{2} + \\sqrt{y}$$';
+  await seedPage(page, offlineFixture, 'home', isolated?.url || './');
   const url = new URL(await page.locator('link[rel="manifest"]').getAttribute('href') || '', page.url());
   const response = await context.request.get(url.href);
   const manifest = await response.json();
@@ -566,20 +640,39 @@ test('PWA部署路径manifest、Service Worker及断网重开和复习持久化'
   const base = new URL('./', page.url()).pathname;
   expect(manifest.start_url).toBe(base); expect(manifest.scope).toBe(base);
   for (const icon of manifest.icons) expect((await context.request.get(new URL(icon.src, page.url()).href)).status()).toBe(200);
-  await page.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration())?.active, undefined, { timeout: 20000 });
-  await page.reload();
-  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
-  await page.waitForLoadState('networkidle');
+  await waitForReadiness(page, 'sw-active-before-offline', state => state.serviceWorker.active === 'activated', 20000);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForAppReady(page);
+  expect(await page.evaluate(() => performance.getEntriesByType('resource').filter(entry => /\/assets\/(?:memory-reader|memory-stats|settings|import-hub)-[^/]+\.js$/.test(new URL(entry.name).pathname)).length)).toBe(0);
   if (isolated) {
     await isolated.stop();
     await expect(context.request.get(isolated.url + 'uncached-offline-probe', { timeout: 1000 })).rejects.toThrow();
   } else await context.setOffline(true);
-  await page.reload();
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForAppReady(page);
   await expect(page.getByRole('heading', { name: '今天，温习一点。' })).toBeVisible();
   await startReading(page);
+  await expect(page.locator('.m-reading[data-active="true"] .katex')).toHaveCount(1);
+  expect(await page.evaluate(async () => { await document.fonts.ready; return Array.from(document.fonts).some(font => font.family === 'KaTeX_Math' && font.status === 'loaded'); })).toBe(true);
   await page.getByRole('button', { name: '显示答案', exact: true }).click();
   await page.locator('[data-rating="good"]').click();
   await expect.poll(async () => (await snapshot(page)).reviewLogs.length).toBe(1);
   await saveShot(page, 'offline');
+  await navigate(page, '设置与数据');
+  await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'settings');
+  await expect(page.getByRole('button', { name: '备份', exact: true })).toBeVisible();
+  await page.locator('.m-top-action').click();
+  await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'advanced');
+  await expect(page.locator('.memory-content').getByRole('heading', { level: 1 })).toBeVisible();
+  await navigate(page, '导入');
+  await expect(page.getByRole('button', { name: '选择 Markdown 文件', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '其他导入：CSV / Anki / Recall', exact: true }).click();
+  await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'compat');
+  await expect(page.locator('.memory-content').getByRole('heading', { level: 1 })).toBeVisible();
+  await navigate(page, '统计');
+  await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'stats');
+  await expect(page.getByRole('heading', { name: '复习量', exact: true })).toBeVisible();
+  expect((await snapshot(page)).reviewLogs).toHaveLength(1);
+  await noOverflow(page);
   } finally { await context.setOffline(false); await isolated?.stop(); }
 });

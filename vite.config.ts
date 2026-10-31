@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
       strategies: "generateSW",
       registerType: "prompt",
       includeAssets: ["favicon.svg", "icons/icon-192.png", "icons/icon-512.png"],
-      workbox: { clientsClaim: true, globPatterns: ["**/*.{js,css,html,svg,png,woff,woff2}"], maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, navigateFallbackDenylist: [/^\/api/] },
+      workbox: { clientsClaim: true, globPatterns: ["**/*.{js,css,html,svg,png,woff2}"], maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, navigateFallbackDenylist: [/^\/api/] },
       manifest: {
         name: "Recall - 记忆卡片与间隔复习", short_name: "Recall",
         description: "个人记忆卡片，多级整理与间隔复习，内容保存在本机。",

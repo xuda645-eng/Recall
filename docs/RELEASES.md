@@ -88,6 +88,7 @@ retroactively marked verified just because a deployment still exists.
 
 | Release | Scope | Result | Record |
 |---|---|---|---|
+| `20261031T222000+0800-startup-optimization` | App startup / SW registration / font precache / acceptance | Local validation passed; publication outcomes appended in record | [Startup dependency and offline optimization](./releases/20261031T222000+0800-startup-optimization.md) |
 | `20261031T214845+0800-public-test-budget` | Acceptance configuration / docs | Pushed; public budget 5 minutes, behavior assertions retained | [Bounded public acceptance budget](./releases/20261031T214845+0800-public-test-budget.md) |
 | `20261031T214513+0800-network-retry-release` | Normal-network retest / pending PWA + WeRead AI release | Deployed; assets/auth passed, browser verification partial due to network | [Network retest and pending release](./releases/20261031T214513+0800-network-retry-release.md) |
 | `20261031T212804+0800-public-diagnosis` | Read-only network / app and SW-stage diagnosis / docs | Slow transfers and delayed serial precache identified; production unchanged | [Public loading blocker diagnosis](./releases/20261031T212804+0800-public-diagnosis.md) |

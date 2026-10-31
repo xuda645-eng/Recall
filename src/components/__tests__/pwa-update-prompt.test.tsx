@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { lazy, Suspense, useState, type ReactNode } from "react";
+import { act, cleanup, fireEvent, render as renderView, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PWAUpdatePrompt } from "../pwa-update-prompt";
+import { PWAUpdatePrompt, PWAUpdateProvider } from "../pwa-update-prompt";
 
 const worker = vi.hoisted(() => ({
   needRefresh: true,
@@ -26,6 +26,10 @@ function deferred() {
   let reject!: (error: Error) => void;
   const promise = new Promise<void>((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
+}
+
+function render(view: ReactNode) {
+  return renderView(view, { wrapper: PWAUpdateProvider });
 }
 
 describe("PWA update prompt", () => {
@@ -56,6 +60,20 @@ describe("PWA update prompt", () => {
     render(<PWAUpdatePrompt />);
     expect(screen.queryByRole("alert")).toBeNull();
     expect(worker.updateServiceWorker).not.toHaveBeenCalled();
+  });
+
+  it("starts immediate registration while the workspace is still suspended", async () => {
+    const workspace = deferred();
+    const Workspace = lazy(async () => { await workspace.promise; return { default: () => <PWAUpdatePrompt /> }; });
+    render(<Suspense fallback={<p>Workspace loading</p>}><Workspace /></Suspense>);
+    expect(screen.getByText("Workspace loading")).toBeTruthy();
+    expect(worker.hookOptions).toHaveBeenCalledTimes(1);
+    expect(worker.hookOptions.mock.calls[0][0].immediate).toBe(true);
+    expect(screen.queryByRole("alert")).toBeNull();
+    await act(async () => { workspace.resolve(); await workspace.promise; });
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(worker.hookOptions).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem("recall.snapshot.v1")).toBe(savedSnapshot);
   });
 
   it("keeps the stable wrapper and existing desktop defaults", () => {

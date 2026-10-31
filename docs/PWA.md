@@ -85,6 +85,19 @@ RECALL_URL=https://recall-memory.pages.dev/ pnpm test:e2e
 Cloudflare 部署限制，也不改变应用 API 的请求超时。超时仍视为失败，
 不通过无限等待、自动重试或移除离线断言来确保发布。
 
+首屏只加载工作区所需模块；阅读器、富文本/公式、统计、设置和其他导入
+按需加载。Service Worker 注册位于应用根部，不再等待工作区脚本完成。
+首次缓存仍包含全部 JS/CSS、界面字体和公式的 WOFF2，保证缓存完成后
+离线首次进入这些页面。界面字体保留 Latin/Latin-ext 子集，覆盖现有
+英文和印尼文界面；中文及其他文字使用系统回退字体，不改变卡片正文。
+不再预缓存重复的 WOFF 兼容格式。
+
+验收导航先等待 `domcontentloaded`，再分别检查界面可见、SW 接管和缓存
+就绪，不用总体 `load` 或 `networkidle` 代替这些条件。失败附件仅含
+文档/SW 状态和缓存数量，不含卡片、Cookie 或设备授权。慢脚本注册回归
+只在本地拦截请求；离线回归检查未打开过的页面和公式字体。
+这些改动减少下载依赖，不改变 Chromium 自身的网络失败行为。
+
 只有明确检查 GitHub Pages 备用预览时才使用
 `RECALL_BUILD_MODE=pages pnpm test:e2e`。备用构建使用 `/Recall/` 子路径，
 不能上传到 Cloudflare 根路径站点。

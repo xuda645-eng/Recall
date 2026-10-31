@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent } from 'react';
 import { Archive, ArrowLeft, ArrowUpRight, BarChart3, BookOpen, ChevronRight, Home, Layers, Library, MoreHorizontal, Plus, SlidersHorizontal, Undo2, Upload, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useRecallStore } from '@/stores/recall-store';
@@ -10,19 +10,21 @@ import { buildExportPayload } from '@/services/import-export';
 import { isCardDue } from '@/lib/stats';
 import { createId } from '@/lib/utils';
 import { normalizeMemoryReviewPlan } from '@/services/memory-review';
-import { MemoryReader } from '@/components/memory-reader';
 import { MemoryFolderRows } from '@/components/memory-folder-rows';
-import { MemoryStats } from '@/components/memory-stats';
-import { MemoryReviewPlanEditor } from '@/components/memory-review-plan';
-import { MemoryWereadImport } from '@/components/memory-weread-import';
 import { MemoryCloudStatus, MemoryCloudSettings } from '@/components/memory-cloud';
-import { Settings } from '@/components/settings';
-import { ImportHub } from '@/components/import-hub';
-import { RichCard } from '@/components/RichCard';
 import { PWAUpdatePrompt } from '@/components/pwa-update-prompt';
 import type { Card, Deck } from '@/types';
 import './memory-workspace.css';
 import './memory-appearance.css';
+
+const MemoryReader = lazy(() => import('@/components/memory-reader').then(module => ({ default: module.MemoryReader })));
+const MemoryStats = lazy(() => import('@/components/memory-stats').then(module => ({ default: module.MemoryStats })));
+const MemoryReviewPlanEditor = lazy(() => import('@/components/memory-review-plan').then(module => ({ default: module.MemoryReviewPlanEditor })));
+const MemoryWereadImport = lazy(() => import('@/components/memory-weread-import').then(module => ({ default: module.MemoryWereadImport })));
+const Settings = lazy(() => import('@/components/settings').then(module => ({ default: module.Settings })));
+const ImportHub = lazy(() => import('@/components/import-hub').then(module => ({ default: module.ImportHub })));
+const RichCard = lazy(() => import('@/components/RichCard').then(module => ({ default: module.RichCard })));
+const loadingView = <p className="m-note" role="status">正在加载，请稍候。</p>;
 
 const titles = { home: '今日复习', folders: '我的卡组', cards: '全部卡片', archived: '已归档', stats: '统计', import: '导入', weread: '微信读书', settings: '设置与数据', advanced: '更多设置', compat: '其他导入' };
 type Route = keyof typeof titles | 'read';
@@ -362,6 +364,7 @@ export function MemoryWorkspace(): JSX.Element {
         <header className="m-desktop-header"><span>{shellTitle}</span><button className="m-secondary" disabled={busy} onClick={topAction}>{topLabel}</button></header>
         <main className="m-main" tabIndex={-1}>
           <PWAUpdatePrompt className="m-pwa-update" hidden={route === 'read'}/>
+          <Suspense fallback={loadingView}>
           {error && !sheet && <p role="alert" className="m-error">{error}</p>}
           {route === 'home' && <><header className="m-intro"><p>{new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date())}</p><h1>今天，温习一点。</h1></header><div className="m-home-columns"><div><section className="m-hero"><p className="m-hero-label"><i/>{dueCards.length ? '今日待复习' : '今日复习已完成'}</p><div className="m-big">{dueCards.length}<small>张卡片</small></div><p className="m-hero-copy">{dueCards.length ? '先试着回忆，再翻开答案。' : '也可以随手翻一张，慢慢读。'}</p><div className="m-card-stack" aria-hidden="true"><div/><div/><div><span>Q.</span><i/><i/><i/><small>从回忆开始</small></div></div><button className="m-primary" disabled={!available.length} onClick={() => read(dueCards.length ? dueCards.slice().sort((first, second) => first.nextReviewDate.localeCompare(second.nextReviewDate)) : arranged(available), !!dueCards.length)}>{dueCards.length ? '开始复习' : '自由浏览'}<ChevronRight size={18}/></button></section><div className="m-home-summary"><div><b>{today}</b><small>今日已练</small></div><div><b>{available.filter(card => card.state === 'review').length}</b><small>已熟悉</small></div><div><b>{available.length}</b><small>在学卡片</small></div></div><div className="m-home-shortcuts"><button onClick={() => navigate('import')}><Upload size={18}/>导入知识</button><button onClick={() => navigate('stats')}><BarChart3 size={18}/>查看统计</button></div></div><div><div className="m-section-head"><h2>我的卡组</h2><button className="m-text" onClick={() => openFolder(null)}>查看全部<ChevronRight size={15}/></button></div><MemoryFolderRows home list={arranged(store.decks.filter(deck => !deck.parentId))} decks={store.decks} cards={available} onOpen={openFolder} onManage={id => setSheet({ kind: 'folder', id })}/>{!store.decks.length && <div className="m-empty"><p>从一个卡组，收好你的知识。</p><button className="m-secondary" onClick={() => setSheet({ kind: 'folder' })}>新建卡组</button></div>}{recent.length > 0 && <section className="m-recent"><div className="m-section-head"><h2>{recentIds.length ? '最近温习' : '随手读一张'}</h2><small>自由浏览</small></div>{recent.map((card, position) => <button key={card.id} onClick={() => read(arranged(available.filter(candidate => candidate.deckId === card.deckId)), false, card.id)}><span className="m-recent-index">{String(position + 1).padStart(2, '0')}</span><span><small>{folderPath(store.decks, card.deckId).map(deck => deck.name).join(' / ')}</small><strong>{card.front || card.bookTitle || '阅读摘录'}</strong></span><ChevronRight size={17}/></button>)}</section>}</div></div></>}
           {route === 'home' && <MemoryCloudStatus onManage={() => navigate('settings')}/>}
@@ -387,11 +390,12 @@ export function MemoryWorkspace(): JSX.Element {
             {receipt && <section className="m-panel"><h2>导入完成</h2><p>新增 {receipt.added}，更新 {receipt.updated}，跳过 {receipt.skipped}</p><button className="m-primary" onClick={() => downloadMemoryText(receipt.text, filename.replace(/\.md$/i, '').replace(/-带编号$/, '') + '-带编号.md')}>保存带编号的 Markdown</button><button className="m-secondary" onClick={() => { setReceipt(null); openFolder(folder); }}>查看位置</button><button onClick={() => setReceipt(null)}>继续导入</button></section>}
           </>}
           {route === 'read' && <MemoryReader ids={queue} initialIndex={index} reviewMode={reviewMode} onEdit={id => setSheet({ kind: 'card', id })} onOptions={id => setSheet({ kind: 'reader-options', id })} onArchive={archiveCard} restoreRequest={restoreRequest} archiveNotice={archiveNotice} fontSize={font} onIndex={setIndex} onExit={() => navigate(returnRoute)} onBusy={setBusy}/>}
+          </Suspense>
         </main>
         {['folders', 'cards'].includes(route) && libraryPool.length > 0 && <div className="m-library-dock"><button className="m-secondary" disabled={!matching.length || busy} onClick={() => read(matching, false)}>浏览<span>{matching.length}</span></button><button className="m-primary" disabled={!matching.some(card => isCardDue(card)) || busy} onClick={() => read(matching.filter(card => isCardDue(card)).sort((first, second) => first.nextReviewDate.localeCompare(second.nextReviewDate)), true)}>到期复习<span>{matching.filter(card => isCardDue(card)).length}</span><ChevronRight size={16}/></button></div>}
       </div>
       {route !== 'read' && archiveNotice}
       {drawer && <button className="m-dismiss" aria-label="关闭菜单" onPointerDown={drawerDown} onPointerMove={drawerMove} onPointerUp={drawerUp} onPointerCancel={() => { drawerGesture.current = null; if (shellRef.current) { shellRef.current.style.transform = ''; shellRef.current.style.transition = ''; } }} onClick={() => { if (!dragged.current) { setDrawer(false); brand.current?.focus(); } }}/>}</div>
-    {sheet && <div className="m-sheet-wrap" onClick={event => { if (event.target === event.currentTarget) closeSheet(); }}><section className="m-sheet" ref={sheetRef} role="dialog" aria-modal="true" aria-labelledby="memory-sheet-title"><div className="m-grab"/><header><h2 id="memory-sheet-title">{sheetTitle}</h2><button disabled={busy} aria-label="关闭面板" onClick={closeSheet}><X size={22}/></button></header>{error && <p role="alert" className="m-error">{error}</p>}{renderSheet()}</section></div>}
+    {sheet && <div className="m-sheet-wrap" onClick={event => { if (event.target === event.currentTarget) closeSheet(); }}><section className="m-sheet" ref={sheetRef} role="dialog" aria-modal="true" aria-labelledby="memory-sheet-title"><div className="m-grab"/><header><h2 id="memory-sheet-title">{sheetTitle}</h2><button disabled={busy} aria-label="关闭面板" onClick={closeSheet}><X size={22}/></button></header>{error && <p role="alert" className="m-error">{error}</p>}<Suspense fallback={loadingView}>{renderSheet()}</Suspense></section></div>}
   </div>;
 }
