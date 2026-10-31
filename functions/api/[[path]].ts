@@ -2,6 +2,7 @@ import { ApiError, isRecord, json, readJson, requireOrigin, setDeviceCookie } fr
 import type { ServerContext } from '../../shared/server';
 import { authenticate, issueCode, listDevices, logout, pair, revokeDevice } from '../../shared/server-auth';
 import { getSync, postSync } from '../../shared/server-sync';
+import { wereadBook, wereadBooks, wereadQuestion } from '../../shared/server-weread';
 
 export async function onRequest({ request, env }: ServerContext): Promise<Response> {
   let rotatedToken: string | undefined;
@@ -12,7 +13,7 @@ export async function onRequest({ request, env }: ServerContext): Promise<Respon
     if (path === '/api/auth/pair' && method === 'POST') return await pair(request, env);
     const auth = await authenticate(request, env);
     rotatedToken = auth.rotatedToken;
-    if (method !== 'GET' && path !== '/api/sync' && request.body) {
+    if (method !== 'GET' && path !== '/api/sync' && !path.startsWith('/api/weread/') && request.body) {
       const input = await readJson(request, 4096, true);
       if (!isRecord(input) || Object.keys(input).length !== 0) throw new ApiError(400, 'Invalid request');
     }
@@ -25,6 +26,9 @@ export async function onRequest({ request, env }: ServerContext): Promise<Respon
     } else if (path === '/api/auth/logout' && method === 'POST') response = await logout(env, auth);
     else if (path === '/api/sync' && method === 'GET') response = await getSync(request, env, auth);
     else if (path === '/api/sync' && method === 'POST') response = await postSync(request, env, auth);
+    else if (path === '/api/weread/books' && method === 'POST') response = await wereadBooks(request, env, auth);
+    else if (path === '/api/weread/book' && method === 'POST') response = await wereadBook(request, env, auth);
+    else if (path === '/api/weread/question' && method === 'POST') response = await wereadQuestion(request, env, auth);
     else throw new ApiError(404, 'Not found');
     if (rotatedToken && !response.headers.has('Set-Cookie')) setDeviceCookie(response, rotatedToken);
     return response;

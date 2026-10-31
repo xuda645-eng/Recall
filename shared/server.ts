@@ -20,6 +20,10 @@ export interface ServerEnv {
   DB: RecallDatabase;
   RECALL_BOOTSTRAP_CODE?: string;
   RECALL_SPACE_ID?: string;
+  WEREAD_API_KEY?: string;
+  ARK_API_KEY?: string;
+  ARK_ENDPOINT_ID?: string;
+  ARK_BASE_URL?: string;
 }
 
 export interface ServerContext {

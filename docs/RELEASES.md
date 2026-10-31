@@ -88,4 +88,7 @@ retroactively marked verified just because a deployment still exists.
 
 | Release | Scope | Result | Record |
 |---|---|---|---|
+| `20261031T202802+0800-weread-ai` | App / protected API / additive D1 | Validated; publication pending | [WeRead online import and AI questions](./releases/20261031T202802+0800-weread-ai.md) |
+| `20261031T202358+0800-topbar-opaque-surface` | Mobile PWA shell | Local checks passed; user requested combined publication hold | [Opaque mobile topbar surface](./releases/20261031T202358+0800-topbar-opaque-surface.md) |
 | `20261031T195831+0800-standing-authorization` | Documentation | Published to GitHub; app unchanged | [Standing authorization and default verification](./releases/20261031T195831+0800-standing-authorization.md) |
+| `20261031T202329+0800-project-auto-review` | Agent configuration and documentation | In progress | [Project automatic approval review](./releases/20261031T202329+0800-project-auto-review.md) |
