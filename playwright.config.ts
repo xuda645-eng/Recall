@@ -6,7 +6,7 @@ const localURL = `http://127.0.0.1:4193/${buildMode === "pages" ? "Recall/" : ""
 export default defineConfig({
   testDir: "./e2e",
   testMatch: "memory-workspace.spec.ts",
-  timeout: process.env.RECALL_URL ? 120000 : 30000,
+  timeout: process.env.RECALL_URL ? 300000 : 30000,
   expect: { timeout: process.env.RECALL_URL ? 30000 : 5000 },
   retries: 0,
   use: {

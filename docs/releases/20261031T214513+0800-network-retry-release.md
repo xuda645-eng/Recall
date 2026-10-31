@@ -125,3 +125,12 @@ Pending implementation/record commit and normal push, private backup, additive
 migration result, production deployment ID/URL/source SHA, non-destructive public
 verification, any recovery incident and completion. Append actual outcomes in a
 documentation-only follow-up without redeploying unchanged app code.
+
+## Acceptance Budget Follow-Up
+
+During continuation the user asked whether the timeout was self-imposed and
+could be relaxed. The Playwright per-test external budget is increased to five
+minutes in [a separate configuration record](./20261031T214845+0800-public-test-budget.md),
+with local/UI budgets, zero retries and all SW/offline/data assertions unchanged.
+The earlier 1.9-minute preflight passed before this change; no failed check is
+retroactively labeled passed. The final public probe uses the new bounded budget.
