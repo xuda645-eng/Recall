@@ -12,8 +12,8 @@
 - Integration worktree: `/private/tmp/recall-integration-all-pending-20261101`.
 - Branch: `codex/integration-all-pending-20261101`, baseline
   `3e6a08ed133169541ce3aa48f9f79f3533360091`.
-- Status: combined validation passed; source publication next; this chat
-  has not pushed main or deployed production yet.
+- Status: combined local validation passed; source pushed and production deployed;
+  public verification partial, evidence follow-up ready for normal publication.
 - Production origin remains `https://recall-memory.pages.dev/`.
 
 ## Inventory And Integration Results
@@ -133,14 +133,78 @@ remain unverified. No physical acceptance is claimed.
 
 ## Source And Publication
 
-- Main push, final implementation SHA, committed build hash checks, deployment
-  ID/URL, timestamps and public results: pending and appended after publication.
+- Implementation SHA: `a319c3bed7150080fc322222f260aa719448ca3b`, committed at
+  `2026-11-01T02:37:05+08:00`. It retains all three task snapshot histories and
+  the reviewed Skill scope correction. Original worktrees remain unchanged.
+- Rebuilt with `RECALL_BUILD_VERSION=1.0-20261101-0230
+  node node_modules/vite/bin/vite.js build --mode production` and ran
+  `shasum -a 256 -c /tmp/recall-all-pending-validated.sha256`: all 196 files
+  matched the validated bundle. Git worktree was clean before upload.
+- `git fetch origin` still returned the baseline `3e6a08e`. Normal
+  `git push origin HEAD:main` succeeded: `3e6a08e..a319c3b HEAD -> main`.
+  `git ls-remote origin refs/heads/main` returned the full implementation SHA
+  at `2026-11-01T02:37:14+08:00`. No force push, tag or dirty override.
 - Existing account verified: `751b9fca4f5173fd70e0dfb69cff81e2`, existing
   `recall-memory` Pages project. Latest observed production at inventory:
   `2d0c437c-ef6b-4f0a-98ae-3a3c0b8aa3b5`, source `3e6a08e`, deployment URL
   `https://2d0c437c.recall-memory.pages.dev/`.
 - Remote main and production must be rechecked before push/deploy. Do not force
   push, deploy after rejected push, upload dirty work or replace another release.
+- Immediately before upload, authenticated Pages listing still showed previous
+  production `2d0c437c`. Command: `CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2
+  npx --yes wrangler@4.156.0 pages deploy dist --project-name recall-memory
+  --branch main --commit-hash a319c3bed7150080fc322222f260aa719448ca3b
+  --commit-message 'feat: integrate folder archive and version-aware PWA refresh'`.
+- Uploaded 27 new files, 167 already uploaded, `_headers`, existing Functions and
+  `_routes.json`. Deployment completed `2026-11-01T02:38:06+08:00`:
+  `2ac571d2-1cc4-4999-93ce-0f3330ce10f2`,
+  `https://2ac571d2.recall-memory.pages.dev/`. Authenticated listing independently
+  confirmed Production/main/source `a319c3b` after deployment.
+- Public verification outcomes and limitations are recorded below. The deployed
+  code and individually verified assets match; complete public-PWA acceptance
+  is not claimed.
+- Read-only asset command: `node /private/tmp/recall-all-pending-public-assets.mjs`.
+  Initial bounded probe matched root HTML, version metadata, SW, all icons,
+  WeRead assets and workspace CSS; manifest and workspace JS timed out.
+  Approved identical unsandboxed retry matched those two files but had transport
+  failures on previously verified resources and `/api/sync`. Neither aggregate
+  run is a full pass. Across the two attempts, every one of the 11 requested
+  files returned 200 with the committed SHA-256, version metadata was `no-store`,
+  and anonymous `/api/sync` and `/api/auth/devices` returned 401. No card data,
+  cookies or authorization header was sent. Original failures remain recorded.
+- Public mobile command: `RECALL_BUILD_VERSION=1.0-20261101-0230
+  RECALL_URL=https://recall-memory.pages.dev/ node scripts/run-playwright.mjs
+  --grep '抽屉显示固定|版本刷新检查后|整组归档先|整组归档包含|整组归档刷新后|整组归档面板|顶部采样层|PWA部署路径'
+  --workers=2 --output=/tmp/recall-all-pending-public-mobile`, with both cached
+  engines and guarded preflight. WebKit version/geometry check passed in 40.1s,
+  including actual SW/cache readiness. Chromium version check and WebKit refresh
+  check each exceeded 300000ms at `Readiness: sw-control`, before feature actions.
+- Stopped only the identified task-owned Playwright queue with SIGINT after
+  repeated cold-load failure: 1 passed, 2 failed, 2 interrupted, 11 did not run,
+  exit 130, 6.2m. Not a full public acceptance pass. No browser safeguards,
+  timeouts, cache/controller assertions or product security were weakened.
+- A single WebKit `整组归档包含` recovery retains the 300-second/SW/cache gates.
+  Its first startup failed because global preflight also checks the unselected
+  Chromium project's missing default executable. Supplying both known cached
+  engine paths recovered startup; no tests passed on that failed preflight.
+  Command: `RECALL_BUILD_VERSION=1.0-20261101-0230
+  RECALL_URL=https://recall-memory.pages.dev/ node scripts/run-playwright.mjs
+  --project iphone15-webkit --grep '整组归档包含' --workers=1 --max-failures=1
+  --output=/tmp/recall-all-pending-public-recovery`, with both cached engines.
+  Final recovery failed after 300000ms at `Readiness: sw-control`, before any
+  archive mutation. Runner also reported one non-test error without identifying
+  another cause in its log. No further cold-load retries or passing claim.
+- Final evidence validation observed `2026-11-01T02:50:22+08:00`: installed
+  package's 8 metadata checks, task/index links and diff checks passed. Physical
+  installation, native blur, public cold-start/offline/update and complete
+  public archive-flow acceptance remain unverified. Local combined/update gates
+  passed and public WebKit version/cache/geometry passed in the earlier context.
+- No rollback performed: no new functional regression was demonstrated, previous
+  release records already contain public loading/SW stalls, and bounded probes
+  show intermittent transport failures. This is not proof of a network-only
+  cause or a full production acceptance pass. If a reproducible release-specific
+  regression is established, use the compatible prior target after confirming
+  current production, without touching card data or shared history.
 - Evidence follow-up is documentation-only and does not redeploy the app.
 
 ## Recovery Boundaries

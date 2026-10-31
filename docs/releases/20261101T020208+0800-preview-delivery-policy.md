@@ -8,8 +8,8 @@
   (inspection clock sample after the user's AGENTS.md request).
 - Scope: Skill instructions/metadata, application agent rules, documentation and
   a local parent-workspace rule mirror. No app/server code or schema changes.
-- Status: validated task snapshot integrated; updated Skill installed;
-  consolidated main publication pending in the all-pending integration release.
+- Status: task snapshot integrated and pushed with main `a319c3b`; updated Skill
+  installed. No separate app deployment for this instruction-only task.
 - Requests: add preview delivery to the optional parallel Skill, then clarify
   its precedence relative to the existing no-repeat-confirmation delivery rules.
 

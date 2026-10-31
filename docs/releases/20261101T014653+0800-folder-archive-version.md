@@ -12,7 +12,8 @@
 - Version request inspected: `2026-11-01T01:56:47+08:00`.
 - PWA build identity: `1.0-20261101-0200`, fixed before validation. Its suffix is
   the Shanghai build minute, not the current browser clock or deployment time.
-- Status: awaiting integration, not published; final preview validation pending.
+- Status: frozen snapshot integrated and published by the integration owner;
+  post-deployment verification is recorded in the consolidated release.
 - Production origin: `https://recall-memory.pages.dev/`, unchanged.
 - Implementation/handoff SHAs and preview completion time: append after commits.
 - Main push, production deployment and public verification: not performed by
@@ -153,3 +154,8 @@ Tracked patch SHA-256: `561f79cbe9421c7dfa35d6c75cfff843fd0b4f07aad75dcd53506b9d
 - Full combined gates, fixed source SHA, preview and publication outcomes are
   recorded by the integrator. The integrated build uses frozen identity
   `1.0-20261101-0230`, not this developer draft's original `0200` identity.
+- Consolidated implementation `a319c3bed7150080fc322222f260aa719448ca3b` was
+  normally pushed and deployed as `2ac571d2-1cc4-4999-93ce-0f3330ce10f2` on
+  `2026-11-01T02:38:06+08:00`. Full validation and actual public evidence are in
+  [all-pending integration](./20261101T022522+0800-all-pending-integration.md).
+  No separate developer preview package or user preview acceptance is claimed.
