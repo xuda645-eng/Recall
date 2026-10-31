@@ -88,6 +88,7 @@ retroactively marked verified just because a deployment still exists.
 
 | Release | Scope | Result | Record |
 |---|---|---|---|
+| `20261101T015717+0800-status-sampling-safe-area` | Installed WebKit PWA sampling region / mobile regression checks | 1341 unit and 46 mobile checks passed; publication next, native iPhone result pending | [Safe-area status sampling](./releases/20261101T015717+0800-status-sampling-safe-area.md) |
 | `20261101T014756+0800-explicit-parallel-skill` | Explicit-only Skill / local installation / docs | Validated, installed and source `12457e6` pushed; no app deployment | [Explicit-only parallel delivery Skill](./releases/20261101T014756+0800-explicit-parallel-skill.md) |
 | `20261101T010911+0800-main-integration` | Combined study queue / WeRead final correction / iOS shell / release reconciliation | Main `b198189` pushed/deployed; 1341 app, 187 cloud, 106 local mobile/update checks passed; public assets/auth and 8 mobile checks passed across attempts, full public/physical acceptance not claimed | [Main integration and production release](./releases/20261101T010911+0800-main-integration.md) |
 | `20261101T001208+0800-ios-status-edge` | Installed WebKit PWA / isolated-copy fix / tests | Merged and deployed; 1201 unit, 187 cloud, 46 PWA and 38 WeRead checks passed; live WebKit recovered, broader Chromium loading and physical effect unverified | [iOS status edge compatibility](./releases/20261101T001208+0800-ios-status-edge.md) |

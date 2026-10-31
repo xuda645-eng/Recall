@@ -207,7 +207,19 @@ test('主屏幕WebKit顶部采样层独立固定，不绘制遮罩或拦截Logo�
     await page.addStyleTag({ content: rules });
     test.info().annotations.push({ type: 'simulation', description: 'macOS WebKit lacks iOS touch-callout; activate the shipped conditional rules to check geometry, not native system-blur suppression.' });
   }
-  await page.locator('.memory-app').evaluate(element => { (element as HTMLElement).style.setProperty('--safe-inset-top', '59px'); });
+  for (const inset of [0, 20, 59, 96]) {
+    await page.locator('.memory-app, .m-status-edge').evaluateAll((elements, value) => {
+      for (const element of elements) (element as HTMLElement).style.setProperty('--safe-inset-top', `${value}px`);
+    }, inset);
+    const samplingBox = (await edge.boundingBox())!;
+    expect(samplingBox.y).toBe(0);
+    expect(samplingBox.height).toBe(inset + 11);
+    expect(samplingBox.y + samplingBox.height).toBeGreaterThan(inset + 4);
+    expect((await page.locator('.m-brand').boundingBox())!.y).toBe(inset + 10);
+  }
+  await page.locator('.memory-app, .m-status-edge').evaluateAll(elements => {
+    for (const element of elements) (element as HTMLElement).style.setProperty('--safe-inset-top', '59px');
+  });
   for (const dark of [false, true]) {
     await page.locator('html').evaluate((element, value) => element.classList.toggle('dark', value), dark);
     const surface = await edge.evaluate(element => {
@@ -215,7 +227,12 @@ test('主屏幕WebKit顶部采样层独立固定，不绘制遮罩或拦截Logo�
       const box = element.getBoundingClientRect();
       return { parentIsBody: element.parentElement === document.body, childCount: element.childNodes.length, display: style.display, position: style.position, color: style.backgroundColor, clip: style.backgroundClip, pointerEvents: style.pointerEvents, zIndex: style.zIndex, filter: style.filter, backdrop: style.backdropFilter, x: box.x, y: box.y, width: box.width, height: box.height, ancestorTransforms: [document.body, document.documentElement].map(ancestor => getComputedStyle(ancestor).transform) };
     });
-    expect(surface).toEqual({ parentIsBody: true, childCount: 0, display: 'block', position: 'fixed', color: dark ? 'rgb(36, 36, 32)' : 'rgb(246, 245, 239)', clip: 'text', pointerEvents: 'none', zIndex: '2147483647', filter: 'none', backdrop: 'none', x: 0, y: 0, width: 393, height: 11, ancestorTransforms: ['none', 'none'] });
+    expect(surface).toEqual({ parentIsBody: true, childCount: 0, display: 'block', position: 'fixed', color: dark ? 'rgb(36, 36, 32)' : 'rgb(246, 245, 239)', clip: 'text', pointerEvents: 'none', zIndex: '2147483647', filter: 'none', backdrop: 'none', x: 0, y: 0, width: 393, height: 70, ancestorTransforms: ['none', 'none'] });
+    const withSampler = await page.screenshot({ clip: { x: 0, y: 0, width: 393, height: 170 }, animations: 'disabled' });
+    await edge.evaluate(element => { (element as HTMLElement).style.visibility = 'hidden'; });
+    const withoutSampler = await page.screenshot({ clip: { x: 0, y: 0, width: 393, height: 170 }, animations: 'disabled' });
+    expect(withSampler.equals(withoutSampler)).toBe(true);
+    await edge.evaluate(element => { (element as HTMLElement).style.visibility = ''; });
   }
   await page.locator('html').evaluate(element => element.classList.remove('dark'));
   const logo = page.locator('.m-brand');
@@ -231,6 +248,7 @@ test('主屏幕WebKit顶部采样层独立固定，不绘制遮罩或拦截Logo�
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).not.toBeVisible();
   await noOverflow(page);
+  await page.screenshot({ path: test.info().outputPath('status-edge-safe-area.png') });
   await page.setViewportSize({ width: 761, height: 852 });
   await expect(edge).toHaveCSS('display', 'none');
 });

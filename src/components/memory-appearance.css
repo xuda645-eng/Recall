@@ -235,7 +235,7 @@
 .m-status-edge { display: none; }
 @supports (-webkit-touch-callout: none) {
   @media (max-width: 760px) {
-    .m-status-edge[data-standalone="true"] { display: block; position: fixed; top: 0; left: 0; right: 0; height: 11px; z-index: 2147483647; pointer-events: none; background-color: #f6f5ef; -webkit-background-clip: text; background-clip: text; }
+    .m-status-edge[data-standalone="true"] { display: block; position: fixed; top: 0; left: 0; right: 0; height: calc(var(--safe-inset-top, env(safe-area-inset-top, 0px)) + 11px); z-index: 2147483647; pointer-events: none; background-color: #f6f5ef; -webkit-background-clip: text; background-clip: text; }
     .dark .m-status-edge[data-standalone="true"] { background-color: #242420; }
   }
 }
