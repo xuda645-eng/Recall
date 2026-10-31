@@ -119,3 +119,19 @@ Pending: finished-task review, combined validation evidence, implementation
 commit SHA/time, normal push result, previous production at publication time,
 deployment ID/URL, non-destructive public verification, any incident/recovery
 and final completion time. This record is a hold/handoff, not a published fix.
+
+## Source Publication Follow-Up
+
+The user explicitly resumed publication of all pending work. The topbar changes
+were reviewed with the finished WeRead source and passed 42 combined mobile
+tests, lint/type/unit/build checks and local D1/online-import suites. Source was
+committed as `2ae24fffa5508b36bbd976bd580043d1374ae80a` at
+2026-10-31T21:09:45+08:00 and normally pushed to `origin/main`, verified at
+2026-10-31T21:13:59+08:00. Private data was excluded.
+
+The combined public load/SW gate still failed after network/browser recoveries.
+No new Pages deployment or D1 migration was performed; production remains
+`8adde351-c4c8-4c8d-aa5b-cdd100a3affe`. The topbar is published as source but is
+not yet a production or physically verified fix. Exact combined commands,
+failures and remaining release steps are in
+[the publication audit](./20261031T210732+0800-publish-pending.md).

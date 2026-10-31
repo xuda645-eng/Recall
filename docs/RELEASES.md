@@ -88,10 +88,10 @@ retroactively marked verified just because a deployment still exists.
 
 | Release | Scope | Result | Record |
 |---|---|---|---|
-| `20261031T210732+0800-publish-pending` | Combined PWA / WeRead AI / additive D1 / config / docs | Local checks passed; public release gate in progress | [Publish reviewed pending work](./releases/20261031T210732+0800-publish-pending.md) |
-| `20261031T204601+0800-smoke-once` | Automation / one manual live probe / docs | Automation paused; current probe passed; source publication remains held | [One current smoke round](./releases/20261031T204601+0800-smoke-once.md) |
-| `20261031T204352+0800-smoke-24h` | Local smoke automation / script / docs | Updated to 24 hours; source publication held with unfinished release | [24-hour smoke window](./releases/20261031T204352+0800-smoke-24h.md) |
-| `20261031T202802+0800-weread-ai` | App / protected API / additive D1 | Validated; publication pending | [WeRead online import and AI questions](./releases/20261031T202802+0800-weread-ai.md) |
-| `20261031T202358+0800-topbar-opaque-surface` | Mobile PWA shell | Local checks passed; user requested combined publication hold | [Opaque mobile topbar surface](./releases/20261031T202358+0800-topbar-opaque-surface.md) |
+| `20261031T210732+0800-publish-pending` | Combined PWA / WeRead AI / additive D1 / config / docs | Source pushed; production blocked by public loading/SW gate | [Publish reviewed pending work](./releases/20261031T210732+0800-publish-pending.md) |
+| `20261031T204601+0800-smoke-once` | Automation / one manual live probe / docs | Source pushed; automation remains paused; no app release for this task | [One current smoke round](./releases/20261031T204601+0800-smoke-once.md) |
+| `20261031T204352+0800-smoke-24h` | Local smoke automation / script / docs | Source pushed; schedule superseded by cancellation | [24-hour smoke window](./releases/20261031T204352+0800-smoke-24h.md) |
+| `20261031T202802+0800-weread-ai` | App / protected API / additive D1 | Source pushed; production migration/deployment blocked in combined audit | [WeRead online import and AI questions](./releases/20261031T202802+0800-weread-ai.md) |
+| `20261031T202358+0800-topbar-opaque-surface` | Mobile PWA shell | Source pushed; production release blocked in combined audit | [Opaque mobile topbar surface](./releases/20261031T202358+0800-topbar-opaque-surface.md) |
 | `20261031T195831+0800-standing-authorization` | Documentation | Published to GitHub; app unchanged | [Standing authorization and default verification](./releases/20261031T195831+0800-standing-authorization.md) |
-| `20261031T202329+0800-project-auto-review` | Agent configuration and documentation | In progress | [Project automatic approval review](./releases/20261031T202329+0800-project-auto-review.md) |
+| `20261031T202329+0800-project-auto-review` | Agent configuration and documentation | Configuration verified and source pushed; no separate app release | [Project automatic approval review](./releases/20261031T202329+0800-project-auto-review.md) |
