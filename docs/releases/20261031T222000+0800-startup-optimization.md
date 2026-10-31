@@ -160,3 +160,86 @@ anonymous API rejection, then append incident timestamps/outcome to this record.
 This task does not change D1/API/storage schema, so no database rollback is
 needed or authorized. Do not clear phone storage, delete caches, reset D1,
 rewrite Git history or force-push to recover.
+
+## Delivered Outcome
+
+- Final root production build:
+  `node node_modules/vite/bin/vite.js build --mode production` succeeded at
+  2026-10-31T22:20:52+08:00. It omits `.vite/manifest.json`; the same 153-entry
+  generated precache and validated runtime assets are retained.
+- Changed-document link checks and staged `git diff --cached --check` passed.
+  `git fetch origin main` showed 0 ahead / 0 behind before the task commit.
+- Implementation source:
+  `8eb2c8b1885f58a58c9b23622f4be895192a439d`, committed at
+  2026-10-31T22:21:38+08:00, message
+  `perf: reduce PWA startup dependencies and register offline cache early`.
+  `git push origin main` succeeded (`34052b9..8eb2c8b main -> main`), and the
+  worktree was clean before deployment.
+- Read-only `wrangler whoami` verified account
+  `751b9fca4f5173fd70e0dfb69cff81e2`; `pages project list` verified the existing
+  `recall-memory` origin. The first sandboxed project-list attempt failed with
+  npm cache `EPERM`; the same command outside the sandbox passed without
+  changing cache ownership or permissions.
+- Deployment command:
+  `CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2 npx --yes wrangler@4.156.0 pages deploy dist --project-name recall-memory --branch main --commit-hash 8eb2c8b1885f58a58c9b23622f4be895192a439d --commit-message 'perf: reduce PWA startup dependencies and register offline cache early'`.
+  No `--commit-dirty=true` was used. Upload compiled existing Functions, uploaded
+  97 files with 95 reused, and completed at 2026-10-31T22:22:19+08:00.
+- Deployment ID: `0f97f0c9-a0f8-4271-b59f-417f1ff7303c`.
+  Deployment URL: <https://0f97f0c9.recall-memory.pages.dev/>.
+  Production URL: <https://recall-memory.pages.dev/>.
+  Read-only deployment listing at 2026-10-31T22:23:26+08:00 confirmed Production,
+  branch main, reported source `8eb2c8b`; previous `d606405a` remains available.
+  Existing production D1/space/secret configuration is unchanged; no migrations
+  or authenticated data writes were performed.
+
+## Public Verification And Remaining Limits
+
+All requests used normal DNS/network/browser defaults. Read-only default-route
+inspection confirms interface `en0`; its initial sandbox socket query failed
+and the same read-only query outside the sandbox succeeded. No network setting
+was changed, no address was pinned, and no proxy/QUIC override was applied.
+
+- `node /tmp/recall-startup-public-assets.mjs` downloads public resources with
+  three-way bounded curl concurrency, 15-second connect / 120-second total
+  limits, and compares SHA-256 against the committed-source production build.
+  Index HTML, SW, Manifest, entry CSS and three manifest icons returned 200 and
+  matched. The first Workbox/entry-JS requests failed TLS connection after 15
+  seconds. CSS still took 117.36 seconds, maskable icon 49.38 seconds, demonstrating
+  continued variable network throughput rather than universal fast loading.
+- One targeted recovery, not infinite retries:
+  `RECALL_ASSET_RECOVERY=1 node /tmp/recall-startup-public-assets.mjs`.
+  Workbox and entry JS returned 200 in 3.36 / 6.05 seconds and matched exactly.
+  Across the initial run and recovery all 9 selected resources match the build.
+  Anonymous `GET /api/auth/session` returned 401 in both runs. Recovery completed
+  at 2026-10-31T22:26:43+08:00. No authenticated owner session was used.
+- With `RECALL_URL=https://recall-memory.pages.dev/` and cached Chromium path:
+  `node node_modules/@playwright/test/cli.js test --project=iphone15-chromium --grep 'PWA部署路径' --workers=1 --output=/tmp/recall-startup-public-pwa`:
+  failed after 30.7 seconds at initial navigation with `net::ERR_TIMED_OUT`.
+  One same-path recovery with
+  `--output=/tmp/recall-startup-public-pwa-recovery` failed similarly after
+  30.9 seconds, ending 2026-10-31T22:25:42+08:00. Both are failures, not passed
+  offline checks. They fail before app/cache/persistence assertions; the existing
+  300-second Playwright budget cannot prevent the browser connection failure.
+- With the same public URL and cached WebKit path:
+  `node node_modules/@playwright/test/cli.js test --project=iphone15-webkit --grep 'iPhone15首页' --workers=1 --output=/tmp/recall-startup-public-webkit`:
+  1 passed in 3.1 minutes, ending 2026-10-31T22:26:47+08:00. This directly uses the
+  public origin and validates visible app, activated SW controller, required
+  cache entries, iPhone 15 shared shell/touch targets and drawer/focus behavior.
+  It is not the WebKit isolated-local-server offline test and does not prove
+  public offline reopening or a physical home-screen installation.
+
+Final result: requested optimizations are committed, pushed and deployed; local
+acceptance and selected public WebKit/assets/auth checks pass. Full public
+Chromium offline acceptance and physical iPhone installation/update/offline
+behavior remain unverified. The pre-existing simulated WebKit automatic-update
+state issue and verified ordinary-refresh recovery are recorded above.
+No new runtime regression has been identified: network failures existed on the
+previous deployment, matched assets/local tests pass, and the public WebKit
+check passes. No rollback was performed; the compatible previous target remains
+recorded if a release-specific regression is subsequently confirmed.
+
+Verification completed at 2026-10-31T22:26:47+08:00. This outcome update is a
+documentation-only follow-up commit and normal push, with no second app deploy.
+Evidence commit locator: the follow-up commit updating this section and the
+RELEASES index; its final push result is reported to the user rather than creating
+another commit to record its own SHA/push.
