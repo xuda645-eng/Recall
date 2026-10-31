@@ -135,3 +135,12 @@ No new Pages deployment or D1 migration was performed; production remains
 not yet a production or physically verified fix. Exact combined commands,
 failures and remaining release steps are in
 [the publication audit](./20261031T210732+0800-publish-pending.md).
+
+Later publication: after normal-network preflight recovered and local mobile
+checks passed again, this topbar source was deployed in
+`d606405a-f52d-42de-90bc-6ca5b961cfcf`, source `552f483`, at approximately
+2026-10-31T21:51:30+08:00. Workspace CSS/JS match the published bundle exactly;
+some public homepage checks passed, broader header/SW checks remain partial due
+to network timeouts. Original physical iPhone system blur remains unverified.
+See [the network-retry release](./20261031T214513+0800-network-retry-release.md)
+for complete evidence and the compatible previous deployment.
