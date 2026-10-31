@@ -4,10 +4,13 @@
 
 - Release ID: `20261031T195831+0800-standing-authorization`.
 - Scope: documentation and agent instructions only.
-- Status: in progress.
+- Status: documentation published to GitHub; production app unchanged.
 - Record started: `2026-10-31T19:58:31+08:00`.
 - Validation: `2026-10-31T20:00:40+08:00`.
-- Commit/push and completion: pending.
+- Implementation commit: `2026-10-31T20:03:41+08:00`.
+- Implementation push verified/completion observed: `2026-10-31T20:03:52+08:00`.
+- Evidence follow-up: documentation-only commit/push after this completion
+  observation; its SHA/time are available in Git history and the final report.
 - App deployment time: not applicable; no app code is changed by this task.
 
 ## Changes And Reasons
@@ -35,9 +38,11 @@ present at task start and are excluded from this commit/release.
 
 - Repository: `xuda645-eng/Recall`, branch `main`.
 - Base source: `d76f615`.
-- Implementation commit: the first commit adding this record; resolve with
-  `git log --diff-filter=A --format=%H -- docs/releases/20261031T195831+0800-standing-authorization.md`.
-- Push result: pending.
+- Implementation commit: `ceff07f032377138d5b521bd771a5390bc33bfbf`.
+- Push result: succeeded with `git push origin main`, remote advanced from
+  `d76f615` to `ceff07f`. The local branch matched `origin/main` afterward.
+- Evidence follow-up commit locator:
+  `git log -1 --format='%H %cI' -- docs/releases/20261031T195831+0800-standing-authorization.md`.
 - App deployment: not applicable. The rules/docs are published as source on
   GitHub; redeploying unchanged committed app code would risk replacing the
   current production bundle, which may include pre-existing uncommitted work.
@@ -56,6 +61,10 @@ present at task start and are excluded from this commit/release.
   link was confirmed against `git show HEAD:docs/README.md` and recorded above.
 - Staging scope: limited to the four app-repository documentation files and this
   release record; the parent mirror and four pre-existing edits are excluded.
+- `git diff --cached --check`: passed before the implementation commit;
+  `git diff --cached --name-only` showed exactly the intended five files.
+- `git status --short --branch` after push: `main...origin/main`; exactly the
+  original four unrelated modified files remain, with no task files left dirty.
 - Application tests/build and physical iPhone checks: not applicable to this
   documentation-only change; no phone or app acceptance claim is made.
 - Read-only Wrangler identity/project/deployment checks initially failed in the

@@ -88,4 +88,4 @@ retroactively marked verified just because a deployment still exists.
 
 | Release | Scope | Result | Record |
 |---|---|---|---|
-| `20261031T195831+0800-standing-authorization` | Documentation | In progress | [Standing authorization and default verification](./releases/20261031T195831+0800-standing-authorization.md) |
+| `20261031T195831+0800-standing-authorization` | Documentation | Published to GitHub; app unchanged | [Standing authorization and default verification](./releases/20261031T195831+0800-standing-authorization.md) |
