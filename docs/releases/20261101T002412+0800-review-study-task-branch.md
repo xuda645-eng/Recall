@@ -9,8 +9,9 @@
 - Worktree: `/private/tmp/recall-review-queue-pwa-20261101`.
 - Task branch: `task/review-queue-pwa-20261101`.
 - Baseline: `52aa8d0f92a38b0593b219f9782bf5233fa3ebe5` on the user-owned Recall repository.
-- Implementation commit: pending local task-branch commit.
-- Status: implementation and full local validation complete; task-branch commit pending.
+- Implementation commit: `c2a460aa820ee8dcbc1a04f6dac9e19b8abfae7e`.
+- Status: implementation and full local validation complete; committed locally
+  on the task branch, awaiting integration without push or deployment.
 - User instruction: develop, test and commit only in this separate worktree.
   Do not modify the primary working directory, push main, or publish production.
   Integration and publication are assigned to the integration chat.
@@ -143,7 +144,11 @@ only overrides study/folder/form selectors, not Logo/topbar surfaces.
 
 ## Publication And Recovery
 
-- Local commit time/SHA: pending.
+- Local implementation commit time: `2026-11-01T01:04:12+08:00`.
+- Local implementation SHA: `c2a460aa820ee8dcbc1a04f6dac9e19b8abfae7e`.
+- Evidence follow-up: the documentation-only commit directly following this
+  implementation commit on `task/review-queue-pwa-20261101` records the local
+  delivery result. Both commits are for the integration chat; neither is pushed.
 - Remote push: not performed, per task boundary.
 - Production deploy: not performed, per task boundary.
 - Production origin: unchanged; no live hosting command was run.
