@@ -7,7 +7,8 @@
   server, dependency, schema, credential or production data change.
 - Inventory timestamp observed: `2026-11-01T01:44:32+08:00`.
 - Validation timestamp observed: `2026-11-01T01:47:56+08:00`.
-- Status: Skill validated and installed; source commit/push pending.
+- Status: Skill validated, installed and implementation source pushed; no app
+  deployment. Evidence follow-up is documentation-only.
 - User request: package the parallel development and single integration-owner
   workflow as an optional Skill. Do not automatically add or activate it when
   the user has not explicitly added it; state this boundary in its description.
@@ -52,6 +53,11 @@
   Checks include boolean false policy, exact invocation name, UI field types,
   description length and the instruction-only two-file package.
 - `git diff --check`: passed before staging; rerun before publication.
+- Installed quick validation also passed. The installed-package check repeated
+  all 8 metadata/package checks, with 13 documentation-index, 20 release-index
+  and 1 task-record local link targets passing. Source/install `diff -qr` and
+  staged `git diff --cached --check` passed. Observed final installed validation
+  and main/remote agreement at `2026-11-01T01:48:48+08:00`.
 - Installation command: `test ! -e
   /Users/bytedance/.codex/skills/recall-parallel-delivery && cp -R
   /Users/bytedance/Documents/CodexProject/Recall/Recall-next/skills/recall-parallel-delivery
@@ -74,10 +80,25 @@
 - Initial source HEAD: `d6eecb4d41c030a9fe8854ddb6be55e7f5462500`.
 - Worktree was clean at inventory. Stage only this Skill and scoped docs, not
   the pre-existing local yellow-highlight Skill or private batches.
-- Implementation commit/push: pending; exact SHA and actual outcomes will be
-  appended after source publication in a documentation-only follow-up.
-- Installation completed after the validation timestamp above; exact completion
-  time and installed validation outcome will be appended during publication.
+- Implementation commit: `12457e6e48f4898d19acfe9b2a3212c59f2769c0`,
+  `feat: add explicit-only parallel delivery skill`, committed at
+  `2026-11-01T01:49:05+08:00`.
+- `git fetch origin` succeeded before committing; `git rev-list --left-right
+  --count main...origin/main` returned `0 0`. The scoped commit contains exactly
+  five Skill/documentation files, not unrelated local resources.
+- Initial sandbox `git push origin main` failed with `could not read Username
+  for 'https://github.com': Device not configured`. Approved escalated retry of
+  `git push origin main && git ls-remote origin refs/heads/main` succeeded through
+  existing credentials: `d6eecb4..12457e6 main -> main`. The remote returned the
+  full implementation SHA; completion observed `2026-11-01T01:49:23+08:00`.
+  No authentication settings changed and no force push was used.
+- Installation completed between the observed validation timestamps
+  `2026-11-01T01:47:56+08:00` and `2026-11-01T01:48:48+08:00`. No exact installer
+  clock sample was taken. Installed validation/equality checks passed above.
+- Evidence follow-up commit: the documentation-only Git commit updating this
+  record and its release-index row; exact SHA/time are available from Git history.
+  Its actual push result will be reported in the final task status without another
+  app deployment or an endless chain of self-describing commits.
 - Production deployment: not applicable. No app bundle is rebuilt or deployed.
 - Production origin: `https://recall-memory.pages.dev/`, unchanged by this task.
 - Last recorded production deployment:
