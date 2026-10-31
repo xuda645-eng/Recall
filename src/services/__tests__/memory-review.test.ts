@@ -40,6 +40,15 @@ function makeSettings(overrides: Partial<RecallSettings> = {}): RecallSettings {
   return { ...createSeedSnapshot(at).settings, ...overrides };
 }
 
+function expectedSmartChoice(card: Card, rating: ReviewRating, settings: RecallSettings, reviewedAt = at): Card {
+  const reviewed = applyReview(card, rating, reviewedAt, settings.desiredRetention);
+  if ((rating === 'good' || rating === 'easy')
+    && Date.parse(reviewed.nextReviewDate) < reviewedAt.getTime() + DAY) {
+    return { ...reviewed, nextReviewDate: new Date(reviewedAt.getTime() + DAY).toISOString(), scheduledDays: 1 };
+  }
+  return reviewed;
+}
+
 beforeEach(() => { setCustomWeights(null); });
 afterEach(() => { setCustomWeights(null); cleanup(); vi.clearAllMocks(); });
 
@@ -53,7 +62,7 @@ describe('normalizeMemoryReviewPlan', () => {
   });
 
   it('accepts strictly increasing integer milliseconds including both bounds', () => {
-    const intervals = { again: MINUTE, hard: MINUTE + 1, good: 2 * DAY, easy: 365 * DAY };
+    const intervals = { again: MINUTE, hard: MINUTE + 1, good: DAY, easy: 365 * DAY };
     const normalized = normalizeMemoryReviewPlan({ mode: 'fixed', intervals, ignored: true });
     expect(normalized).toEqual({ mode: 'fixed', intervals });
     expect(normalized.intervals).not.toBe(intervals);
@@ -70,6 +79,15 @@ describe('normalizeMemoryReviewPlan', () => {
 
   it.each([null, [], {}, 'intervals'])('falls back when the interval record is invalid: %j', intervals => {
     expect(normalizeMemoryReviewPlan({ mode: 'fixed', intervals })).toEqual({ mode: 'fixed', intervals: DEFAULT_FIXED_INTERVALS });
+  });
+
+  it.each(['smart', 'fixed'] as const)('rejects strictly ordered sub-day Good/Easy intervals in %s mode', mode => {
+    for (const intervals of [
+      { again: MINUTE, hard: 2 * MINUTE, good: 3 * MINUTE, easy: 4 * MINUTE },
+      { again: MINUTE, hard: 2 * MINUTE, good: DAY - 1, easy: DAY + 1 },
+    ]) {
+      expect(normalizeMemoryReviewPlan({ mode, intervals })).toEqual({ mode, intervals: DEFAULT_FIXED_INTERVALS });
+    }
   });
 
   it('returns independent defaults and preserves valid smart-mode interval drafts', () => {
@@ -91,7 +109,7 @@ describe('previewMemoryReview', () => {
     expect(preview.reviewedAt).toBe(at.toISOString());
     expect(preview.fingerprint).toBe(reviewFingerprint(card, settings));
     for (const rating of RATINGS) {
-      expect(preview.choices[rating].card).toEqual(applyReview(card, rating, at, settings.desiredRetention));
+      expect(preview.choices[rating].card).toEqual(expectedSmartChoice(card, rating, settings));
       expect(preview.choices[rating].label).toMatch(/分钟|小时|天|立即复习/);
     }
     expect({ card, settings }).toEqual(original);
@@ -110,7 +128,7 @@ describe('previewMemoryReview', () => {
     const settings = makeSettings({ fsrsWeights: customWeights });
     const card = makeCard({ state: 'new', stability: 0, difficulty: 0, reps: 0, lapses: 0 });
     setCustomWeights(customWeights);
-    const expected = applyReview(card, 'good', at, settings.desiredRetention);
+    const expected = expectedSmartChoice(card, 'good', settings);
     const previous = [...default_w];
     previous[2] *= 0.8;
     setCustomWeights(previous);
@@ -167,6 +185,59 @@ describe('previewMemoryReview', () => {
     expect(preview.choices.hard.card.scheduledDays).toBe(90 * MINUTE / DAY);
     expect(preview.choices.hard.label).toBe('1.5 小时');
   });
+
+  it.each([
+    '2026-11-01T00:30:00.123-04:00',
+    '2026-03-08T01:30:00.123-05:00',
+  ])('floors Good/Easy at an exact elapsed 24 hours from %s without resetting FSRS learning', timestamp => {
+    const reviewedAt = new Date(timestamp);
+    const card = makeCard({
+      state: 'new', lastReviewDate: null, nextReviewDate: reviewedAt.toISOString(),
+      stability: 0, difficulty: 0, reps: 0, lapses: 0,
+    });
+    const original = structuredClone(card);
+    const settings = makeSettings();
+    const preview = previewMemoryReview(card, settings, reviewedAt);
+    const fsrsGood = applyReview(card, 'good', reviewedAt);
+    expect(Date.parse(fsrsGood.nextReviewDate) - reviewedAt.getTime()).toBeLessThan(DAY);
+    expect(preview.choices.good.card).toEqual({
+      ...fsrsGood, nextReviewDate: new Date(reviewedAt.getTime() + DAY).toISOString(), scheduledDays: 1,
+    });
+    expect(preview.choices.good.card.state).toBe('learning');
+    expect(preview.choices.good.label).toBe('1 天');
+    for (const rating of ['good', 'easy'] as const) {
+      expect(Date.parse(preview.choices[rating].card.nextReviewDate)).toBeGreaterThanOrEqual(reviewedAt.getTime() + DAY);
+    }
+    for (const rating of ['again', 'hard'] as const) {
+      expect(preview.choices[rating].card).toEqual(applyReview(card, rating, reviewedAt));
+    }
+    expect(card).toEqual(original);
+  });
+
+  it('preserves longer FSRS month-scale intervals rather than replacing them with one day', () => {
+    const card = makeCard({ stability: 180 });
+    const settings = makeSettings();
+    const preview = previewMemoryReview(card, settings, at);
+    for (const rating of ['good', 'easy'] as const) {
+      const expected = applyReview(card, rating, at, settings.desiredRetention);
+      expect(Date.parse(expected.nextReviewDate) - at.getTime()).toBeGreaterThan(30 * DAY);
+      expect(preview.choices[rating].card).toEqual(expected);
+    }
+  });
+
+  it('keeps fixed Good at exactly one day and Easy at months while leaving Again/Hard sub-day', () => {
+    const card = makeCard({ state: 'new', reps: 0, lastReviewDate: null, stability: 0, difficulty: 0, lapses: 0 });
+    const intervals = { again: MINUTE, hard: 2 * MINUTE, good: DAY, easy: 180 * DAY };
+    const settings = makeSettings({ reviewPlan: { mode: 'fixed', intervals } });
+    const preview = previewMemoryReview(card, settings, at);
+    for (const rating of RATINGS) {
+      expect(preview.choices[rating].card).toEqual({
+        ...applyReview(card, rating, at),
+        nextReviewDate: new Date(at.getTime() + intervals[rating]).toISOString(),
+        scheduledDays: intervals[rating] / DAY,
+      });
+    }
+  });
 });
 
 describe('reviewFingerprint', () => {
@@ -218,7 +289,7 @@ describe('MemoryReviewPlanEditor', () => {
     vi.mocked(commitMemory).mockImplementation(async change => { editorSnapshot = change(editorSnapshot); });
   });
 
-  it('starts smart; serially merges only plan/retention into the latest state', async () => {
+  it('starts smart; serially merges plan, retention and study preferences into the latest state', async () => {
     const onClose = vi.fn(), onBusy = vi.fn();
     render(createElement(MemoryReviewPlanEditor, { onClose, onBusy }));
     expect(onBusy).not.toHaveBeenCalled();
@@ -235,6 +306,7 @@ describe('MemoryReviewPlanEditor', () => {
     expect(commitMemory).toHaveBeenCalledOnce();
     expect(editorSnapshot).toEqual({ ...before, settings: {
       ...before.settings, desiredRetention: 0.95, reviewPlan: { mode: 'fixed', intervals: DEFAULT_FIXED_INTERVALS },
+      studyPreferences: { newCardRatio: 0.3, batchSize: 10, sessionMinutes: 30 },
     } });
     expect(editorSnapshot.cards).toEqual(before.cards);
     expect(editorSnapshot.reviewLogs).toEqual(before.reviewLogs);

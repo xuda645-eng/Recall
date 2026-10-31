@@ -32,7 +32,8 @@ export function normalizeMemoryReviewPlan(plan: unknown): MemoryReviewPlan {
   const valid = source !== null && RATINGS.every(rating => {
     const interval = source[rating];
     if (typeof interval !== 'number' || !Number.isInteger(interval)
-      || interval < MINUTE || interval > MAX_INTERVAL || interval <= previous) {
+      || interval < MINUTE || interval > MAX_INTERVAL || interval <= previous
+      || ((rating === 'good' || rating === 'easy') && interval < DAY)) {
       return false;
     }
     previous = interval;
@@ -91,11 +92,16 @@ export function previewMemoryReview(
   try {
     const choice = (rating: ReviewRating): { card: Card; label: string } => {
       const reviewed = applyReview(card, rating, at, settings.desiredRetention);
-      const next = plan.mode === 'fixed' ? {
+      let next = plan.mode === 'fixed' ? {
         ...reviewed,
         nextReviewDate: new Date(at.getTime() + plan.intervals[rating]).toISOString(),
         scheduledDays: plan.intervals[rating] / DAY,
       } : reviewed;
+      const minimumDue = at.getTime() + DAY;
+      if ((rating === 'good' || rating === 'easy')
+        && new Date(next.nextReviewDate).getTime() < minimumDue) {
+        next = { ...next, nextReviewDate: new Date(minimumDue).toISOString(), scheduledDays: 1 };
+      }
       return {
         card: next,
         label: intervalLabel(new Date(next.nextReviewDate).getTime() - at.getTime()),

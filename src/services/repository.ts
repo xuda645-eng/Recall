@@ -29,6 +29,7 @@ import { normalizeName } from "@/lib/utils";
 import { mergeImportPayload } from "@/services/import-export";
 import { migrateFolders, validateTree } from "@/lib/memory-folders";
 import { normalizeMemoryReviewPlan } from "@/services/memory-review";
+import { normalizeMemoryStudyPreferences } from "@/services/memory-study";
 import { DEFAULT_SHORTCUTS } from "@/lib/shortcuts";
 import { isWrappedSyncCode, sealSettingsSecrets, unsealSettingsSecrets } from "@/services/sync-secret";
 import type { Card, Deck, RecallExportPayload, RecallStateSnapshot, ReviewLog, StudySession, Theme } from "@/types";
@@ -792,6 +793,7 @@ function migrateSettings(settings: Partial<RecallStateSnapshot["settings"]> & { 
     allowHtml: typeof settings.allowHtml === "boolean" ? settings.allowHtml : false,
     desiredRetention: typeof settings.desiredRetention === "number" && settings.desiredRetention >= 0.7 && settings.desiredRetention <= 0.99 ? settings.desiredRetention : 0.9,
     reviewPlan: settings.reviewPlan ? normalizeMemoryReviewPlan(settings.reviewPlan) : undefined,
+    studyPreferences: normalizeMemoryStudyPreferences(settings.studyPreferences),
         backupFolder: typeof settings.backupFolder === "string" ? settings.backupFolder : null,
         backupSchedule: (settings.backupSchedule === "daily" || settings.backupSchedule === "weekly") ? settings.backupSchedule : "never",
                 lastBackupAt: typeof settings.lastBackupAt === "string" ? settings.lastBackupAt : null,

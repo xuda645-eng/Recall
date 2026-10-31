@@ -104,7 +104,9 @@ desiredRetention: 0.9,
     expect(deckFromRow(deckToRow(deck) as DeckRow)).toEqual(deck);
     expect(studySessionFromRow(studySessionToRow(session) as StudySessionRow)).toEqual(session);
     expect(reviewLogFromRow(reviewLogToRow(reviewLog) as ReviewLogRow)).toEqual(reviewLog);
-    expect(settingsFromRows(settingsToRows(settings))).toEqual(settings);
+    expect(settingsFromRows(settingsToRows(settings))).toEqual({
+      ...settings, studyPreferences: { newCardRatio: 0.3, batchSize: 10, sessionMinutes: 30 },
+    });
     expect(settingsToRows(settings)).toContainEqual({ key: "schema_version", value: "9" });
   });
 
