@@ -110,6 +110,12 @@ and a seven-day question cache, separate from cards/sync entities.
 
 ## Bounded 24-Hour Smoke
 
+The user canceled scheduled smoke on 2026-10-31 after shortening its window.
+Heartbeat `recall-ai` is paused; there are no further automatic probes.
+One explicitly requested current probe passed at 2026-10-31T20:46:22.020+08:00.
+The guard below remains available for deliberate manual use, not an active
+schedule. Do not resume it without a new user request.
+
 Run `node scripts/weread-ai-smoke.mjs` from the app repository. It reads existing
 private credential files without printing their contents, requests one notebook
 page, and sends only synthetic original text to the real Ark endpoint. It never
