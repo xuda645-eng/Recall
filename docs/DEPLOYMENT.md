@@ -48,31 +48,53 @@ Required repo secrets:
 The web build is a Vite SPA that can be served by any static host (Nginx,
 GitHub Pages, Cloudflare Pages, etc.).
 
-### GitHub Pages
+### Cloudflare Pages (Production)
 
-This fork publishes to `https://xuda645-eng.github.io/Recall/` using the
-`pages.yml` workflow on push to `main`. Configure repository Pages with
-**GitHub Actions** as the source, not a `gh-pages` branch. The workflow validates
-the web application, builds `dist/`, uploads a Pages artifact, and deploys it
-using GitHub's OIDC-backed Pages action. No third-party hosting, paid service,
-or API key is required for this static PWA.
+Production is the existing Cloudflare Pages project **recall-memory**, branch
+**main**, at `https://recall-memory.pages.dev/`. GitHub hosts the source in
+`xuda645-eng/Recall`; pushing source does not authorize switching the production
+host. The original deployment record is in `docs/SELFHOST.md`.
+
+Use the existing Wrangler OAuth login. Verify the account and project before
+publishing. Do not create another Pages project, change DNS, enable a sync relay,
+or add database, R2, or paid bindings for this static PWA.
 
 ```bash
+npx --yes wrangler@4.156.0 whoami
+npx --yes wrangler@4.156.0 pages project list
 pnpm install --frozen-lockfile
+pnpm lint
+pnpm test:coverage
 pnpm exec tsc -b
-pnpm exec vite build --mode pages
-pnpm exec vite preview --mode pages --host 127.0.0.1 --port 4193 --strictPort
+pnpm test:e2e
+pnpm exec vite build --mode production
+npx --yes wrangler@4.156.0 pages deploy dist --project-name recall-memory --branch main
 ```
 
-Pages mode sets the asset base, manifest start URL, scope, and icon paths to
-`/Recall/`. Default development mode uses `/`. Always use Pages mode for both
-the build and its preview. See `docs/PWA.md` for the primary mobile browser
-acceptance suite and physical iPhone checks.
+Commit and push the validated source before deployment. Publish only `dist/`,
+using the root-path production build, not the `/Recall/` GitHub Pages build.
+After publishing, verify the public address, root-path manifest and icons,
+Service Worker activation, and mobile operations:
+
+```bash
+RECALL_URL=https://recall-memory.pages.dev/ pnpm test:e2e
+```
+
+See `docs/PWA.md` for the primary mobile browser acceptance suite and physical
+iPhone checks. Browser simulations do not prove real iPhone installation.
 
 Do not upload `.env*`, credentials, private card batches, test snapshots, or
 internal handoff files. The production site starts with empty data and stores
 cards on the device. Changing host or origin does not migrate local browser
 data; export a `.recall` backup before switching URLs.
+
+### GitHub Pages (Manual Fallback Only)
+
+The earlier `https://xuda645-eng.github.io/Recall/` deployment remains a separate
+fallback preview, not production. `pages.yml` is manual-only and must not publish
+automatically on source push. Its build and tests use `RECALL_BUILD_MODE=pages`
+and the `/Recall/` asset base, manifest scope, start URL, and icons. Do not switch
+users between origins without a backup; device-local data is not shared.
 
 ### PWA update prompt
 

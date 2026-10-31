@@ -1,8 +1,6 @@
-name: Deploy PWA to GitHub Pages
+name: Manual GitHub Pages Preview
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -39,7 +37,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: Verify iPhone PWA before publishing
-        run: pnpm test:e2e
+        run: RECALL_BUILD_MODE=pages pnpm test:e2e
 
       - name: Setup Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6

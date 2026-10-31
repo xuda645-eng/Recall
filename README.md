@@ -17,7 +17,7 @@
 
 此分支的浏览器入口按已确认的 v5 原型实现，优先适配 iPhone 15 的 393 x 852 CSS 像素竖屏。桌面 Tauri 保留原界面。
 
-- 在线入口：[Recall PWA](https://xuda645-eng.github.io/Recall/)。首次联网加载后支持离线温习，无须和电脑连接同一个 Wi-Fi。
+- 在线入口：[Recall PWA](https://recall-memory.pages.dev/)。源码托管在 GitHub，生产部署使用现有 Cloudflare Pages 项目 `recall-memory`。首次联网加载后支持离线温习，无须和电脑连接同一个 Wi-Fi。
 - 温习流程：先回忆，显示答案，再评分。可选择 FSRS 智能调度或自定义固定四档，默认固定档位为 1 分钟、1 天、30 天、180 天。
 - 归档当前卡片后不再安排复习，提供 3 秒撤销；独立归档库可以阅读原文和移出归档，保留原排期与历史。
 - 支持多级卡组、Markdown 增量导入和微信读书 Skill 导出的 JSON。微信读书划线原文不改写，章节是来源信息。
@@ -175,7 +175,7 @@ pnpm dev # Browser preview (no Rust)
 
 ### PWA
 
-Installable PWA: **https://madlezz.github.io/Recall**
+Installable PWA (this fork): [Recall on Cloudflare Pages](https://recall-memory.pages.dev/)
 
 Swipe left / right / up / down to rate after reveal.
 

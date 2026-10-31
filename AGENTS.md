@@ -109,9 +109,11 @@ pnpm test:e2e      # playwright (starts pnpm dev via config)
 - Big files (>500 lines without headers): read once at opening, use grep thereafter.
 - Prefer vault + graphify over inventing a second architecture narrative.
 
-## GitHub account
+## Source And Deployment
 
-The original upstream is **Madlezz/Recall**. This workspace's user-owned fork is **xuda645-eng/Recall**. Publish this PWA to the user fork only, using authenticated HTTPS. Preserve the fork's history and never force-push or publish private card batches, credentials, or internal handoff documents.
+The original upstream is **Madlezz/Recall**. This workspace's user-owned fork is **xuda645-eng/Recall**. Commit and push source changes to this fork using authenticated HTTPS. Preserve the fork's history and never force-push or publish private card batches, credentials, or internal handoff documents.
+
+**Production hosting is Cloudflare Pages, not GitHub Pages.** Reuse the existing **recall-memory** project, production branch **main**, and **https://recall-memory.pages.dev/**. GitHub is the source host, not permission to choose a different production platform. Read `docs/SELFHOST.md` and `docs/DEPLOYMENT.md` before deploying, verify the authenticated Cloudflare account and existing project, then build and test the root-path production bundle. Do not create another project, enable databases or paid bindings, or change DNS as part of a static PWA release. Keep the origin stable to preserve access to existing device-local cards. The GitHub Pages workflow is a manual-only fallback preview, not the production release path.
 
 ## Cost / infra (HARD)
 

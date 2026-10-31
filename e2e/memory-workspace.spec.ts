@@ -33,14 +33,14 @@ async function seedPage(page: Page, data = fixture(), hash = 'home', entry = './
   await expect(page.locator('.memory-app')).toBeVisible();
   await page.waitForLoadState('networkidle');
 }
-async function serveIsolatedBuild() {
+async function serveIsolatedBuild(basePath: string) {
   const root = resolve(process.cwd(), 'dist');
   const mime: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff': 'font/woff', '.woff2': 'font/woff2' };
   const server = createServer(async (request, response) => {
     try {
       const pathname = new URL(request.url || '/', 'http://localhost').pathname;
-      if (!pathname.startsWith('/Recall/')) { response.writeHead(404).end(); return; }
-      const file = resolve(root, pathname === '/Recall/' ? 'index.html' : decodeURIComponent(pathname.slice('/Recall/'.length)));
+      if (!pathname.startsWith(basePath)) { response.writeHead(404).end(); return; }
+      const file = resolve(root, pathname === basePath ? 'index.html' : decodeURIComponent(pathname.slice(basePath.length)));
       if (!file.startsWith(root + sep)) { response.writeHead(404).end(); return; }
       const contents = await readFile(file);
       response.writeHead(200, { 'Content-Type': mime[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' }).end(contents);
@@ -51,7 +51,7 @@ async function serveIsolatedBuild() {
   if (!address || typeof address === 'string') throw new Error('隔离服务器未能启动');
   let stopped = false;
   return {
-    url: `http://127.0.0.1:${address.port}/Recall/`,
+    url: `http://127.0.0.1:${address.port}${basePath}`,
     stop: async () => { if (stopped) return; stopped = true; server.closeAllConnections(); await new Promise<void>((done, reject) => server.close(error => error ? reject(error) : done())); },
   };
 }
@@ -403,8 +403,9 @@ test('表单焦点约束、Escape关闭和来源字号保留', async ({ page }) 
   expect(await page.locator('.m-reading[data-active="true"]').evaluate(element => getComputedStyle(element).fontSize)).toBe('22px');
 });
 
-test('PWA子路径manifest、Service Worker及断网重开和复习持久化', async ({ page, context, browserName }) => {
-  const isolated = browserName === 'webkit' ? await serveIsolatedBuild() : null;
+test('PWA部署路径manifest、Service Worker及断网重开和复习持久化', async ({ page, context, browserName, baseURL }) => {
+  const basePath = new URL('./', baseURL || 'http://127.0.0.1:4193/').pathname;
+  const isolated = browserName === 'webkit' ? await serveIsolatedBuild(basePath) : null;
   try {
   await seedPage(page, fixture(), 'home', isolated?.url || './');
   const url = new URL(await page.locator('link[rel="manifest"]').getAttribute('href') || '', page.url());

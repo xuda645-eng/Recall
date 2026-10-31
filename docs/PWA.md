@@ -2,7 +2,8 @@
 
 ## 使用与安装
 
-在线入口：<https://xuda645-eng.github.io/Recall/>。
+在线入口：<https://recall-memory.pages.dev/>。生产平台是现有 Cloudflare
+Pages 项目 `recall-memory`，GitHub 仅托管源码。
 
 1. 在 iPhone 的 Safari 中打开入口，等待首次加载完成。
 2. 使用 Safari 分享菜单中的“添加到主屏幕”，从主屏幕图标启动。
@@ -53,7 +54,8 @@ pnpm exec playwright install --with-deps chromium webkit
 pnpm test:e2e
 ```
 
-Playwright 自动启动 `/Recall/` 子路径的 Pages 构建与预览。主套件是
+Playwright 默认启动站点根路径 `/` 的生产构建与预览，与 Cloudflare
+Pages 生产地址一致。主套件是
 `e2e/memory-workspace.spec.ts`，覆盖 Chromium 和 WebKit 的 iPhone 15
 尺寸、归档与撤销、导入、配置、触摸滚动、字体与焦点、安全区压力、
 窄屏、断点、横屏、桌面及 PWA 离线持久化。测试只写独立浏览器上下文
@@ -61,17 +63,21 @@ Playwright 自动启动 `/Recall/` 子路径的 Pages 构建与预览。主套�
 
 Chromium 使用浏览器离线模式验证原站点重开。当前 macOS Playwright
 WebKit 的离线开关会在导航时产生引擎内部错误，因此 WebKit 以相同
-Pages 构建启动独立静态服务器，完成缓存后关闭服务器，并验证无网络
+生产构建启动独立静态服务器，完成缓存后关闭服务器，并验证无网络
 重载和评分。这个检查证明构建的缓存行为，不是 iPhone 真机断网验收。
 
 验证已发布版本可使用：
 
 ```bash
-RECALL_URL=https://xuda645-eng.github.io/Recall/ pnpm test:e2e
+RECALL_URL=https://recall-memory.pages.dev/ pnpm test:e2e
 ```
 
 本地验收每项限时 30 秒；设置 `RECALL_URL` 的公网验收每项限时
 120 秒，为首次下载和缓存应用资源留出时间，不跳过缓存就绪或离线检查。
+
+只有明确检查 GitHub Pages 备用预览时才使用
+`RECALL_BUILD_MODE=pages pnpm test:e2e`。备用构建使用 `/Recall/` 子路径，
+不能上传到 Cloudflare 根路径站点。
 
 模拟浏览器结果不等于真机验收。实际 iPhone Safari 的主屏幕安装、
 动态安全区、系统键盘、离线冷启动和更新提示仍需在手机检查。
