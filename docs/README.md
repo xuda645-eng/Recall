@@ -26,7 +26,7 @@ Quick map of the documentation in this folder and the repo root.
 | [`./DEPLOYMENT.md`](./DEPLOYMENT.md) | CI/CD, release pipeline, Tauri signing, PWA host, relay deploy. |
 | [`./RELEASES.md`](./RELEASES.md) | Standing-approved delivery workflow, per-release records, validation evidence and rollback. |
 | [`./AGENT_PERMISSIONS.md`](./AGENT_PERMISSIONS.md) | Project-scoped automatic approval review, loading checks and manual-review recovery. |
-| [`../skills/recall-parallel-delivery/SKILL.md`](../skills/recall-parallel-delivery/SKILL.md) | Explicit-only parallel worktree development, accessible previews, task handoffs and serialized integration/release. |
+| [`../skills/recall-parallel-delivery/SKILL.md`](../skills/recall-parallel-delivery/SKILL.md) | Explicit-only isolated development/previews; integrator inventories all pending Recall tasks unless an explicit task list narrows scope. |
 | [`../TROUBLESHOOTING.md`](../TROUBLESHOOTING.md) | Common failure modes (build, sync, tests, emulator). |
 
 ## Quality / QA

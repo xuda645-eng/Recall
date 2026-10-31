@@ -8,7 +8,8 @@
   (inspection clock sample after the user's AGENTS.md request).
 - Scope: Skill instructions/metadata, application agent rules, documentation and
   a local parent-workspace rule mirror. No app/server code or schema changes.
-- Status: source validation passed; installed update and publication pending.
+- Status: validated task snapshot integrated; updated Skill installed;
+  consolidated main publication pending in the all-pending integration release.
 - Requests: add preview delivery to the optional parallel Skill, then clarify
   its precedence relative to the existing no-repeat-confirmation delivery rules.
 
@@ -65,8 +66,16 @@
 - Repository: `https://github.com/xuda645-eng/Recall`, branch `main`.
 - Initial source: `a9ce6d8fe1dd6897692156b81cd8966ab43bee5b`, clean at inventory.
 - Read-only `git fetch origin` succeeded; main/remote divergence was `0 0`.
-- Implementation commit/push and installed-update evidence: pending; append actual
-  SHA/timestamps and outcomes in a documentation-only evidence follow-up.
+- Task snapshot: `db0c145cb6a60ddbcd84675ab00054bd864984a0`, committed in the
+  isolated integration workspace at `2026-11-01T02:29:55+08:00`, merged with
+  history in `47805f5`. Original policy worktree remains untouched.
+- A user follow-up clarified that the integrator defaults to all pending Recall
+  work unless specific tasks are explicitly listed. The consolidated release
+  adds this rule without enabling implicit Skill invocation.
+- Source/installed Skill equality and installed validation passed at
+  `2026-11-01T02:33:28+08:00`, after preserving the prior installed version.
+- Main push outcome is recorded by the
+  [all-pending integration](./20261101T022522+0800-all-pending-integration.md).
 - Parent workspace `AGENTS.md` is a local mirror outside the application's Git
   root. Keep it in sync locally; do not initialize, commit or publish the parent
   empty repository or its private contents.
