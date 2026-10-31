@@ -1,9 +1,11 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Download, Loader2, X } from "lucide-react";
+import { Download, Loader2, RefreshCw, X } from "lucide-react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { cn } from "@/lib/utils";
 import { typeClass } from "@/lib/surface";
+import { APP_BUILD } from "@/lib/app-build";
+import { refreshMemoryPWA } from "@/services/pwa-refresh";
 
 export interface PWAUpdatePromptProps {
   className?: string;
@@ -14,13 +16,42 @@ interface PWAUpdateState {
   needRefresh: boolean;
   setNeedRefresh: (value: boolean) => void;
   updateServiceWorker: (reloadPage?: boolean) => Promise<void>;
+  reloadPage: () => void;
 }
 
 const PWAUpdateContext = createContext<PWAUpdateState | null>(null);
 
+export function PWAAppVersion({ disabled = false }: { disabled?: boolean }): JSX.Element {
+  const state = useContext(PWAUpdateContext);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+  const lock = useRef(false);
+  if (!state) throw new Error('PWAAppVersion requires PWAUpdateProvider');
+  const { updateServiceWorker, reloadPage, needRefresh } = state;
+  async function refresh(): Promise<void> {
+    if (lock.current || disabled) return;
+    lock.current = true;
+    setRefreshing(true);
+    setError('');
+    try { await refreshMemoryPWA(updateServiceWorker, APP_BUILD.version, reloadPage); }
+    catch (failure) {
+      lock.current = false;
+      setRefreshing(false);
+      setError(failure instanceof Error && /[\u4e00-\u9fff]/.test(failure.message) ? failure.message : '无法检查更新，请联网后重试。本机数据未改动。');
+    }
+  }
+  return <><div className="m-app-version"><small aria-label="当前版本" title="构建时间使用北京时间，精确到分钟">Recall · <span data-app-version={APP_BUILD.version}>{APP_BUILD.version}</span></small><button className="m-version-refresh" type="button" aria-label={refreshing ? '正在检查更新' : '检查更新并刷新'} title="检查更新并刷新" disabled={disabled || refreshing} onClick={() => void refresh()}>{refreshing ? <Loader2 size={15} className="animate-spin" aria-hidden="true"/> : <RefreshCw size={15} aria-hidden="true"/>}</button></div>{error ? <small className="m-version-message" role="status">{error}</small> : needRefresh && <small className="m-version-message" role="status">有新版本，点击右侧图标刷新。</small>}</>;
+}
+
 export function PWAUpdateProvider({ children }: { children: ReactNode }): JSX.Element {
   const mounted = useRef(true);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const reloadRequested = useRef(false);
+  const reloadPage = () => {
+    if (reloadRequested.current) return;
+    reloadRequested.current = true;
+    window.location.reload();
+  };
 
   useEffect(() => {
     mounted.current = true;
@@ -35,6 +66,7 @@ export function PWAUpdateProvider({ children }: { children: ReactNode }): JSX.El
     updateServiceWorker,
   } = useRegisterSW({
     immediate: true,
+    onNeedReload: reloadPage,
     onRegisteredSW(_swUrl, r) {
       if (r && mounted.current) {
         if (pollTimer.current !== null) clearInterval(pollTimer.current);
@@ -48,7 +80,7 @@ export function PWAUpdateProvider({ children }: { children: ReactNode }): JSX.El
     },
   });
 
-  return <PWAUpdateContext.Provider value={{ needRefresh, setNeedRefresh, updateServiceWorker }}>{children}</PWAUpdateContext.Provider>;
+  return <PWAUpdateContext.Provider value={{ needRefresh, setNeedRefresh, updateServiceWorker, reloadPage }}>{children}</PWAUpdateContext.Provider>;
 }
 
 export function PWAUpdatePrompt({ className, hidden = false }: PWAUpdatePromptProps = {}): JSX.Element {
