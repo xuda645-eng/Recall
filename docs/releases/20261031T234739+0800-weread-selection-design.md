@@ -158,5 +158,25 @@ No production asset/data rollback target is applicable to this design-only task.
   prototype commit. Existing unrelated release edits remain unstaged.
 - JavaScript syntax, explicit browser-globals ESLint, TypeScript config/spec
   lint, standalone typecheck, file/link checks and staged whitespace checks
-  are required before committing. Actual source SHA/push results appended
-  after publication.
+  passed before committing. Parent runtime archive matches the reviewed files.
+
+## Publication Outcome
+
+- Design implementation commit: `063d5168d455445b5ab073edee8c55f00f4dd42f`,
+  `design: prototype WeRead book selection and automatic import`.
+- Commit and push completed before 2026-10-31T23:52:15+08:00. Only eight
+  reviewed prototype/documentation files were committed with path-scoped
+  `git commit --only`; the other task's staged record remained staged.
+- Initial `git push origin main` in the restricted shell failed with
+  `could not read Username for https://github.com: Device not configured`.
+  Same command through normal sandbox escalation succeeded using the existing
+  credential helper: remote `main` advanced `b3a5338..063d516`.
+- GitHub source: `xuda645-eng/Recall`, `main`. No force-push, branch creation,
+  tag, infrastructure, migration, real data, AI or production asset change.
+- Cloudflare deployment, deployed source SHA, deployment ID/URL and production
+  rollback: not applicable to this independent design-only publication.
+- Local preview verified visually and retained as a browser deliverable at
+  `http://127.0.0.1:4395/`. It depends on the local preview server remaining
+  running and is not an iPhone-accessible public production URL.
+- Evidence follow-up: documentation-only commit containing this section and
+  the completed index row; its push outcome is reported in the final response.
