@@ -4,15 +4,17 @@
 
 - Release ID: `20261031T232024+0800-topbar-weread-runtime`.
 - Scope: mobile shell CSS, shared upstream transport, regression tests and docs.
-- Status: validated source pushed and deployed; public verification in progress,
-  physical iOS 27 acceptance unverified.
+- Status: validated source pushed and deployed; inherited publication evidence
+  reconciled by main integration. Uncaptured historical public results and
+  physical iOS 27 acceptance remain unverified.
 - User target: iPhone 15 home-screen PWA, portrait; user reports iOS 27.
 - First regression run: `2026-10-31T23:14:22+08:00`.
 - Local validation completed and record created: `2026-10-31T23:20:24+08:00`.
 - Implementation commit: `2026-10-31T23:22:51+08:00`; normal push completed
   before the deployment started at `2026-10-31T23:24:07+08:00`.
 - Deployment completed: `2026-10-31T23:24:23.351+08:00`, from Wrangler log.
-- Public verification and completion times: pending.
+- Historical public verification and task-completion times were not captured;
+  do not infer them from later integration validation.
 
 ## Changes And Diagnosis
 

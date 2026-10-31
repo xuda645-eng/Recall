@@ -6,8 +6,8 @@
 - Repository/branch: `xuda645-eng/Recall`, `main`.
 - Record created: `2026-11-01T00:27:27+08:00`. Initial implementation start was
   not captured; the final validation sequence began at `00:17:37+08:00`.
-- Status: initial source published; final correction on main, combined publication
-  owned by the main integration release below.
+- Status: initial source published; final correction integrated, pushed and
+  deployed as main `b198189` / Pages `0a8d051f`, recorded by main integration.
 - Implementation source locator: the commit adding this record. Actual SHA,
   commit/push, deployment, verification and completion times appended below.
 - Production origin remains <https://recall-memory.pages.dev/>.

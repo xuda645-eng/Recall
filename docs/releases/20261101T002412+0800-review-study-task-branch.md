@@ -10,8 +10,10 @@
 - Task branch: `task/review-queue-pwa-20261101`.
 - Baseline: `52aa8d0f92a38b0593b219f9782bf5233fa3ebe5` on the user-owned Recall repository.
 - Implementation commit: `c2a460aa820ee8dcbc1a04f6dac9e19b8abfae7e`.
-- Status: implementation and full local validation complete; committed locally
-  on the task branch, awaiting integration without push or deployment.
+- Status: original task implementation and full local validation completed and
+  committed on this task branch; subsequently integrated, pushed and deployed by
+  main integration as `b198189` / Pages `0a8d051f`. Original task boundaries below
+  describe its historical delivery, not pending main publication.
 - User instruction: develop, test and commit only in this separate worktree.
   Do not modify the primary working directory, push main, or publish production.
   Integration and publication are assigned to the integration chat.
