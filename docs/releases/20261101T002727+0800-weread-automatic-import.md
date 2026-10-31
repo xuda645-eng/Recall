@@ -65,7 +65,7 @@ launcher with tool approval. No production credentials or cards enter tests.
 
 | Command | Observed result |
 |---|---|
-| `node node_modules/vitest/vitest.mjs run --coverage` | Final 69 files / 1197 tests passed; statements 40.18%, branches 37.81%, functions 34.74%, lines 43.66%, configured floors passed. |
+| `node node_modules/vitest/vitest.mjs run --coverage` | Final 69 files / 1198 tests passed after the source-description conflict regression; statements 40.18%, branches 37.81%, functions 34.74%, lines 43.66%, configured floors passed. |
 | `node node_modules/vitest/vitest.mjs run --config cloud-tests/vitest.config.ts` | 3 files / 187 tests passed, including 41 budget cases. |
 | `node node_modules/typescript/bin/tsc -b` | Passed. |
 | `node node_modules/typescript/bin/tsc -p tsconfig.cloud.json` | Passed. |
@@ -104,10 +104,71 @@ visually inspected; no horizontal overflow or clipped primary action observed.
 
 ## Publication And Verification
 
-Pending final checks, task-scoped commit, normal push, exact committed archive
-build, deployment and non-destructive public checks. Preserve and exclude
-`docs/releases/20261031T232024+0800-topbar-weread-runtime.md`; never release
-unrelated dirty files or private card batches. Append actual outcomes here.
+- Implementation commit `902fa451af2537b0302b97aa9305203cba51f7f0`,
+  created `2026-11-01T00:30:54+08:00`. Normal `git push origin main` succeeded
+  (`52aa8d0..902fa45`); `git ls-remote origin refs/heads/main` independently
+  returned the full implementation SHA before evidence publication.
+- Only 25 task files were committed. The parallel dirty record
+  `docs/releases/20261031T232024+0800-topbar-weread-runtime.md` remains untouched
+  and excluded; no private batch or credential files were staged.
+- Built an isolated `git archive 902fa451af2537b0302b97aa9305203cba51f7f0`
+  under `/tmp/recall-weread-release-902fa45`, using the existing dependency
+  symlink. `node node_modules/vite/bin/vite.js build --mode production` from
+  that archive passed: Vite 2.34 seconds, PWA precache 154 entries / 3233.85 KiB.
+  Existing large-chunk warnings remain; no build error. An earlier redundant
+  workspace build also passed but was not the published artifact.
+- Rechecked previous production immediately before publishing: still
+  `2abbe90f-669c-42b8-9047-61f5228cfc9a`, source `dfed397`.
+- Deployment command from the committed archive:
+
+```sh
+CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2 npx --yes wrangler@4.156.0 pages deploy dist --project-name recall-memory --branch main --commit-hash 902fa451af2537b0302b97aa9305203cba51f7f0 --commit-message 'feat: WeRead book selection and safe automatic import'
+```
+
+- Worker compilation passed at `2026-11-01T00:32:21.037+08:00`; 29 files uploaded
+  and 164 reused. Functions and routes uploaded without a schema migration.
+- Deployment completed at `2026-11-01T00:32:34.426+08:00`, from Wrangler's
+  timestamped completion log. Actual ID:
+  `71b8ebee-3c1c-4dee-b2f7-2b08094e428d`, branch `main`, source `902fa45`.
+  Deployment URL: <https://71b8ebee.recall-memory.pages.dev/>.
+  Production URL: <https://recall-memory.pages.dev/>.
+- Non-destructive public verification began around `00:33+08:00`. Node's inline
+  fetch byte-comparison failed on the initial connection with
+  `UND_ERR_CONNECT_TIMEOUT` (10-second connection timeout). Retrying the same
+  asset and anonymous API assertions using system IPv4 curl, 15-second connect
+  and 60-second transfer bounds; no credential or real model request.
+- Public asset/API and browser outcomes, completion time and documentation-only
+  evidence push appended below once checks complete. No rollback has occurred.
+
+### Final Candidate Correction
+
+- During the final audit before task completion, the new failed-book article
+  retained a light failure background in dark mode. Added a scoped dark failure
+  surface and a dual-browser regression assertion. Also included `card.source`
+  in the consent fingerprint so another page's source-description edits cannot
+  be silently overwritten by a pending approved update.
+- Existing draft IDs/database remain compatible. Old consent fingerprints for
+  changed existing cards conservatively require renewed confirmation; successful
+  questions remain available. No data reset or migration.
+- Revalidated full unit coverage (1198 passed), app types, ESLint (0 errors /
+  132 warnings), and the full 22-case automatic-path mobile subset including the
+  new dark failure-state assertion (2.0 minutes). The earlier 38 legacy/automatic
+  and 44 main mobile tests remain the validated base for unchanged flows.
+- The initial deployment `71b8ebee-3c1c-4dee-b2f7-2b08094e428d` is a superseded
+  candidate, not the final task version. Correction source SHA and replacement
+  deployment are appended below after normal commit/push and isolated build.
+- Public initial-candidate browser checks already passed empty startup in both
+  engines, manual synthetic WeRead import in WebKit and WebKit SW/offline
+  persistence. Chromium's manual check failed before reaching import while
+  waiting for `sw-control` at the unchanged five-minute budget. This is a failed
+  public readiness check, not a passed WeRead flow. Command-line Node connection
+  and curl manifest TLS timeouts are recorded; curl did match `index.html`.
+- Added `e2e/weread-public.config.ts` and `e2e/weread-public.spec.ts` to verify
+  committed resource SHA-256 digests and five anonymous 401 gates through a fresh
+  credential-free WebKit context. Foreign origins, credentials and non-whitelisted
+  production mutation/model inputs are rejected. Service Workers are blocked only
+  in this asset/API probe; the separate main suite retains its real SW checks.
+  The probe retains a five-minute budget and does not replace failed SW assertions.
 
 ## Limits And Recovery
 

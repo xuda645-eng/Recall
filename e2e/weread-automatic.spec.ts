@@ -91,6 +91,9 @@ test('失败全批不导入，刷新保留已成功问题且不续跑，重试�
   await expect(page.getByRole('alert')).toBeVisible();
   expect(calls).toHaveLength(2);
   expect((await snapshot(page)).cards).toHaveLength(0);
+  await page.evaluate(() => document.documentElement.classList.add('dark'));
+  const failedBackground = await page.locator('.wr-job-books .wr-failed').evaluate(element => getComputedStyle(element).backgroundColor);
+  expect(failedBackground).toBe('rgb(71, 52, 44)');
   await page.reload();
   await expect(page.getByRole('heading', { name: '进度已为你保留' })).toBeVisible();
   await page.waitForTimeout(500);

@@ -116,4 +116,5 @@
 @media (max-width:360px) { .memory-app .wr-book { gap: 10px; padding: 14px 11px; grid-template-columns: 57px minmax(0, 1fr); } .wr-book > .wr-cover { width: 57px; height: 84px; } }
 .dark .wr-workspace { --wr-olive: #c4ceae; --wr-olive-soft: #3c4531; }
 .dark .wr-consent { color: #d5ddc7; }
+.dark .wr-job-books .wr-failed { border-color: #916344; background: #47342c; }
 @media(prefers-reduced-motion:reduce) { .wr-spin { animation: none; } .wr-meter i { transition: none; } }

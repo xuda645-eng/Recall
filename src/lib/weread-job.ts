@@ -17,7 +17,7 @@ export interface WereadJob {
   receipt?: { added: number; updated: number; skipped: number; deckIds: string[] };
 }
 function contentIdentity(card: RecallStateSnapshot['cards'][number]): string {
-  return JSON.stringify([card.id, card.deckId, card.front, card.back, card.contentKind, card.recallKind, card.bookTitle, card.chapter, card.sourceRef, card.aiSummary]);
+  return JSON.stringify([card.id, card.deckId, card.front, card.back, card.contentKind, card.recallKind, card.bookTitle, card.chapter, card.sourceRef, card.aiSummary, card.source]);
 }
 export function needsQuestion(draft: WereadDraft): boolean {
   return draft.include && draft.kind !== 'excerpt' && !draft.originalUnchanged && !draft.highlight.question?.trim();

@@ -96,4 +96,13 @@ describe('bounded persistent WeRead job', () => {
     imported.cards[0].deckId = 'moved';
     expect(() => safeJobPlan(imported, job)).toThrow('位置');
   });
+  it('source-description edits after consent are content conflicts, not silent overwrites', () => {
+    const { snapshot, books, drafts } = fixture();
+    const imported = applyWereadImport(snapshot, planWereadImport(snapshot, drafts), new Set()).snapshot;
+    books[0].highlights[0].markText += '修订';
+    const changed = buildWereadDrafts(imported, books, ['test-book']);
+    const job = createWereadJob(imported, changed, new Set([changed[0].id]));
+    imported.cards[0].source = '另一个页面编辑了来源说明';
+    expect(() => safeJobPlan(imported, job)).toThrow('变化');
+  });
 });
