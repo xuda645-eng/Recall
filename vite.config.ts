@@ -2,11 +2,28 @@ import path from "node:path";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig } from "vite";
+import { createBuildInfo } from "./src/lib/build-version";
+
+const buildInfo = createBuildInfo(new Date(), process.env.RECALL_BUILD_VERSION);
+const versionJSON = JSON.stringify(buildInfo);
+
 export default defineConfig(({ mode }) => {
   const base = mode === "pages" ? "/Recall/" : "/";
   return {
     base,
-    plugins: [react(), VitePWA({
+    define: { __RECALL_BUILD_INFO__: versionJSON },
+    plugins: [{
+      name: "recall-build-version",
+      generateBundle() { this.emitFile({ type: "asset", fileName: "version.json", source: versionJSON }); },
+      configureServer(server) {
+        server.middlewares.use((request, response, next) => {
+          if (request.url?.split('?')[0] !== `${base}version.json`) { next(); return; }
+          response.setHeader("Content-Type", "application/json");
+          response.setHeader("Cache-Control", "no-store");
+          response.end(versionJSON);
+        });
+      },
+    }, react(), VitePWA({
       strategies: "generateSW",
       registerType: "prompt",
       includeAssets: ["favicon.svg", "icons/icon-192.png", "icons/icon-512.png"],

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useRecallStore } from '@/stores/recall-store';
 import { folderPath, subtreeIds, createFolder, changeFolder, moveMemoryCard, newMemoryCard } from '@/lib/memory-folders';
 import { parseMemoryMarkdown, planMemoryImport, applyMemoryImport, type MarkdownPlan } from '@/lib/memory-markdown';
-import { archiveMemoryCard, restoreMemoryCard } from '@/lib/memory-archive';
+import { archiveMemoryCard, archiveMemoryFolder, restoreMemoryCard, restoreMemoryCards } from '@/lib/memory-archive';
 import { commitMemory, downloadMemoryText } from '@/services/memory-actions';
 import { buildExportPayload } from '@/services/import-export';
 import { isCardDue } from '@/lib/stats';
@@ -14,7 +14,7 @@ import { isMemoryNewCard, normalizeMemoryStudyPreferences, selectMemoryStudyCard
 import { MemoryFolderRows } from '@/components/memory-folder-rows';
 import { MemoryStatusEdge } from '@/components/memory-status-edge';
 import { MemoryCloudStatus, MemoryCloudSettings } from '@/components/memory-cloud';
-import { PWAUpdatePrompt } from '@/components/pwa-update-prompt';
+import { PWAAppVersion, PWAUpdatePrompt } from '@/components/pwa-update-prompt';
 import type { Card, Deck } from '@/types';
 import './memory-workspace.css';
 import './memory-appearance.css';
@@ -31,8 +31,8 @@ const loadingView = <p className="m-note" role="status">正在加载，请稍候
 
 const titles = { home: '今日复习', folders: '卡组目录', cards: '全部卡片', archived: '已归档', stats: '统计', import: '导入', weread: '微信读书', settings: '设置与数据', advanced: '更多设置', compat: '其他导入' };
 type Route = keyof typeof titles | 'read';
-type Sheet = { kind: 'folder' | 'card' | 'move' | 'help' | 'filter' | 'path' | 'add' | 'card-menu' | 'reader-options' | 'review-plan' | 'font' | 'archived-detail'; id?: string };
-interface ArchiveUndo { id: string; archivedAt: string; expiresAt: number; reading: boolean; }
+type Sheet = { kind: 'folder' | 'folder-archive' | 'card' | 'move' | 'help' | 'filter' | 'path' | 'add' | 'card-menu' | 'reader-options' | 'review-plan' | 'font' | 'archived-detail'; id?: string };
+interface ArchiveUndo { ids: string[]; archivedAt: string; expiresAt: number; reading: boolean; }
 const template = '# 知识整理\n\n## 回忆方法\n\n<!-- recall:card {} -->\n问题：怎样确认理解？\n\n合上材料，用自己的话说明结论、依据与适用条件。\n\n<!-- recall:end -->\n\n<!-- recall:card {"type":"excerpt","title":"阅读段落"} -->\n\n没有问题的一段内容也可以是一张卡片。\n\n<!-- recall:end -->\n';
 const date = (value?: string) => value && Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '首次导入时间未知';
 const currentTime = () => Date.now();
@@ -229,22 +229,35 @@ export function MemoryWorkspace(): JSX.Element {
     await commitMemory(snapshot => archiveMemoryCard(snapshot, id, archivedAt));
     if (!mounted.current) return;
     setRemaining(3);
-    setArchiveUndo({ id, archivedAt, expiresAt: currentTime() + 3000, reading: route === 'read' });
+    setArchiveUndo({ ids: [id], archivedAt, expiresAt: currentTime() + 3000, reading: route === 'read' });
+    setSheet(null);
+  }
+  async function archiveFolder(id: string): Promise<void> {
+    const archivedAt = new Date().toISOString();
+    let ids: string[] = [];
+    await commitMemory(snapshot => {
+      const result = archiveMemoryFolder(snapshot, id, archivedAt);
+      ids = result.ids;
+      return result.snapshot;
+    });
+    if (!mounted.current) return;
+    setRemaining(3);
+    setArchiveUndo({ ids, archivedAt, expiresAt: currentTime() + 3000, reading: false });
     setSheet(null);
   }
   async function undoArchive(): Promise<void> {
     const operation = archiveUndo;
     if (!operation || currentTime() >= operation.expiresAt) { setArchiveUndo(null); return; }
     await run(async () => {
-      await commitMemory(snapshot => restoreMemoryCard(snapshot, operation.id, operation.archivedAt));
-      if (route === 'read' && operation.reading) setRestoreRequest({ id: operation.id, token: createId('restore') });
+      await commitMemory(snapshot => restoreMemoryCards(snapshot, operation.ids, operation.archivedAt));
+      if (route === 'read' && operation.reading) setRestoreRequest({ id: operation.ids[0], token: createId('restore') });
       setArchiveUndo(null);
     });
   }
   function restoreArchive(id: string): void {
     void run(async () => {
       await commitMemory(snapshot => restoreMemoryCard(snapshot, id));
-      if (archiveUndo?.id === id) setArchiveUndo(null);
+      if (archiveUndo?.ids.includes(id)) setArchiveUndo(null);
       setSheet(null);
     });
   }
@@ -297,6 +310,8 @@ export function MemoryWorkspace(): JSX.Element {
   }
   function editorSheet(): JSX.Element {
     const editing = store.cards.find(card => card.id === sheet?.id);
+    const archiveFolders = sheet?.kind === 'folder' && sheet.id ? subtreeIds(store.decks, sheet.id) : new Set<string>();
+    const archiveCount = available.filter(card => archiveFolders.has(card.deckId)).length;
     return <form onChange={() => { sheetDirty.current = true; }} onSubmit={event => {
       event.preventDefault();
       const values = new FormData(event.currentTarget);
@@ -320,11 +335,18 @@ export function MemoryWorkspace(): JSX.Element {
         {sheet?.kind === 'folder' && <option value="">根目录</option>}{store.decks.filter(deck => sheet?.kind !== 'folder' || !sheet.id || !subtreeIds(store.decks, sheet.id).has(deck.id)).map(deck => <option key={deck.id} value={deck.id}>{folderPath(store.decks, deck.id).map(item => item.name).join(' / ')}</option>)}
       </select></label>
       {sheet?.kind === 'card' && <><p className="m-note">{editing?.contentKind === 'excerpt' ? '阅读摘录 · 保留原文与复习进度' : '问答卡 · 先回忆问题，再查看答案'}</p><label>{editing?.contentKind === 'excerpt' ? '段落标题（可选）' : '问题'}<textarea name="front" required={editing?.contentKind !== 'excerpt'} maxLength={10000} defaultValue={editing?.front || ''}/></label><label>{editing?.contentKind === 'excerpt' ? '划线原文' : '答案'}<textarea name="back" required maxLength={20000} defaultValue={editing?.back || ''}/></label><details className="m-card-source-fields"><summary>来源信息（可选）</summary><label>书名<input name="bookTitle" defaultValue={editing?.bookTitle || ''}/></label><label>章节<input name="chapter" defaultValue={editing?.chapter || ''}/></label><label>来源<input name="source" defaultValue={editing?.source || ''}/></label></details></>}
+      {sheet?.kind === 'folder' && sheet.id && <><button className="m-secondary" type="button" disabled={busy || !archiveCount} onClick={() => { if (sheetDirty.current && !window.confirm('归档前放弃未保存的修改？')) return; setSheet({ kind: 'folder-archive', id: sheet.id }); }}><Archive size={20}/>归档整个卡组</button><small>{archiveCount ? `包含所有子卡组，共 ${archiveCount} 张在学卡片。原文与进度保留。` : '本卡组及子卡组没有在学卡片。'}</small></>}
       <button className="m-primary" disabled={busy} type="submit">{sheet?.kind === 'card' && !editing ? '保存卡片' : '保存修改'}</button>
     </form>;
   }
   function renderSheet(): JSX.Element {
     if (!sheet) return <></>;
+    if (sheet.kind === 'folder-archive') {
+      const deck = store.decks.find(candidate => candidate.id === sheet.id);
+      const folders = subtreeIds(store.decks, sheet.id || null);
+      const count = available.filter(card => folders.has(card.deckId)).length;
+      return <form onSubmit={event => { event.preventDefault(); void run(() => archiveFolder(sheet.id!)); }}><p>将归档“{deck?.name}”及所有子卡组中的 {count} 张在学卡片，不再安排复习。</p><p className="m-note">卡组目录、原文、复习进度和历史记录仍保留。已归档卡片不受影响；操作后 3 秒内可撤销，也可以在“已归档”中逐张移出。</p><button className="m-secondary" type="button" disabled={busy} onClick={() => setSheet({ kind: 'folder', id: sheet.id })}>取消，返回管理</button><button className="m-primary" type="submit" disabled={busy || !deck || !count}>确认归档 {count} 张卡片</button></form>;
+    }
     if (sheet.kind === 'review-plan') return <MemoryReviewPlanEditor onClose={() => setSheet(null)} onBusy={setBusy}/>;
     if (sheet.kind === 'help') return <div className="m-about"><p>#、##、### 是卡组；卡片块里的标题仍是正文。编号和时间可以先留空，导入后保存带编号文件继续维护。</p><pre>{template}</pre><button onClick={() => downloadMemoryText(template, 'Recall-知识卡片示例.md')}>下载完整示例</button></div>;
     if (sheet.kind === 'path') return <div className="m-sheet-list"><button onClick={() => openFolder(null)}>全部卡组</button>{folderPath(store.decks, folder).map(deck => <button key={deck.id} onClick={() => openFolder(deck.id)}>{deck.name}<ChevronRight size={16}/></button>)}</div>;
@@ -339,7 +361,7 @@ export function MemoryWorkspace(): JSX.Element {
     return editorSheet();
   }
 
-  const sheetTitle = sheet ? { folder: sheet.id ? '管理卡组' : '新建卡组', card: sheet.id ? '编辑卡片' : '添加卡片', move: '移动卡片', help: 'Markdown 格式', filter: '筛选与排序', path: '当前卡组路径', add: '添加', 'card-menu': '管理卡片', 'reader-options': '卡片与复习', 'review-plan': '复习计划', font: '阅读字号', 'archived-detail': '已归档 · 查看原文' }[sheet.kind] : '';
+  const sheetTitle = sheet ? { folder: sheet.id ? '管理卡组' : '新建卡组', 'folder-archive': '归档整个卡组', card: sheet.id ? '编辑卡片' : '添加卡片', move: '移动卡片', help: 'Markdown 格式', filter: '筛选与排序', path: '当前卡组路径', add: '添加', 'card-menu': '管理卡片', 'reader-options': '卡片与复习', 'review-plan': '复习计划', font: '阅读字号', 'archived-detail': '已归档 · 查看原文' }[sheet.kind] : '';
   const navEntries: [Route, string, typeof Home][] = [['home', '今日复习', Home], ['folders', '卡组目录', Library], ['cards', '全部卡片', Layers], ['archived', '已归档', Archive], ['stats', '统计', BarChart3], ['import', '导入', Upload]];
   const topBack = ['read', 'weread', 'compat', 'advanced'].includes(route) || route === 'folders' && !!folder;
   const hasTopAction = !['stats', 'archived', 'import'].includes(route);
@@ -347,7 +369,7 @@ export function MemoryWorkspace(): JSX.Element {
   const today = store.reviewLogs.filter(log => new Date(log.reviewDate).toDateString() === new Date().toDateString()).length;
   const recentIds = [...new Set(store.reviewLogs.slice().reverse().map(log => log.cardId))];
   const recent = recentIds.length ? recentIds.map(id => available.find(card => card.id === id)).filter((card): card is Card => !!card).slice(0, 2) : available.slice(0, 2);
-  const archiveNotice = archiveUndo ? <div className="m-archive-undo" role="status" aria-live="polite" inert={drawer || !!sheet}><span>已归档，不再安排复习</span><button disabled={busy} onClick={() => void undoArchive()} aria-label={`撤销归档，剩余 ${remaining} 秒`}>撤销 <b aria-hidden="true">{remaining}</b><span aria-hidden="true">s</span></button></div> : null;
+  const archiveNotice = archiveUndo ? <div className="m-archive-undo" role="status" aria-live="polite" inert={drawer || !!sheet}><span>{archiveUndo.ids.length > 1 ? `已归档 ${archiveUndo.ids.length} 张，不再安排复习` : '已归档，不再安排复习'}</span><button disabled={busy} onClick={() => void undoArchive()} aria-label={`撤销归档，剩余 ${remaining} 秒`}>撤销 <b aria-hidden="true">{remaining}</b><span aria-hidden="true">s</span></button></div> : null;
 
   return <div className="memory-app" data-drawer={drawer} onClickCapture={event => {
     (event.target as HTMLElement).closest<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
@@ -366,7 +388,7 @@ export function MemoryWorkspace(): JSX.Element {
     <aside id="memory-drawer" className="memory-drawer" ref={drawerRef} data-visible={drawer || drawerVisible} aria-label="项目菜单" aria-hidden={mobile && !drawer}>
       <div className="m-drawer-brand"><strong>Recall</strong><span>记忆卡片</span><small>{titles[navRoute as keyof typeof titles]}</small></div>
       <nav>{navEntries.map(([target, label, Icon]) => <button key={target} aria-current={navRoute === target ? 'page' : undefined} onClick={() => { if (target === 'folders') setFolder(null); navigate(target); }}><span className="m-nav-icon"><Icon size={20}/></span>{target === 'folders' ? label : t(`memory.routes.${target}`, label)}</button>)}</nav>
-      <div className="m-drawer-footer"><button onClick={() => navigate('settings')}>设置与数据</button><button onClick={() => setSheet({ kind: 'add' })}>添加卡片</button><small>本机保存 · Recall</small></div>
+      <div className="m-drawer-footer"><button onClick={() => navigate('settings')}>设置与数据</button><button onClick={() => setSheet({ kind: 'add' })}>添加卡片</button><PWAAppVersion disabled={busy}/></div>
     </aside>
     <div ref={shellRef} className={`memory-shell ${drawer ? 'is-open' : ''} ${route === 'read' ? 'is-reading' : ''} ${archiveUndo ? 'has-archive-undo' : ''}`}>
       <header className="memory-bar"><button ref={brand} className="m-brand" aria-expanded={drawer} aria-controls="memory-drawer" aria-label={drawer ? '关闭项目菜单' : '打开项目菜单'} disabled={busy} onClick={() => { if (sheet) { closeSheet(); return; } setDrawer(value => !value); }}><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M23 15h32c27 0 34 32 12 45l19 25H64L43 57v28H23z" fill="white"/><path d="M54 23c-1 10-4 14-14 15 10 1 13 5 14 15 1-10 4-14 14-15-10-1-13-5-14-15" fill="currentColor"/></svg></button>{route === 'folders' && folder ? <button className="m-context" onClick={() => setSheet({ kind: 'path' })} aria-label={`查看卡组路径：${shellTitle}`}>{shellTitle}</button> : <div className="m-context">{shellTitle}</div>}{hasTopAction ? <button className="m-top-action" aria-label={topLabel} disabled={busy || drawer || !!sheet} onClick={topAction}>{route === 'read' ? '退出' : topBack ? <ArrowLeft size={20}/> : route === 'settings' ? <MoreHorizontal size={20}/> : <Plus size={22}/>}</button> : <span className="m-top-action-placeholder" aria-hidden="true"/>}</header>

@@ -40,6 +40,11 @@
 .memory-drawer button[aria-current="page"] .m-nav-icon { background: var(--stone); color: var(--card-paper); }
 .m-drawer-footer { display: grid; gap: 4px; margin-top: auto; padding: 12px 10px; border-top: 1px solid var(--line); }
 .m-drawer-footer small { padding: 8px 10px; font-size: 12px; }
+.m-app-version { display: flex; align-items: center; min-width: 0; }
+.m-app-version small { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.memory-drawer .m-version-refresh { flex-shrink: 0; justify-content: center; padding: 0; min-width: 44px; min-height: 44px; opacity: .55; }
+.memory-drawer .m-version-refresh:hover, .memory-drawer .m-version-refresh:focus-visible { opacity: 1; }
+.m-version-message { line-height: 1.6; }
 .memory-bar { height: 48px; top: var(--safe-top); left: var(--safe-left); right: var(--safe-right); gap: 8px; }
 .memory-bar > button, .memory-bar .m-context { height: 48px; background: var(--card-paper); border-radius: 14px; box-shadow: 0 5px 16px #3d362d12; }
 .memory-bar .m-brand { width: 48px; padding: 0; background: #353532; color: #353532; border: 0; box-shadow: 0 7px 20px #35353224; }

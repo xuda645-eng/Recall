@@ -62,6 +62,16 @@ describe("PWA update prompt", () => {
     expect(worker.updateServiceWorker).not.toHaveBeenCalled();
   });
 
+  it("reloads only once when manual activation and Workbox both request it", () => {
+    const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => {});
+    render(<PWAUpdatePrompt />);
+    const callback = worker.hookOptions.mock.calls[0][0].onNeedReload;
+    callback();
+    callback();
+    expect(reload).toHaveBeenCalledOnce();
+    expect(localStorage.getItem("recall.snapshot.v1")).toBe(savedSnapshot);
+  });
+
   it("starts immediate registration while the workspace is still suspended", async () => {
     const workspace = deferred();
     const Workspace = lazy(async () => { await workspace.promise; return { default: () => <PWAUpdatePrompt /> }; });

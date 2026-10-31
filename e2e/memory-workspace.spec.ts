@@ -20,6 +20,17 @@ function fixture() {
   ];
   return { ...seed, decks, cards, reviewLogs: [], studySessions: [], settings: { ...seed.settings, onboardingComplete: true, studyPreferences: { newCardRatio: 1, batchSize: 10, sessionMinutes: 30 }, reviewPlan: { mode: 'fixed' as const, intervals: { again: 60000, hard: 86400000, good: 2592000000, easy: 15552000000 } } } };
 }
+function folderArchiveFixture() {
+  const seed = fixture();
+  const decks = [...seed.decks, { ...seed.decks[1], id: 'deep', name: '深层练习', parentId: 'leaf' }, { ...seed.decks[0], id: 'outside', name: '其他卡组' }];
+  const cards = [
+    { ...seed.cards[0], deckId: 'root' },
+    seed.cards[1], seed.cards[2],
+    { ...seed.cards[1], id: 'deep-card', deckId: 'deep', front: '深层问题' },
+    { ...seed.cards[1], id: 'outside-card', deckId: 'outside', front: '其他问题' },
+  ];
+  return { ...seed, decks, cards };
+}
 async function snapshot(page: Page) {
   return page.evaluate(() => JSON.parse(localStorage.getItem('recall.snapshot.v1') || 'null'));
 }
@@ -79,7 +90,7 @@ async function seedPage(page: Page, data = fixture(), hash = 'home', entry = './
   await page.reload({ waitUntil: 'domcontentloaded' });
   await waitForAppReady(page);
 }
-async function serveIsolatedBuild(basePath: string) {
+async function serveIsolatedBuild(basePath: string, overrides = new Map<string, string>()) {
   const root = resolve(process.cwd(), 'dist');
   const mime: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff': 'font/woff', '.woff2': 'font/woff2' };
   const server = createServer(async (request, response) => {
@@ -88,7 +99,7 @@ async function serveIsolatedBuild(basePath: string) {
       if (!pathname.startsWith(basePath)) { response.writeHead(404).end(); return; }
       const file = resolve(root, pathname === basePath ? 'index.html' : decodeURIComponent(pathname.slice(basePath.length)));
       if (!file.startsWith(root + sep)) { response.writeHead(404).end(); return; }
-      const contents = await readFile(file);
+      const contents = overrides.get(pathname.slice(basePath.length)) ?? await readFile(file);
       response.writeHead(200, { 'Content-Type': mime[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' }).end(contents);
     } catch { response.writeHead(404).end(); }
   });
@@ -140,6 +151,71 @@ test('新用户从空卡组开始，不自动展示个人或示例数据', async
   expect((await snapshot(page)).cards).toEqual([]);
   expect((await snapshot(page)).decks).toEqual([]);
   await noOverflow(page);
+});
+
+test('抽屉显示固定构建版本，刷新图标在移动窄屏与桌面均可触达', async ({ page }) => {
+  await seedPage(page);
+  await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
+  const version = page.locator('[data-app-version]');
+  const text = (await version.textContent())!;
+  expect(text).toMatch(/^1\.0-\d{8}-\d{4}$/);
+  const metadata = await page.evaluate(async () => (await fetch(new URL('version.json', location.href), { credentials: 'omit', cache: 'no-store' })).json());
+  expect(metadata.version).toBe(text);
+  expect(metadata.timezone).toBe('Asia/Shanghai');
+  await saveShot(page, 'drawer-version');
+  for (const width of [393, 320, 760, 761, 1280]) {
+    await page.setViewportSize({ width, height: 852 });
+    await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))));
+    await expect(version).toHaveText(text);
+    const refresh = page.getByRole('button', { name: '检查更新并刷新', exact: true });
+    await expect(refresh).toBeInViewport();
+    const box = (await refresh.boundingBox())!;
+    expect(Math.round(box.width * 1000) / 1000).toBeGreaterThanOrEqual(44);
+    expect(Math.round(box.height * 1000) / 1000).toBeGreaterThanOrEqual(44);
+    const geometry = await page.evaluate(() => ({ width: innerWidth, scroll: document.documentElement.scrollWidth }));
+    expect(geometry.scroll, `${width}px viewport: ${JSON.stringify(geometry)}`).toBeLessThanOrEqual(geometry.width + 1);
+  }
+});
+
+test('版本刷新检查后重新加载，离线失败不误报最新也不改变本机数据', async ({ page, context }) => {
+  await seedPage(page);
+  const before = await snapshot(page);
+  await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
+  const version = await page.locator('[data-app-version]').textContent();
+  await context.setOffline(true);
+  await page.getByRole('button', { name: '检查更新并刷新', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: '无法检查更新' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '检查更新并刷新', exact: true })).toBeEnabled();
+  expect(await snapshot(page)).toEqual(before);
+  await context.setOffline(false);
+  await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), page.getByRole('button', { name: '检查更新并刷新', exact: true }).click()]);
+  await waitForAppReady(page);
+  await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
+  await expect(page.locator('[data-app-version]')).toHaveText(version!);
+  expect(await snapshot(page)).toEqual(before);
+});
+
+test('版本刷新激活新发现的Service Worker后重开且保留归档和复习数据', async ({ page }) => {
+  const overrides = new Map<string, string>();
+  const server = await serveIsolatedBuild('/', overrides);
+  try {
+    await seedPage(page, fixture(), 'home', server.url);
+    const before = await snapshot(page);
+    overrides.set('sw.js', (await readFile(resolve(process.cwd(), 'dist/sw.js'), 'utf8')) + '\nself.addEventListener("message", event => { if (event.data === "recall-refresh-test") event.ports[0]?.postMessage("updated"); });');
+    await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
+    let reloads = 0;
+    page.on('request', request => { if (request.isNavigationRequest() && request.frame() === page.mainFrame()) reloads++; });
+    await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), page.getByRole('button', { name: '检查更新并刷新', exact: true }).click()]);
+    await waitForAppReady(page);
+    const active = await page.evaluate(() => new Promise<string>(resolve => {
+      const channel = new MessageChannel();
+      channel.port1.onmessage = event => resolve(event.data);
+      navigator.serviceWorker.controller!.postMessage('recall-refresh-test', [channel.port2]);
+    }));
+    expect(active).toBe('updated');
+    expect(reloads).toBe(1);
+    expect(await snapshot(page)).toEqual(before);
+  } finally { await server.stop(); }
 });
 
 test('Service Worker注册先于懒加载memory-workspace脚本完成', async ({ page, baseURL }) => {
@@ -549,6 +625,98 @@ test('归档切到下一张，3秒内撤销回到原卡且保留进度历史', a
   expect((await snapshot(page)).cards[0].archivedAt).toBeUndefined();
   expect((await snapshot(page)).cards[0].reps).toBe(0);
   expect((await snapshot(page)).reviewLogs).toHaveLength(0);
+});
+
+test('整组归档先确认范围，取消和关闭不写入且保护未保存修改', async ({ page }) => {
+  await seedPage(page, folderArchiveFixture());
+  const before = await snapshot(page);
+  await page.getByRole('button', { name: '管理回忆方法', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('包含所有子卡组，共 3 张在学卡片');
+  await saveShot(page, 'folder-archive-manage');
+  await page.getByRole('button', { name: '归档整个卡组', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('已归档卡片不受影响');
+  await page.getByRole('button', { name: '取消，返回管理', exact: true }).click();
+  await page.getByLabel('名称', { exact: true }).fill('未保存的名称');
+  page.once('dialog', dialog => dialog.dismiss());
+  await page.getByRole('button', { name: '归档整个卡组', exact: true }).click();
+  await expect(page.getByLabel('名称', { exact: true })).toHaveValue('未保存的名称');
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: '归档整个卡组', exact: true }).click();
+  await page.getByRole('button', { name: '关闭面板', exact: true }).click();
+  await expect(page.getByRole('button', { name: '管理回忆方法', exact: true })).toBeFocused();
+  expect(await snapshot(page)).toEqual(before);
+  await noOverflow(page);
+});
+
+test('整组归档包含深层卡片且仅一次撤销本批，原归档与其他卡组保留', async ({ page }) => {
+  await seedPage(page, folderArchiveFixture());
+  const before = await snapshot(page);
+  await page.getByRole('button', { name: '管理回忆方法', exact: true }).click();
+  await page.getByRole('button', { name: '归档整个卡组', exact: true }).click();
+  await saveShot(page, 'folder-archive-confirm');
+  await page.getByRole('button', { name: '确认归档 3 张卡片', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const archived = await snapshot(page);
+  for (const index of [0, 1, 3]) expect(archived.cards[index]).toEqual({ ...before.cards[index], archivedAt: archived.cards[0].archivedAt });
+  expect(archived.cards[2]).toEqual(before.cards[2]);
+  expect(archived.cards[4]).toEqual(before.cards[4]);
+  expect(archived.decks).toEqual(before.decks);
+  expect(archived.reviewLogs).toEqual(before.reviewLogs);
+  await page.getByRole('button', { name: /撤销归档，剩余/ }).click();
+  await expect.poll(async () => (await snapshot(page)).cards).toEqual(before.cards);
+  const restored = await snapshot(page);
+  expect(restored.decks).toEqual(before.decks);
+  expect(restored.reviewLogs).toEqual(before.reviewLogs);
+  expect(restored.studySessions).toEqual(before.studySessions);
+  expect(restored.settings).toMatchObject(before.settings);
+  await noOverflow(page);
+});
+
+test('整组归档刷新后持久保留，可逐张恢复且空卡组入口禁用', async ({ page }) => {
+  await seedPage(page, folderArchiveFixture());
+  const before = await snapshot(page);
+  await page.getByRole('button', { name: '管理回忆方法', exact: true }).click();
+  await page.getByRole('button', { name: '归档整个卡组', exact: true }).click();
+  await page.getByRole('button', { name: '确认归档 3 张卡片', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.m-archive-undo')).toBeVisible();
+  await expect(page.locator('.m-archive-undo')).toHaveCount(0, { timeout: 5000 });
+  const archived = await snapshot(page);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForAppReady(page);
+  expect(await snapshot(page)).toEqual(archived);
+  await page.getByRole('button', { name: '管理回忆方法', exact: true }).click();
+  await expect(page.getByRole('button', { name: '归档整个卡组', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '关闭面板', exact: true }).click();
+  await navigate(page, '已归档');
+  await expect(page.locator('.memory-card-row')).toHaveCount(4);
+  await page.locator('[data-card-id="second"]').getByRole('button', { name: '移出归档', exact: true }).click();
+  await expect.poll(async () => (await snapshot(page)).cards[1]).toEqual(before.cards[1]);
+  const restored = await snapshot(page);
+  expect(restored.cards[1]).toEqual(before.cards[1]);
+  expect(restored.cards[0]).toEqual(archived.cards[0]);
+  await navigate(page, '今日复习');
+  await page.getByRole('button', { name: '管理回忆方法', exact: true }).click();
+  await expect(page.getByRole('button', { name: '归档整个卡组', exact: true })).toBeEnabled();
+  await noOverflow(page);
+});
+
+test('整组归档面板在安全区、窄屏和断点保持可读可触达', async ({ page }) => {
+  await seedPage(page, folderArchiveFixture());
+  for (const width of [393, 320, 760, 761]) {
+    await page.setViewportSize({ width, height: 852 });
+    await page.locator('.memory-app').evaluate(element => { (element as HTMLElement).style.setProperty('--safe-top', '59px'); (element as HTMLElement).style.setProperty('--safe-bottom', '34px'); });
+    await page.getByRole('button', { name: '管理回忆方法', exact: true }).click();
+    const button = page.getByRole('button', { name: '归档整个卡组', exact: true });
+    await expect(button).toBeInViewport();
+    const box = (await button.boundingBox())!;
+    expect(box.width).toBeGreaterThanOrEqual(44);
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    await button.click();
+    await expect(page.getByRole('button', { name: '确认归档 3 张卡片', exact: true })).toBeInViewport();
+    await noOverflow(page);
+    await page.getByRole('button', { name: '关闭面板', exact: true }).click();
+  }
 });
 
 test('后悔药到期后通过独立归档库查看原文并恢复', async ({ page }) => {

@@ -22,14 +22,17 @@ test('公网已提交资源逐字节校验，匿名微信读书端点不授权�
   const names = await readdir(resolve(directory, 'assets'));
   const manifest = JSON.parse(await readFile(resolve(directory, 'manifest.webmanifest'), 'utf8')) as { start_url: string; scope: string; icons: { src: string }[] };
   expect(manifest.start_url).toBe('/'); expect(manifest.scope).toBe('/');
-  const paths = ['index.html', 'manifest.webmanifest', 'sw.js', ...names.filter(name => /^(memory-weread-import|memory-workspace)-.*\.(js|css)$/.test(name)).map(name => `assets/${name}`), ...manifest.icons.map(icon => icon.src.replace(/^\//, ''))];
+  const build = JSON.parse(await readFile(resolve(directory, 'version.json'), 'utf8')) as { version: string };
+  await expect(page.locator('[data-app-version]')).toHaveText(build.version);
+  const paths = ['index.html', 'manifest.webmanifest', 'version.json', 'sw.js', ...names.filter(name => /^(memory-weread-import|memory-workspace)-.*\.(js|css)$/.test(name)).map(name => `assets/${name}`), ...manifest.icons.map(icon => icon.src.replace(/^\//, ''))];
   const expected = await Promise.all(paths.map(async path => ({ path, digest: createHash('sha256').update(await readFile(resolve(directory, path))).digest('hex') })));
   const actual = await page.evaluate(async files => Promise.all(files.map(async ({ path }) => {
     const response = await fetch(`/${path}`, { credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(120000) });
     const digest = await crypto.subtle.digest('SHA-256', await response.arrayBuffer());
-    return { path, status: response.status, digest: [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('') };
+    return { path, status: response.status, cache: response.headers.get('Cache-Control'), digest: [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('') };
   })), expected);
   for (const file of actual) { expect(file.status, file.path).toBe(200); expect(file.digest, file.path).toBe(expected.find(item => item.path === file.path)!.digest); }
+  expect(actual.find(file => file.path === 'version.json')!.cache).toBe('no-store');
   const endpoints = await page.evaluate(async paths => Promise.all(paths.map(async path => {
     const response = await fetch(path, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(60000) });
     await response.text();

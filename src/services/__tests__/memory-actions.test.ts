@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSeedSnapshot } from '@/data/seed';
 import { migrateFolders } from '@/lib/memory-folders';
+import { archiveMemoryFolder, restoreMemoryCards } from '@/lib/memory-archive';
 import { dataState } from '@/stores/store-helpers';
 import type { RecallStateSnapshot } from '@/types';
 
@@ -47,6 +48,32 @@ beforeEach(async () => {
 afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
 
 describe('commitMemory queued persistence', () => {
+  it('persists a folder archive and its undo as one write each', async () => {
+    const before = structuredClone(persisted);
+    const archivedAt = '2026-11-01T00:00:00.000Z';
+    let ids: string[] = [];
+    await commitMemory(current => {
+      const result = archiveMemoryFolder(current, current.decks[0].id, archivedAt);
+      ids = result.ids;
+      return result.snapshot;
+    });
+    expect(mocks.saveSnapshot).toHaveBeenCalledOnce();
+    expect(persisted.cards.filter(card => card.archivedAt === archivedAt).map(card => card.id)).toEqual(ids);
+    expect(persisted.reviewLogs).toEqual(before.reviewLogs);
+    await commitMemory(current => restoreMemoryCards(current, ids, archivedAt));
+    expect(mocks.saveSnapshot).toHaveBeenCalledTimes(2);
+    expect(persisted).toEqual(before);
+  });
+
+  it('failed folder archive persistence leaves all cards unchanged', async () => {
+    const before = structuredClone(persisted);
+    mocks.saveSnapshot.mockRejectedValueOnce(new Error('disk write failed'));
+    await expect(commitMemory(current => archiveMemoryFolder(current, current.decks[0].id).snapshot)).rejects.toThrow('disk write failed');
+    expect(persisted).toEqual(before);
+    expect(dataState(store)).toEqual(before);
+    expect(mocks.setState).not.toHaveBeenCalled();
+  });
+
   it('does not mutate or publish store state when a save fails', async () => {
     const originalStore = store;
     const before = structuredClone(store);
