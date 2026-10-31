@@ -88,6 +88,7 @@ retroactively marked verified just because a deployment still exists.
 
 | Release | Scope | Result | Record |
 |---|---|---|---|
+| `20261031T214513+0800-network-retry-release` | Normal-network retest / pending PWA + WeRead AI release | Current public PWA gate passed; pending source release in progress | [Network retest and pending release](./releases/20261031T214513+0800-network-retry-release.md) |
 | `20261031T212804+0800-public-diagnosis` | Read-only network / app and SW-stage diagnosis / docs | Slow transfers and delayed serial precache identified; production unchanged | [Public loading blocker diagnosis](./releases/20261031T212804+0800-public-diagnosis.md) |
 | `20261031T210732+0800-publish-pending` | Combined PWA / WeRead AI / additive D1 / config / docs | Source pushed; production blocked by public loading/SW gate | [Publish reviewed pending work](./releases/20261031T210732+0800-publish-pending.md) |
 | `20261031T204601+0800-smoke-once` | Automation / one manual live probe / docs | Source pushed; automation remains paused; no app release for this task | [One current smoke round](./releases/20261031T204601+0800-smoke-once.md) |
