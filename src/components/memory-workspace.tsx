@@ -11,6 +11,7 @@ import { isCardDue } from '@/lib/stats';
 import { createId } from '@/lib/utils';
 import { normalizeMemoryReviewPlan } from '@/services/memory-review';
 import { MemoryFolderRows } from '@/components/memory-folder-rows';
+import { MemoryStatusEdge } from '@/components/memory-status-edge';
 import { MemoryCloudStatus, MemoryCloudSettings } from '@/components/memory-cloud';
 import { PWAUpdatePrompt } from '@/components/pwa-update-prompt';
 import type { Card, Deck } from '@/types';
@@ -353,6 +354,7 @@ export function MemoryWorkspace(): JSX.Element {
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }
   }}>
+    <MemoryStatusEdge/>
     <aside id="memory-drawer" className="memory-drawer" ref={drawerRef} data-visible={drawer || drawerVisible} aria-label="项目菜单" aria-hidden={mobile && !drawer}>
       <div className="m-drawer-brand"><strong>Recall</strong><span>记忆卡片</span><small>{titles[navRoute as keyof typeof titles]}</small></div>
       <nav>{navEntries.map(([target, label, Icon]) => <button key={target} aria-current={navRoute === target ? 'page' : undefined} onClick={() => { if (target === 'folders') setFolder(null); navigate(target); }}><span className="m-nav-icon"><Icon size={20}/></span>{t(`memory.routes.${target}`, label)}</button>)}</nav>

@@ -88,6 +88,7 @@ retroactively marked verified just because a deployment still exists.
 
 | Release | Scope | Result | Record |
 |---|---|---|---|
+| `20261101T001208+0800-ios-status-edge` | Installed WebKit PWA / isolated-copy fix / tests | 1162 unit tests and 46 mobile checks passed; scoped publication pending, physical result unverified | [iOS status edge compatibility](./releases/20261101T001208+0800-ios-status-edge.md) |
 | `20261031T234739+0800-weread-selection-design` | Independent high-fidelity prototype / synthetic mobile tests / docs | Source pushed; 32 mobile browser checks passed, no production app change | [WeRead selection and automatic import design](./releases/20261031T234739+0800-weread-selection-design.md) |
 | `20261031T233712+0800-browser-crash-guard` | Local browser test tooling / safety docs | 17 guard checks, 1158 unit tests and 44 mobile E2E passed; no app redeployment | [macOS test browser crash prevention](./releases/20261031T233712+0800-browser-crash-guard.md) |
 | `20261031T232024+0800-topbar-weread-runtime` | Mobile topbar / WeRead Workers transport / tests | Local validation passed; publication pending, physical iOS 27 unverified | [Idle topbar and WeRead runtime compatibility](./releases/20261031T232024+0800-topbar-weread-runtime.md) |

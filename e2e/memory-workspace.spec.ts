@@ -189,6 +189,52 @@ test('iPhone15首页、48px共享Logo、静止抽屉和快速关闭恢复', asyn
   await noOverflow(page);
 });
 
+test('主屏幕WebKit顶部采样层独立固定，不绘制遮罩或拦截Logo触摸', async ({ page, browserName }) => {
+  await seedPage(page);
+  await expect(page.locator('.m-status-edge')).toHaveCSS('display', 'none');
+  await page.addInitScript(() => { Object.defineProperty(navigator, 'standalone', { configurable: true, value: true }); });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForAppReady(page);
+  const edge = page.locator('.m-status-edge');
+  await expect(edge).toHaveAttribute('data-standalone', 'true');
+  if (browserName !== 'webkit') {
+    await expect(edge).toHaveCSS('display', 'none');
+    return;
+  }
+  if (!await page.evaluate(() => CSS.supports('-webkit-touch-callout', 'none'))) {
+    const rules = await page.evaluate(() => Array.from(document.styleSheets).flatMap(sheet => Array.from(sheet.cssRules)).filter(rule => rule instanceof CSSSupportsRule && rule.conditionText.includes('-webkit-touch-callout') && rule.cssText.includes('.m-status-edge')).map(rule => Array.from((rule as CSSSupportsRule).cssRules).map(child => child.cssText).join('\n')).join('\n'));
+    expect(rules).toContain('.m-status-edge');
+    await page.addStyleTag({ content: rules });
+    test.info().annotations.push({ type: 'simulation', description: 'macOS WebKit lacks iOS touch-callout; activate the shipped conditional rules to check geometry, not native system-blur suppression.' });
+  }
+  await page.locator('.memory-app').evaluate(element => { (element as HTMLElement).style.setProperty('--safe-inset-top', '59px'); });
+  for (const dark of [false, true]) {
+    await page.locator('html').evaluate((element, value) => element.classList.toggle('dark', value), dark);
+    const surface = await edge.evaluate(element => {
+      const style = getComputedStyle(element);
+      const box = element.getBoundingClientRect();
+      return { parentIsBody: element.parentElement === document.body, childCount: element.childNodes.length, display: style.display, position: style.position, color: style.backgroundColor, clip: style.backgroundClip, pointerEvents: style.pointerEvents, zIndex: style.zIndex, filter: style.filter, backdrop: style.backdropFilter, x: box.x, y: box.y, width: box.width, height: box.height, ancestorTransforms: [document.body, document.documentElement].map(ancestor => getComputedStyle(ancestor).transform) };
+    });
+    expect(surface).toEqual({ parentIsBody: true, childCount: 0, display: 'block', position: 'fixed', color: dark ? 'rgb(36, 36, 32)' : 'rgb(246, 245, 239)', clip: 'text', pointerEvents: 'none', zIndex: '2147483647', filter: 'none', backdrop: 'none', x: 0, y: 0, width: 393, height: 11, ancestorTransforms: ['none', 'none'] });
+  }
+  await page.locator('html').evaluate(element => element.classList.remove('dark'));
+  const logo = page.locator('.m-brand');
+  expect((await logo.boundingBox())!.y).toBe(69);
+  await logo.click();
+  await expect.poll(async () => (await logo.boundingBox())!.x).toBeGreaterThan(300);
+  expect((await edge.boundingBox())!.x).toBe(0);
+  await page.keyboard.press('Escape');
+  await expect(logo).toBeFocused();
+  await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))));
+  await page.locator('.m-top-action').click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  await noOverflow(page);
+  await page.setViewportSize({ width: 761, height: 852 });
+  await expect(edge).toHaveCSS('display', 'none');
+});
+
 test('状态栏安全区与Logo行保留10px间距，滚动和抽屉不改变同行位置', async ({ page }) => {
   await seedPage(page);
   const logo = page.locator('.m-brand');
