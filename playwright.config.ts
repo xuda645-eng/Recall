@@ -27,7 +27,7 @@ export default defineConfig({
     { name: "iphone15-webkit", use: { browserName: "webkit", launchOptions: { executablePath: process.env.RECALL_WEBKIT } } },
   ],
   webServer: process.env.RECALL_URL ? undefined : {
-    command: `pnpm exec vite build --mode ${buildMode} && pnpm exec vite preview --mode ${buildMode} --host 127.0.0.1 --port 4193 --strictPort`,
+    command: `node node_modules/vite/bin/vite.js build --mode ${buildMode} && node node_modules/vite/bin/vite.js preview --mode ${buildMode} --host 127.0.0.1 --port 4193 --strictPort`,
     url: localURL,
     reuseExistingServer: !process.env.CI,
     timeout: 60000,

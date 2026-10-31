@@ -3,7 +3,7 @@ import { createSeedSnapshot } from '../src/data/seed';
 import type { WereadBook } from '../src/lib/memory-weread';
 import type { Card, RecallStateSnapshot } from '../src/types';
 
-const origin = 'http://127.0.0.1:4197';
+const origin = `http://127.0.0.1:${Number(process.env.RECALL_WEREAD_PORT || 4197)}`;
 const at = '2026-10-01T00:00:00.000Z';
 const aiAction = 'AI 生成问题（最多 20 条）';
 const editedQuestion = '我编辑的问题：这个结论的适用条件是什么？';
@@ -162,6 +162,7 @@ async function boot(page: Page, data = snapshotFixture()): Promise<void> {
   await page.getByRole('button', { name: '导入知识', exact: true }).tap();
   await page.getByRole('button', { name: '导入划线', exact: true }).tap();
   await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'weread');
+  await page.getByRole('button', { name: '其他导入方式', exact: true }).tap();
 }
 
 async function reopen(page: Page, data?: RecallStateSnapshot): Promise<void> {
@@ -171,6 +172,7 @@ async function reopen(page: Page, data?: RecallStateSnapshot): Promise<void> {
   }, data);
   await page.reload();
   await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'weread');
+  await page.getByRole('button', { name: '其他导入方式', exact: true }).tap();
 }
 
 const draftCards = (page: Page) => page.locator('.m-weread-card');

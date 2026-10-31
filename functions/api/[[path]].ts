@@ -2,7 +2,8 @@ import { ApiError, isRecord, json, readJson, requireOrigin, setDeviceCookie } fr
 import type { ServerContext } from '../../shared/server';
 import { authenticate, issueCode, listDevices, logout, pair, revokeDevice } from '../../shared/server-auth';
 import { getSync, postSync } from '../../shared/server-sync';
-import { wereadBook, wereadBooks, wereadQuestion } from '../../shared/server-weread';
+import { wereadBook, wereadBooks, wereadProgress, wereadQuestion } from '../../shared/server-weread';
+import { wereadBudget } from '../../shared/server-weread-budget';
 
 export async function onRequest({ request, env }: ServerContext): Promise<Response> {
   let rotatedToken: string | undefined;
@@ -28,6 +29,8 @@ export async function onRequest({ request, env }: ServerContext): Promise<Respon
     else if (path === '/api/sync' && method === 'POST') response = await postSync(request, env, auth);
     else if (path === '/api/weread/books' && method === 'POST') response = await wereadBooks(request, env, auth);
     else if (path === '/api/weread/book' && method === 'POST') response = await wereadBook(request, env, auth);
+    else if (path === '/api/weread/progress' && method === 'POST') response = await wereadProgress(request, env, auth);
+    else if (path === '/api/weread/budget' && method === 'POST') response = await wereadBudget(request, env, auth);
     else if (path === '/api/weread/question' && method === 'POST') response = await wereadQuestion(request, env, auth);
     else throw new ApiError(404, 'Not found');
     if (rotatedToken && !response.headers.has('Set-Cookie')) setDeviceCookie(response, rotatedToken);
