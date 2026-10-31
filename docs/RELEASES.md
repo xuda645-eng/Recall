@@ -88,6 +88,7 @@ retroactively marked verified just because a deployment still exists.
 
 | Release | Scope | Result | Record |
 |---|---|---|---|
+| `20261031T223906+0800-release-coordination-diagnosis` | Coordination / read-only diagnosis / docs | Concurrent release complete; Logo and production WeRead diagnosis incomplete, app unchanged | [Release coordination and diagnosis](./releases/20261031T223906+0800-release-coordination-diagnosis.md) |
 | `20261031T222000+0800-startup-optimization` | App startup / SW registration / font precache / acceptance | Deployed; local and public WebKit passed, public Chromium offline check network-blocked | [Startup dependency and offline optimization](./releases/20261031T222000+0800-startup-optimization.md) |
 | `20261031T214845+0800-public-test-budget` | Acceptance configuration / docs | Pushed; public budget 5 minutes, behavior assertions retained | [Bounded public acceptance budget](./releases/20261031T214845+0800-public-test-budget.md) |
 | `20261031T214513+0800-network-retry-release` | Normal-network retest / pending PWA + WeRead AI release | Deployed; assets/auth passed, browser verification partial due to network | [Network retest and pending release](./releases/20261031T214513+0800-network-retry-release.md) |
