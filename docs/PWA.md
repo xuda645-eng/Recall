@@ -28,6 +28,13 @@ Pages 项目 `recall-memory`，GitHub 仅托管源码。
 ## 已实现的产品逻辑
 
 - 纸白底色、石墨色主卡、48 x 48 Logo、48px 三段式 appbar。
+- iPhone 主屏幕安装态使用已获 F 真机清晰反馈的浏览器自动安全框。
+  根 HTML 仍以 `viewport-fit=cover` 为默认，解析期只读引导脚本只在
+  iPhone + standalone 时切换为 auto；普通 Safari 标签页、iPad、
+  Android 和桌面保持 cover。四边 env、安全区间距、48px 顶栏和
+  动态高度均保留，不强制 Logo 上移或移除安全区。完整应用首次
+  渲染、抽屉、阅读、离线更新仍分别验收，F 静态页成功不等于已
+  完成正式应用真机验收。详见[接入记录](./releases/20261101T165615+0800-iphone-system-frame-adoption.md)。
 - WebKit 主屏幕 PWA 使用独立于前景抽屉的顶部颜色采样层，尝试让
   系统以纯色状态栏替代覆盖 Logo 上缘的滚动边缘模糊。采样层高度为
   `env(safe-area-inset-top) + 11px`，不是只覆盖视口最上面的 11px；
@@ -69,6 +76,9 @@ Pages 项目 `recall-memory`，GitHub 仅托管源码。
   的源码公式。不能直接据此上移正式 Logo；新增静态 F“系统安全框”
   仅将该文档的 viewport-fit 改为 auto，仍尊重全部 env 安全区，
   观察原安装内是否安全且清晰。正式 cover 和工作区顶栏不变。
+  16:52 用户确认原安装内 F 效果良好，截图上缘清晰且未被状态栏
+  遮挡。开始仅在 iPhone standalone 接入自动安全框；保留默认
+  cover、全部安全区和原有样式，正式应用完整真机效果仍待反馈。
 - 移动端 Logo 行位于顶部安全区下方 10px。顶栏从屏幕顶端开始，
   使用全宽不透明纸色固定底面；滚动正文从顶栏下方开始，不穿过
   状态栏和 Logo 行。移动端外壳固定，不使用文档级滚动。

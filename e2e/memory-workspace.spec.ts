@@ -153,6 +153,115 @@ test('新用户从空卡组开始，不自动展示个人或示例数据', async
   await noOverflow(page);
 });
 
+test('正式应用仅iPhone主屏幕启用系统安全框，标签页和其他设备保留cover', async ({ page }) => {
+  test.skip(!!process.env.RECALL_URL, 'Device identity emulation and reload stress are local-only');
+  const userAgent = await page.evaluate(() => navigator.userAgent);
+  const context = page.context();
+  for (const identity of [
+    { userAgent: 'iPhone Safari', standalone: true, fit: 'auto' },
+    { userAgent: 'iPhone Safari', standalone: false, fit: 'cover' },
+    { userAgent: 'iPad Safari', standalone: true, fit: 'cover' },
+    { userAgent: 'Android Chrome', standalone: true, fit: 'cover' },
+    { userAgent, standalone: false, fit: 'cover' },
+  ]) {
+    const candidate = await context.newPage();
+    try {
+      await candidate.addInitScript(identity => {
+        Object.defineProperty(navigator, 'userAgent', { configurable: true, value: identity.userAgent });
+        Object.defineProperty(navigator, 'standalone', { configurable: true, value: identity.standalone });
+      }, identity);
+      await candidate.goto('./#home');
+      await waitForAppReady(candidate);
+      await expect(candidate.locator('meta[name="viewport"]')).toHaveAttribute('content', new RegExp(`viewport-fit=${identity.fit}`));
+      await noOverflow(candidate);
+    } finally { await candidate.close(); }
+  }
+});
+
+test('iPhone系统安全框首帧、抽屉、缩短视口和原版更新离线重开保留合成数据', async ({ page, context, browserName }) => {
+  test.skip(!!process.env.RECALL_URL, 'Synthetic old-to-new/offline mutation test is local-only');
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'userAgent', { configurable: true, value: 'iPhone Safari' });
+    Object.defineProperty(navigator, 'standalone', { configurable: true, value: true });
+    const observer = new MutationObserver(() => {
+      if (!document.querySelector('.memory-bar')) return;
+      document.documentElement.setAttribute('data-first-viewport', document.querySelector('meta[name="viewport"]')!.getAttribute('content')!);
+      observer.disconnect();
+    });
+    observer.observe(document, { childList: true, subtree: true });
+  });
+  const originalHtml = await readFile(resolve('dist/index.html'), 'utf8');
+  const oldHtml = originalHtml.replace(/<script src="[^"\n]*pwa-viewport\.js"><\/script>/, '');
+  const currentWorker = await readFile(resolve('dist/sw.js'), 'utf8');
+  const oldWorker = currentWorker.replace(/url:"index.html",revision:"[^"]+"/, 'url:"index.html",revision:"legacy-cover"').replace(/\{url:"pwa-viewport\.js",revision:"[^"]+"\},?/, '');
+  expect(oldWorker).not.toBe(currentWorker);
+  expect(oldWorker).not.toContain('url:"pwa-viewport.js"');
+  const oldOverrides = new Map([['index.html', oldHtml], ['sw.js', oldWorker]]);
+  const oldServer = await serveIsolatedBuild('/', oldOverrides);
+  try {
+    await seedPage(page, fixture(), 'home', oldServer.url);
+    await expect(page.locator('meta[name="viewport"]')).toHaveAttribute('content', /viewport-fit=cover/);
+    const before = await snapshot(page);
+    oldOverrides.set('index.html', originalHtml);
+    oldOverrides.set('sw.js', currentWorker);
+    await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
+    await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), page.getByRole('button', { name: '检查更新并刷新', exact: true }).click()]);
+    await waitForAppReady(page);
+    await expect(page.locator('meta[name="viewport"]')).toHaveAttribute('content', /viewport-fit=auto/);
+    await expect(page.locator('html')).toHaveAttribute('data-first-viewport', /viewport-fit=auto/);
+    expect(await snapshot(page)).toEqual(before);
+    for (const inset of [0, 20, 59, 96]) {
+      await page.locator('.memory-app').evaluate((element, value) => {
+        (element as HTMLElement).style.setProperty('--safe-inset-top', `${value}px`);
+        (element as HTMLElement).style.setProperty('--safe-bottom', '34px');
+      }, inset);
+      expect((await page.locator('.m-brand').boundingBox())!).toMatchObject({ y: inset + 10, width: 48, height: 48 });
+      await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
+      await expect(page.locator('.memory-shell')).toHaveClass(/is-open/);
+      expect((await page.locator('.m-brand').boundingBox())!.y).toBe(inset + 10);
+      await page.getByRole('button', { name: '关闭项目菜单', exact: true }).click();
+      await expect(page.locator('.memory-shell')).not.toHaveClass(/is-open/);
+      await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))));
+    }
+    for (const dimensions of [{ width: 393, height: 793 }, { width: 852, height: 393 }, { width: 393, height: 852 }]) {
+      await page.setViewportSize(dimensions);
+      await expect(page.locator('meta[name="viewport"]')).toHaveAttribute('content', /viewport-fit=auto/);
+      await saveShot(page, `system-frame-${dimensions.width}-${dimensions.height}`);
+      await expect.poll(() => page.evaluate(() => ({ width: innerWidth, overflow: document.documentElement.scrollWidth > innerWidth + 1 })), { message: `${dimensions.width}x${dimensions.height} system-frame layout` }).toEqual({ width: dimensions.width, overflow: false });
+      await noOverflow(page);
+    }
+    await navigate(page, '设置与数据');
+    await page.getByRole('button', { name: '显示运行信息' }).click();
+    await expect(page.getByLabel('显示诊断结果')).toContainText('viewport-fit=auto');
+    if (browserName === 'webkit') await oldServer.stop();
+    else await context.setOffline(true);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForAppReady(page);
+    await expect(page.locator('meta[name="viewport"]')).toHaveAttribute('content', /viewport-fit=auto/);
+    expect(await snapshot(page)).toEqual(before);
+  } finally { await context.setOffline(false); await oldServer.stop(); }
+});
+
+test('系统安全框引导脚本公开可用，原应用和诊断往返保留正常视口', async ({ page }) => {
+  await page.goto('./#settings', { waitUntil: 'domcontentloaded' });
+  await waitForAppReady(page);
+  const script = page.locator('script[src$="pwa-viewport.js"]');
+  expect(await script.count()).toBe(1);
+  const scriptUrl = new URL((await script.getAttribute('src'))!, page.url());
+  expect(scriptUrl.origin).toBe(new URL(page.url()).origin);
+  expect((await page.context().request.get(scriptUrl.href)).status()).toBe(200);
+  const content = await page.locator('meta[name="viewport"]').getAttribute('content');
+  const expected = await page.evaluate(() => /iPhone/.test(navigator.userAgent) && ((navigator as Navigator & { standalone?: boolean }).standalone === true || matchMedia('(display-mode: standalone)').matches) ? 'auto' : 'cover');
+  expect(content).toContain(`viewport-fit=${expected}`);
+  await page.getByRole('button', { name: '显示运行信息' }).click();
+  await expect(page.getByLabel('显示诊断结果')).toContainText(`viewport-fit=${expected}`);
+  await page.getByRole('link', { name: '打开原安装内对照页' }).click();
+  await expect(page.getByRole('heading', { name: '静态页还模糊吗？' })).toBeVisible();
+  await page.getByRole('link', { name: '返回 Recall', exact: true }).click();
+  await waitForAppReady(page);
+  await expect(page.locator('meta[name="viewport"]')).toHaveAttribute('content', new RegExp(`viewport-fit=${expected}`));
+});
+
 test('原安装显示诊断往返不改变合成卡片，静态页不加载应用或API', async ({ page }) => {
   test.skip(!!process.env.RECALL_URL, 'Persistence mutation checks use only the local synthetic fixture');
   await page.addInitScript(() => Object.defineProperty(navigator, 'standalone', { configurable: true, value: true }));
