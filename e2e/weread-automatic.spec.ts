@@ -63,6 +63,92 @@ test('正式连接入口、个人书卡字段与搜索，百分比1不误作100%
   await expect(page.locator('.wr-dock')).toContainText('已选 1 本');
   expect(calls).toEqual([]);
 });
+for (const markedFinished of [true, false, null, undefined]) {
+  test(`书卡仅明确已读完时显示标记，其他状态隐藏且保留进度：${String(markedFinished)}`, async ({ page }) => {
+    const calls = await setup(page);
+    await page.route('**/api/weread/books', route => route.fulfill({ json: { books: [
+      { bookId: 'original', title: '阅读的回声', highlightCount: 2, markedFinished },
+    ], cursor: null } }));
+    const before = await snapshot(page);
+    await page.getByRole('button', { name: '连接微信读书', exact: true }).click();
+    const card = page.getByRole('button', { name: '阅读的回声，2 条我的划线' });
+    const badge = card.locator('.wr-reading > span');
+    await expect(badge).toHaveCount(markedFinished === true ? 1 : 0);
+    if (markedFinished === true) await expect(badge).toHaveText('已标记读完');
+    await expect(card.locator('.wr-reading')).not.toContainText('状态未提供');
+    await expect(card.locator('.wr-reading')).not.toContainText('在读');
+    await expect(card).toContainText('阅读进度 1%');
+    expect(await card.locator('.wr-meter > i').evaluate(meter => meter.style.width)).toBe('1%');
+    for (const viewport of [{ width: 393, height: 852 }, { width: 320, height: 852 }, { width: 760, height: 852 }, { width: 852, height: 393 }]) {
+      await page.setViewportSize(viewport);
+      await expect(card).toBeVisible();
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    }
+    expect(await snapshot(page)).toEqual(before);
+    expect(calls).toEqual([]);
+  });
+}
+test('确认页仅顶栏返回保留选书，退出和再次进入不残留返回处理', async ({ page }) => {
+  const calls = await setup(page);
+  const before = await snapshot(page);
+  await choose(page);
+  await expect(page.getByRole('button', { name: '再选一选', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '返回导入', exact: true })).toHaveCount(0);
+  const back = page.locator('.memory-bar').getByRole('button', { name: '返回', exact: true });
+  await back.click();
+  await expect(page.getByRole('heading', { name: '选择想记住的书' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '阅读的回声，2 条我的划线' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: '下一步 · AI 问题与导入' }).click();
+  await expect(page.getByRole('heading', { name: '让划线变成问题' })).toBeVisible();
+  await back.click();
+  await back.click();
+  await expect(page.getByRole('heading', { name: '把知识，收进卡片。' })).toBeVisible();
+  await page.getByRole('button', { name: '导入划线', exact: true }).click();
+  await expect(page.getByRole('button', { name: '连接微信读书', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '其他导入方式', exact: true }).click();
+  await expect(page.locator('input[type="file"][accept=".json,application/json"]')).toBeVisible();
+  await back.click();
+  await expect(page.getByRole('button', { name: '连接微信读书', exact: true })).toBeVisible();
+  expect(await snapshot(page)).toEqual(before);
+  expect(calls).toEqual([]);
+});
+test('展开划线支持全选全不选和半选，数量同步且仅导入确认选中的原文', async ({ page }, testInfo) => {
+  const calls = await setup(page);
+  const before = await snapshot(page);
+  await choose(page);
+  await page.getByRole('button', { name: '选择划线 · 默认全选', exact: true }).click();
+  const all = page.getByRole('checkbox', { name: /全选 \/ 全不选/ });
+  const rows = page.locator('.wr-highlight-options > label:not(.wr-highlight-all) input');
+  const generate = page.getByRole('button', { name: '生成并自动导入', exact: true });
+  await expect(all).toBeChecked();
+  await expect(rows).toHaveCount(2);
+  await all.uncheck();
+  await expect(all).not.toBeChecked();
+  await expect(page.locator('.wr-highlight-options input:checked')).toHaveCount(0);
+  await expect(page.locator('.wr-confirm-count')).toContainText('0');
+  await expect(generate).toBeDisabled();
+  await rows.first().check();
+  await expect(all).toBeChecked({ indeterminate: true });
+  await expect(page.locator('.wr-highlight-all')).toContainText('已选 1 / 2 条划线');
+  await expect(page.locator('.wr-confirm-count')).toContainText('1');
+  await all.check();
+  await expect(all).toBeChecked();
+  await expect(rows.nth(1)).toBeChecked();
+  await rows.nth(1).uncheck();
+  await page.getByRole('button', { name: '选择划线 · 默认全选', exact: true }).click();
+  await page.getByRole('button', { name: '选择划线 · 默认全选', exact: true }).click();
+  await expect(all).toBeChecked({ indeterminate: true });
+  const box = await page.locator('.wr-highlight-all').boundingBox();
+  expect(box!.height).toBeGreaterThanOrEqual(44);
+  await page.locator('.wr-highlight-all').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `/tmp/recall-weread-selection-${testInfo.project.name}.png` });
+  expect(await snapshot(page)).toEqual(before);
+  expect(calls).toEqual([]);
+  await generate.click();
+  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  expect(calls).toEqual([original[0]]);
+  expect((await snapshot(page)).cards.map((card: { back: string }) => card.back)).toEqual([original[0]]);
+});
 test('确认后真实流程生成并自动导入，原文保持，重复导入跳过模型', async ({ page }) => {
   const calls = await setup(page);
   await choose(page);
@@ -111,7 +197,7 @@ test('单次101条默认全选并全部生成导入，重复导入不重做问�
   await expect(page.locator('.wr-confirm-count')).toContainText('101');
   await expect(page.getByRole('button', { name: '生成并自动导入' })).toBeEnabled();
   await page.getByRole('button', { name: '选择划线 · 默认全选' }).click();
-  await expect(page.locator('.wr-highlight-options input:checked')).toHaveCount(101);
+  await expect(page.locator('.wr-highlight-options > label:not(.wr-highlight-all) input:checked')).toHaveCount(101);
   expect(calls).toEqual([]);
   expect((await snapshot(page)).cards).toHaveLength(0);
   await page.getByRole('button', { name: '生成并自动导入' }).click();

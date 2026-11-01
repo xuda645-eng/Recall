@@ -13,6 +13,7 @@ export interface MemoryWereadImportProps {
   onClose: () => void;
   onComplete: (deckIds: string[]) => void;
   onBusy?: (busy: boolean) => void;
+  onBackChange?: (handler: (() => void) | null) => void;
 }
 type Stage = 'load' | 'books' | 'drafts' | 'changes' | 'done';
 const originalSample = {
@@ -30,6 +31,12 @@ const originalSample = {
 
 export function MemoryWereadImport(props: MemoryWereadImportProps): JSX.Element {
   const [manual, setManual] = useState(false);
+  const { onBackChange } = props;
+  useEffect(() => {
+    if (!manual) return;
+    onBackChange?.(() => setManual(false));
+    return () => onBackChange?.(null);
+  }, [manual, onBackChange]);
   return manual ? <MemoryWereadManualImport {...props} onClose={() => setManual(false)}/>
     : <MemoryWereadOnlineImport {...props} onLocal={() => setManual(true)}/>;
 }

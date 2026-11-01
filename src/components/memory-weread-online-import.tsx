@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, BookOpen, Check, ChevronRight, LoaderCircle, Pause, Search, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowRight, BookOpen, Check, ChevronRight, LoaderCircle, Pause, Search, SlidersHorizontal } from 'lucide-react';
 import { useRecallStore } from '@/stores/recall-store';
 import { commitMemory } from '@/services/memory-actions';
 import { generateWereadQuestion, loadOnlineBook, loadOnlineBooks, loadOnlineProgress, type WereadOnlineBook } from '@/services/weread-online';
@@ -24,13 +24,13 @@ function ReadingCard({ book, selected, disabled, imported, onSelect, onVisible }
   }, [book.readingProgress, onVisible]);
   return <button ref={card} type="button" className="wr-book" aria-pressed={selected} disabled={disabled || !book.highlightCount} onClick={onSelect} aria-label={`${book.title}，${book.highlightCount} 条我的划线`}>
     <Cover book={book}/><div className="wr-book-info"><div className="wr-book-title"><h3>{book.title}</h3><span className="wr-check">{selected && <Check size={13}/>}</span></div><p className="wr-author">{book.author || '作者未提供'}</p>
-    <div className="wr-reading"><span>{book.markedFinished == null ? '状态未提供' : book.markedFinished ? '已标记读完' : '在读'}</span><small>{book.readingProgress == null ? '进度暂未提供' : `阅读进度 ${book.readingProgress}%`}</small></div>
+    <div className="wr-reading">{book.markedFinished === true && <span>已标记读完</span>}<small>{book.readingProgress == null ? '进度暂未提供' : `阅读进度 ${book.readingProgress}%`}</small></div>
     {book.readingProgress != null && <Meter value={book.readingProgress}/>}
     <p className="wr-counts"><strong>{book.highlightCount}</strong> 条我的划线 <small>· {book.totalNoteCount == null ? '笔记总数未提供' : `笔记共 ${book.totalNoteCount} 条`}</small></p>
     <p className="wr-book-foot">{!book.highlightCount ? '暂无可导入划线' : book.lastNoteAt ? `最近笔记 ${book.lastNoteAt}` : '笔记时间未提供'}{imported && <span> · 已导入 Recall</span>}</p></div>
   </button>;
 }
-export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal }: MemoryWereadImportProps & { onLocal: () => void }): JSX.Element {
+export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal, onBackChange }: MemoryWereadImportProps & { onLocal: () => void }): JSX.Element {
   const [stage, setStage] = useState<'connect' | 'books' | 'confirm' | 'job'>('connect');
   const [books, setBooks] = useState<WereadOnlineBook[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -59,11 +59,21 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal 
   const progressActive = useRef(0);
   const progressControllers = useRef(new Set<AbortController>());
   const needsSave = useRef(false);
+  const selectAllHighlights = useRef<HTMLInputElement>(null);
   const callbacks = useRef({ onBusy });
   useEffect(() => { callbacks.current = { onBusy }; }, [onBusy]);
   const failure = (value: unknown) => value instanceof Error ? value.message : '操作失败，请重试';
   const publish = (next: WereadJob) => { currentJob.current = next; if (mounted.current) setJob(next); };
   const report = (value: boolean) => { running.current = value; if (mounted.current) setBusy(value); callbacks.current.onBusy?.(value); };
+
+  useEffect(() => {
+    onBackChange?.(() => {
+      if (running.current || initializing) return;
+      if (stage === 'confirm') { setStage(renewed ? 'job' : 'books'); setError(''); }
+      else onClose();
+    });
+    return () => onBackChange?.(null);
+  }, [stage, renewed, initializing, onBackChange, onClose]);
 
   useEffect(() => {
     mounted.current = true;
@@ -185,6 +195,9 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal 
     && (filter === 'all' || book.markedFinished === (filter === 'finished')) && (!onlyHighlights || book.highlightCount > 0) && (!onlyUnimported || !isImported(book.bookId)))
     .sort((first, second) => sort === 'highlights' ? second.highlightCount - first.highlightCount : sort === 'progress' ? (second.readingProgress ?? -1) - (first.readingProgress ?? -1) : (second.lastNoteAt || '').localeCompare(first.lastNoteAt || ''));
   const included = drafts.filter(draft => draft.include);
+  useEffect(() => {
+    if (selectAllHighlights.current) selectAllHighlights.current.indeterminate = included.length > 0 && included.length < drafts.length;
+  }, [included.length, drafts.length, showHighlights]);
   let confirmationRows: ReturnType<typeof planWereadImport>['rows'] = [];
   let confirmationError = '';
   if (stage === 'confirm' && included.length) {
@@ -230,8 +243,8 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal 
       {!!changes.length && <div className="wr-changes"><h2>{changes.length} 张已有卡片的原文发生变化</h2><p>默认保留已有内容；勾选后才更新，复习进度保留。</p>{changes.map(draft => <label key={draft.id}><input type="checkbox" checked={updates.has(draft.id)} onChange={event => setUpdates(old => { const next = new Set(old); if (event.target.checked) next.add(draft.id); else next.delete(draft.id); return next; })}/><span>{draft.book.title} · {draft.highlight.markText.slice(0, 60)}</span></label>)}</div>}
       <p className="wr-consent">确认后，仅所选原文发送至火山 AI，依次生成全部问题。每日最多 {AI_DAILY_MODEL_ATTEMPTS} 次模型尝试，每小时最多 120 次请求；限流或失败保留进度。全部成功后自动导入，原文不改写；已有相同划线保留。AI 可能出错，导入后可查看和编辑。</p>
       <button className="m-secondary wr-more" aria-expanded={showHighlights} onClick={() => setShowHighlights(!showHighlights)}>选择划线 · 默认全选</button>
-      {showHighlights && <div className="wr-highlight-options">{drafts.map(draft => <label key={draft.id}><input type="checkbox" checked={draft.include} onChange={event => setDrafts(old => old.map(item => item.id === draft.id ? { ...item, include: event.target.checked } : item))}/><span><small>{draft.book.title} · {draft.highlight.chapterTitle}</small>{draft.highlight.markText}</span></label>)}</div>}
-      <div className="wr-dock"><button className="m-primary" disabled={busy || !included.length || !!confirmationError} onClick={() => void confirm()}>生成并自动导入<ArrowRight size={17}/></button><button className="m-text" disabled={busy} onClick={() => { setStage('books'); setError(''); }}>再选一选</button></div>
+      {showHighlights && <div className="wr-highlight-options"><label className="wr-highlight-all"><input ref={selectAllHighlights} type="checkbox" checked={drafts.length > 0 && included.length === drafts.length} disabled={busy || !drafts.length} onChange={event => { const include = event.target.checked; setDrafts(old => old.map(draft => ({ ...draft, include }))); }}/><span>全选 / 全不选<small>已选 {included.length} / {drafts.length} 条划线</small></span></label>{drafts.map(draft => <label key={draft.id}><input type="checkbox" checked={draft.include} disabled={busy} onChange={event => setDrafts(old => old.map(item => item.id === draft.id ? { ...item, include: event.target.checked } : item))}/><span><small>{draft.book.title} · {draft.highlight.chapterTitle}</small>{draft.highlight.markText}</span></label>)}</div>}
+      <div className="wr-dock"><button className="m-primary" disabled={busy || !included.length || !!confirmationError} onClick={() => void confirm()}>生成并自动导入<ArrowRight size={17}/></button></div>
     </> : job ? <>
       {done ? <><div className="wr-done-symbol"><Check size={30}/></div><header className="wr-heading wr-done-heading"><h1>让读过的，留得住。</h1><p>导入完成 · 原文已保留</p></header><div className="wr-receipt">{[[job.receipt?.added || 0, '新增卡片'], [job.receipt?.updated || 0, '更新卡片'], [job.receipt?.skipped || 0, '跳过已有']].map(([value, title]) => <div key={title}><strong>{value}</strong><span>{title}</span></div>)}</div></>
         : <><header className="wr-heading"><span className="wr-eyebrow">READING INTO MEMORY</span><h1>{job.status === 'import-failed' ? '问题已好，导入未完成' : paused ? '进度已为你保留' : job.status === 'importing' ? '正在放进你的卡组' : '正在把划线变成问题'}</h1><p>{paused ? '已完成的问题保留，继续时不重做。' : '一条划线，一个问题。原文始终保留。'}</p></header><div className="wr-job-summary"><div><span>问题生成进度</span><strong>{job.generated.length}<small> / {totalJob}</small></strong></div><Meter value={totalJob ? job.generated.length / totalJob * 100 : 100}/><p>01 生成问题 <span>02 自动导入</span></p></div></>}
@@ -240,6 +253,5 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal 
       {!busy && job.error.includes('变化') && <button className="m-secondary wr-more" onClick={reconfirm}>重新检查导入变化</button>}
       <div className="wr-dock">{done ? <><button className="m-primary" onClick={() => onComplete(job.receipt?.deckIds || [])}>查看卡组<ChevronRight size={18}/></button><button className="m-text" onClick={() => void clearJob()}>继续选择其他书</button></> : busy ? <button className="m-secondary" disabled={job.status === 'importing'} onClick={() => abort.current?.abort()}><Pause size={17}/>{job.status === 'importing' ? '正在自动导入' : '暂停，保留进度'}</button> : <><button className="m-primary" onClick={() => void execute(job)}>{job.status === 'import-failed' ? '重试导入' : '重试并继续'}</button><button className="m-text" onClick={() => { if (window.confirm('取消任务并删除这份本机问题草稿？已导入卡片不会删除。')) void clearJob(); }}>取消任务，重新选择</button></>}</div>
     </> : null}
-    {stage !== 'job' && <button className="m-text wr-back" disabled={busy} onClick={onClose}><X size={15}/>返回导入</button>}
   </section>;
 }

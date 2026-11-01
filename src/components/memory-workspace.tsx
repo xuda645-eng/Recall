@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
 import { Archive, ArrowLeft, ArrowUpRight, BarChart3, BookOpen, ChevronRight, Home, Layers, Library, MoreHorizontal, Plus, SlidersHorizontal, Undo2, Upload, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useRecallStore } from '@/stores/recall-store';
@@ -77,6 +77,8 @@ export function MemoryWorkspace(): JSX.Element {
   const shellRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const files = useRef<HTMLInputElement>(null);
+  const wereadBack = useRef<(() => void) | null>(null);
+  const registerWereadBack = useCallback((handler: (() => void) | null) => { wereadBack.current = handler; }, []);
   const lock = useRef(false);
   const fileGeneration = useRef(0);
   const mounted = useRef(true);
@@ -265,6 +267,7 @@ export function MemoryWorkspace(): JSX.Element {
   function topAction(): void {
     if (route === 'read') navigate(returnRoute);
     else if (route === 'folders' && folder) openFolder(currentFolder?.parentId || null);
+    else if (route === 'weread' && wereadBack.current) wereadBack.current();
     else if (route === 'weread' || route === 'compat') navigate('import');
     else if (route === 'advanced') navigate('settings');
     else if (route === 'settings') navigate('advanced');
@@ -427,7 +430,7 @@ export function MemoryWorkspace(): JSX.Element {
           {route === 'settings' && <div className="m-settings"><p className="m-note">按照你的节奏，安排下一次温习。</p><div><span><strong>复习计划</strong><small>{reviewPlan.mode === 'smart' ? `智能调度 · ${Math.round(store.settings.desiredRetention * 100)}% 目标记忆率` : '固定间隔 · 自定义四档'}</small></span><button className="m-secondary" onClick={() => setSheet({ kind: 'review-plan' })}>配置</button></div><div><span><strong>已归档</strong><small>保留原文和进度，不安排复习。</small></span><button className="m-secondary" onClick={() => navigate('archived')}>查看 {store.cards.length - available.length}</button></div><div><strong>阅读字号</strong><button className="m-secondary" onClick={() => setSheet({ kind: 'font' })}>{font}</button></div><div><span><strong>本机数据</strong><small>本机保留离线缓存；授权后自动同步，仍建议定期备份。</small></span><button className="m-secondary" onClick={() => downloadMemoryText(JSON.stringify(buildExportPayload(store), null, 2), `Recall-${new Date().toISOString().slice(0, 10)}.recall`, 'application/json')}>备份</button></div><div><strong>导入知识</strong><button className="m-secondary" onClick={() => navigate('import')}>打开</button></div><div><span><strong>更多设置</strong><small>主题、同步和其他选项。</small></span><button className="m-secondary" onClick={() => navigate('advanced')}>查看</button></div></div>}
           {route === 'advanced' && <Settings/>}
           {route === 'compat' && <ImportHub onClose={() => navigate('import')}/>}
-          {route === 'weread' && <MemoryWereadImport onClose={() => navigate('import')} onComplete={deckIds => { setDrawer(false); setSheet(null); setFolder(deckIds[0] || null); setRoute('folders'); setQuery(''); setError(''); }} onBusy={setBusy}/>}
+          {route === 'weread' && <MemoryWereadImport onClose={() => navigate('import')} onComplete={deckIds => { setDrawer(false); setSheet(null); setFolder(deckIds[0] || null); setRoute('folders'); setQuery(''); setError(''); }} onBusy={setBusy} onBackChange={registerWereadBack}/>}
           {route === 'import' && <>
             <div className="m-step">选择 / 校验 / 完成</div>
             {!plan && !receipt && <><section className="m-import-box"><span className="m-import-symbol"><Upload size={27}/></span><h1>把知识，收进卡片。</h1><p className="m-note">选择文件，先查看内容，再确认导入。</p><button className="m-primary" disabled={busy} onClick={() => files.current?.click()}>选择 Markdown 文件<Plus size={18}/></button><small>Markdown .md · 多级卡组 · 增量更新</small><input ref={files} type="file" accept=".md,.markdown" hidden onChange={event => { void loadFile(event.target.files?.[0]); event.target.value = ''; }}/></section><div className="m-import-choice"><span><strong>Markdown 格式</strong><small>多级卡组，重复导入不覆盖进度。</small></span><div><button onClick={() => downloadMemoryText(template, 'Recall-知识卡片示例.md')}>示例</button><button onClick={() => setSheet({ kind: 'help' })}>格式</button></div></div><div className="m-import-choice"><span><strong>微信读书</strong><small>选书、预览回忆问题，保留划线原文。</small></span><button className="m-secondary" onClick={() => navigate('weread')}>导入划线</button></div><div className="m-import-choice"><span><strong>手动整理</strong><small>从一个问题和答案开始。</small></span><button className="m-secondary" onClick={() => setSheet({ kind: 'card' })}>添加</button></div><button className="m-text m-compat-link" onClick={() => navigate('compat')}>其他导入：CSV / Anki / Recall<ArrowUpRight size={15}/></button></>}
