@@ -171,3 +171,11 @@ Commands ran with the existing dependency symlink, without package installation:
   phone URL). It does not trigger a third preview or any production release.
   Remaining scope: user's physical iPhone comparison, actual installation and
   native insets/blur/offline cold launch; r2 icon-192 direct byte check as noted.
+
+## Subsequent Physical Result
+
+2026-11-01T10:40+08:00: user reports A/B/C all clear. Their screenshot confirms
+A in detected home-screen PWA mode with a sharp Logo. Baseline A did not
+reproduce the production issue, so B/C cannot be selected as proven fixes.
+Next investigation is recorded in
+[the full-shell comparison](./20261101T104013+0800-full-shell-device-probe.md).
