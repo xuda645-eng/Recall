@@ -179,3 +179,88 @@ Documentation follow-up validation: 35 local Markdown links passed,
 `git diff --check` passed, and the source/public/config diff is empty. App
 tests and production deployment are not repeated for unchanged application
 code. Normal main commit/push publishes this evidence only.
+
+## Physical B Geometry Report And Native-Source Check
+
+2026-11-01T14:08+08:00: the owner provided two screenshots covering the B
+page's local report. The Logo upper edge is still visibly softened. The report
+identifies `installed-context-20261101-r2` and variant B. Transcribed display
+values only, not private images, card content or credentials:
+
+| Field | Observed value |
+| --- | --- |
+| `navigatorStandalone` / `displayModeStandalone` | `true` / `true` |
+| Screen / DPR | 393 x 852 CSS pixels / 3 |
+| Inner viewport | 393 x 793 CSS pixels |
+| Visual viewport | 393 x 793, offsetTop 0, scale 1 |
+| Safe-area top / right / bottom / left | 59 / 0 / 34 / 0px |
+| Logo top / height | 69 / 48px |
+| Header / scroll owner | fixed / content |
+| Captured `scrollTop` | 0 |
+| Sampler display / height | block / 69px |
+| Sampler background clip / pointer events | border-box / none |
+
+The B CSS variant is active: its strip reaches safe-top + 10px, matching
+the Logo top, and uses the actual-paint clipping mode instead of A's text
+clipping. The problem is not simply that B failed to load or the tested
+59px safe-area value differs from this phone. This does not prove WebKit
+recognized the element as a native fixed-color extension or that the original
+top effect must disappear. Width/opacity/native-layer state are not in this
+report. The captured scrollTop can predate scrolling to the report, since
+the previous instructions requested plus/refresh before scrolling; do not
+use it as evidence that the scroller is broken.
+
+852 - 793 = 59px, exactly the reported top safe area. This is a concrete
+screen/viewport mismatch worth comparing with the known-clear installation,
+not proof of double top padding or the blur's root cause. The native host
+geometry is not exposed by DOM viewport values. In particular, no CSS
+screen-height forcing, negative top offset or safe-area removal follows from
+this observation. The prior 393 x 852 browser tests did not simulate this
+native screen-to-viewport relationship.
+
+### Primary-Source Research
+
+Checked on 2026-11-01. The public WebKit main commit inspected was
+`1c4737f59e9f4a1709fa1962a3439b9ea861f325` (commit time
+2026-11-01T05:43:17Z); this is not established as iOS 27.0.1's shipped source.
+
+- [Pinned WebKit native scroll-pocket code](https://github.com/WebKit/WebKit/blob/1c4737f59e9f4a1709fa1962a3439b9ea861f325/Source/WebKit/UIProcess/API/ios/WKWebViewIOS.mm):
+  `_updateNeedsTopScrollPocketDueToVisibleContentInset` compares native
+  adjusted/obscured insets, native content offset, beyond-top state and edge
+  style. `_shouldHideTopScrollPocket` preserves the effect when that native
+  visible-inset flag is set, rather than always hiding it for a color extension.
+  Inference: active CSS paint geometry alone does not establish the native
+  visibility decision. The B report cannot evaluate these private inputs.
+- [WebKit report 313800](https://bugs.webkit.org/show_bug.cgi?id=313800):
+  still NEW at lookup, reports a viewport shorter than the screen by a status
+  area while CSS still reports a top safe inset, including iOS 27 beta comments.
+  This resembles the geometry, but concerns another app/device/status-bar
+  recipe and does not establish Recall's blur cause or an applicable fix.
+- [WebKit report 317153](https://bugs.webkit.org/show_bug.cgi?id=317153):
+  install-time geometry differences were reported in early beta comments,
+  but a later comment says no longer reproducible in beta 4 and the report
+  was closed FIXED in October. Do not cite only the older comments to claim
+  an unresolved installation defect on this iOS 27.0.1 phone.
+
+The preferred search script failed `invalid_api_key` and then its own
+`NameError: AGENT_PLAN_URL` while displaying an error hint. Recovered with
+built-in search and direct primary-source lookup; no key, account or security
+configuration was changed and no credentials were requested from the owner.
+
+### Next Paired Evidence
+
+If the existing, previously clear **Recall 完整壳对照** home-screen icon is
+still installed, open D from that icon and expand **诊断信息（仅本机）**.
+Its already-shipped report includes screen/viewport, visual viewport offset,
+Logo top and edge height. Compare those with this B report on the same phone
+now, also checking whether D is still clear. Do not substitute a Safari tab
+or add another installation. If the old icon is absent, request that fact
+rather than telling the owner to reinstall it. C's native/scroll state remains
+unmeasured. No new code patch or deployment is justified by B's report alone.
+
+This follow-up is documentation only on main base `c0e61992dd29bcee6164d1e60abdfc3d38f31131`.
+Preserves the other task's published changes. Validate Markdown links and
+diff, then normal commit/push; no app tests/build or production replacement.
+Completed: 35 local documentation links passed, diff whitespace passed and
+the application/public/config diff remained empty. External primary links
+were opened during research, not inferred from search snippets alone.
