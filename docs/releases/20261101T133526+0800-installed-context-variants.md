@@ -9,7 +9,8 @@
 - Scope: static read-only diagnostic page, its precache query matching, tests
   and physical-result documentation. Real app header/styles/data unchanged.
 - Status: committed, pushed and deployed; public resource and live browser
-  checks passed. Native variant results remain pending.
+  checks passed. All three original-installed variants show blur in the
+  owner's latest physical screenshots; none is an established fix.
 
 ## Evidence And Purpose
 
@@ -23,7 +24,8 @@ its necessity or contribution is not established. Screenshots stay private.
 
 Compare the same three mechanisms within this reproduced context. Do not
 ship one as a real-app fix merely because the earlier separate preview was
-clear. Native results for these new original-context variants remain pending.
+clear. The physical result for these original-context variants is recorded
+below and supersedes their previously pending acceptance status.
 
 ## Changes And Safety
 
@@ -141,3 +143,39 @@ clear is needed. Returning via **返回 Recall** preserves the original app.
 
 Publication evidence is committed/pushed separately as documentation only;
 it does not rebuild or redeploy the unchanged validated app bundle.
+
+## Physical A/B/C Result
+
+2026-11-01T14:03+08:00: the owner supplied three current screenshots, showing
+the original-installed diagnostic page with A, B and C selected respectively.
+Each visible mode label reports home-screen PWA and the selected variant.
+All three show the same softened upper edge over the Logo and adjacent
+controls. The screenshots do not show a clear winner. B's painted strip and
+C's sticky/document-scroll structure therefore did not eliminate the visible
+symptom in this original installation. Neither is approved as a real-app fix.
+
+This is stronger evidence than the previous separate-installation previews,
+where even A and original-style D looked clear. The difference remains
+unexplained: it does not prove an installation defect, old app code, a card/
+React cause, or a particular native WebKit condition. The expanded Dynamic
+Island and low battery are common to these images but were not necessary
+in earlier blurred screenshots; do not blame those states from correlation.
+
+The images show the selected variants and top section, not the local display
+report or before/after-scroll pairs. Computed safe-area values, visual viewport
+offset/scale and actual sampler/header styles on this phone remain unverified.
+Next retrieve the existing B/C **本机显示信息** reports, refreshed with the
+page's plus button. Those contain display geometry only, not cards or auth.
+Do not infer the native host's scroll-pocket insets directly from CSS values.
+
+No new style patch, production release, additional install, storage clearing
+or rollback follows this result. This is documentation-only evidence capture,
+based on main `9b85a1831ce52c1823c1e029b4e3c3559f1e159f` in a new clean
+worktree, preserving the parallel task's already merged changes. Validate
+local links and diff, then commit/push without rebuilding/redeploying.
+The three private screenshots remain attachments, not repository artifacts.
+
+Documentation follow-up validation: 35 local Markdown links passed,
+`git diff --check` passed, and the source/public/config diff is empty. App
+tests and production deployment are not repeated for unchanged application
+code. Normal main commit/push publishes this evidence only.
