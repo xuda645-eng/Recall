@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#353532">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Recall">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./diagnostics.js" defer></script>
+  <title>Recall 原安装内显示对照</title>
+</head>
+<body>
+  <div class="status-edge" aria-hidden="true"></div>
+  <div class="shell">
+    <header class="bar">
+      <a class="brand" href="../#settings" aria-label="返回 Recall 设置">
+        <svg viewBox="0 0 100 100" aria-hidden="true"><path d="M23 15h32c27 0 34 32 12 45l19 25H64L43 57v28H23z" fill="white"/><path d="M54 23c-1 10-4 14-14 15 10 1 13 5 14 15 1-10 4-14 14-15-10-1-13-5-14-15" fill="currentColor"/></svg>
+      </a>
+      <div class="context">今日复习</div>
+      <button id="refresh" aria-label="重新读取显示信息">+</button>
+    </header>
+    <div class="content">
+      <main>
+        <p class="eyebrow">原安装实例内 · 只读 · 不加载卡片</p>
+        <h1>静态页还模糊吗？</h1>
+        <p id="mode" role="status">正在识别运行模式</p>
+        <p>这是从原 Recall 打开的同域静态页，没有加载卡片、云同步或完整应用脚本。只看 Logo、标题和加号上缘，不把外侧阴影当作模糊。</p>
+        <p>请反馈“仍模糊”或“清晰”，并附上本页截图。不要另装图标，也不要删除或重装原应用。</p>
+        <a class="return" href="../#settings">返回 Recall</a>
+        <section class="sample"><p>合成观察区</p><strong>今天，温习一点。</strong><p>上下滚动后再观察顶部。这里没有保存、评分、导入或授权功能。</p></section>
+        <h2>本机显示信息</h2>
+        <p>数值只展示在这里，不写入存储，也不会自动发送。</p>
+        <pre id="report" aria-label="静态页显示信息"></pre>
+        <p>系统安装状态无法由网页完整读取。即使这里清晰，也不能单凭这一页确定原因。</p>
+        <footer>installed-context-20261101-r1</footer>
+      </main>
+    </div>
+  </div>
+  <div id="safe-probe" aria-hidden="true"></div>
+</body>
+</html>

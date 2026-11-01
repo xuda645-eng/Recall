@@ -1,0 +1,39 @@
+:root {
+  --paper: #f6f5ef;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --bar-height: calc(var(--safe-top) + 72px);
+  color: #30302b;
+  background: var(--paper);
+  font-family: "PingFang SC", "Hiragino Sans GB", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); }
+a, button { -webkit-tap-highlight-color: transparent; color: inherit; font: inherit; }
+a:focus-visible, button:focus-visible { outline: 3px solid #889075; outline-offset: 3px; }
+.shell { position: fixed; inset: 0; height: 100dvh; width: 100%; overflow: hidden; background: radial-gradient(ellipse at 95% 0%, #e9e9dd66, transparent 52%), var(--paper); }
+.bar { position: fixed; top: 0; left: 0; right: 0; display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px; grid-template-rows: 48px; gap: 8px; height: var(--bar-height); padding: calc(var(--safe-top) + 10px) max(12px, var(--safe-right)) 12px max(14px, var(--safe-left)); background: var(--paper); z-index: 20; }
+.bar > * { height: 48px; border-radius: 14px; background: #fffef9; box-shadow: 0 5px 16px #3d362d12; }
+.brand { width: 48px; display: grid; place-items: center; background: #353532; color: #353532; box-shadow: 0 7px 20px #35353224; }
+.brand svg { width: 30px; height: 30px; }
+.context { display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 650; border: 1px solid #e0dfd5; }
+#refresh { padding: 0; border: 1px solid #e0dfd5; font-size: 28px; cursor: pointer; }
+.content { position: absolute; top: var(--bar-height); bottom: 0; width: 100%; overflow-y: auto; overscroll-behavior-y: contain; }
+main { max-width: 720px; margin: auto; padding: 12px max(20px, var(--safe-right)) calc(var(--safe-bottom) + 24px) max(20px, var(--safe-left)); }
+h1 { font-size: 28px; margin: 12px 0; }
+h2 { font-size: 20px; margin-top: 28px; }
+p { line-height: 1.8; font-size: 14px; }
+.eyebrow, footer { color: #737368; font-size: 12px; }
+#mode { padding: 10px 12px; border-left: 3px solid #a47035; background: #a470350e; }
+.return { display: flex; align-items: center; justify-content: center; min-height: 48px; background: #fffef9; border: 1px solid #e0dfd5; border-radius: 12px; text-decoration: none; }
+.sample { margin: 24px 0; padding: 24px; border-radius: 24px; background: #353532; color: #f6f5ef; }
+.sample strong { display: block; margin: 28px 0; font: 28px/1.5 "Iowan Old Style", "Songti SC", serif; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.7; padding: 14px; border-radius: 12px; background: #fffef9; }
+.status-edge { display: none; }
+@supports (-webkit-touch-callout: none) {
+  [data-standalone="true"] .status-edge { display: block; position: fixed; inset: 0 0 auto; height: calc(var(--safe-top) + 11px); background-color: var(--paper); -webkit-background-clip: text; background-clip: text; z-index: 2147483647; pointer-events: none; }
+}
+#safe-probe { position: absolute; visibility: hidden; pointer-events: none; padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left); }

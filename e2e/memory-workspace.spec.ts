@@ -153,6 +153,76 @@ test('新用户从空卡组开始，不自动展示个人或示例数据', async
   await noOverflow(page);
 });
 
+test('原安装显示诊断往返不改变合成卡片，静态页不加载应用或API', async ({ page }) => {
+  test.skip(!!process.env.RECALL_URL, 'Persistence mutation checks use only the local synthetic fixture');
+  await page.addInitScript(() => Object.defineProperty(navigator, 'standalone', { configurable: true, value: true }));
+  await seedPage(page);
+  const before = await snapshot(page);
+  await navigate(page, '设置与数据');
+  await page.getByRole('button', { name: '显示运行信息' }).click();
+  const report = await page.getByLabel('显示诊断结果').textContent();
+  expect(report).toContain('"navigator": true');
+  expect(report).not.toContain(longFront);
+  expect(report).not.toContain('recall.snapshot');
+  const requests: string[] = [];
+  page.on('request', request => requests.push(request.url()));
+  await page.getByRole('link', { name: '打开原安装内对照页' }).click();
+  await expect(page.getByRole('heading', { name: '静态页还模糊吗？' })).toBeVisible();
+  await expect(page.locator('#mode')).toContainText('主屏幕 PWA');
+  expect(await page.locator('.memory-app').count()).toBe(0);
+  expect(requests.some(url => /\/(api|assets)\//.test(new URL(url).pathname))).toBe(false);
+  for (const inset of [0, 20, 59, 96]) {
+    await page.evaluate(value => {
+      document.documentElement.style.setProperty('--safe-top', `${value}px`);
+      document.documentElement.style.setProperty('--safe-bottom', '34px');
+    }, inset);
+    await page.getByRole('button', { name: '重新读取显示信息' }).click();
+    expect((await page.locator('.brand').boundingBox())!.y).toBe(inset + 10);
+    expect((await page.locator('.brand').boundingBox())!.height).toBe(48);
+    await noOverflow(page);
+  }
+  await page.evaluate(() => document.documentElement.style.setProperty('--safe-top', '59px'));
+  await saveShot(page, 'installed-context-diagnostics');
+  expect(await snapshot(page)).toEqual(before);
+  await page.getByRole('link', { name: '返回 Recall', exact: true }).click();
+  await waitForAppReady(page);
+  await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'settings');
+  expect(await snapshot(page)).toEqual(before);
+});
+
+test('原安装静态诊断离线进入并返回，未访问过的页面已预缓存', async ({ page, context, browserName, baseURL }) => {
+  test.skip(!!process.env.RECALL_URL, 'Offline synthetic fixture runs locally, not against production');
+  const basePath = new URL('./', baseURL || 'http://127.0.0.1:4193/').pathname;
+  const isolated = browserName === 'webkit' ? await serveIsolatedBuild(basePath) : null;
+  try {
+  await seedPage(page, fixture(), 'home', isolated?.url || './');
+  const before = await snapshot(page);
+  await navigate(page, '设置与数据');
+  if (isolated) await isolated.stop();
+  else await context.setOffline(true);
+  await page.getByRole('link', { name: '打开原安装内对照页' }).click();
+  await expect(page.getByRole('heading', { name: '静态页还模糊吗？' })).toBeVisible();
+  await expect(page.locator('#report')).toContainText('installed-context-20261101-r1');
+  await page.getByRole('link', { name: '返回 Recall', exact: true }).click();
+  await waitForAppReady(page);
+  expect(await snapshot(page)).toEqual(before);
+  } finally { await context.setOffline(false); await isolated?.stop(); }
+});
+
+test('原安装显示诊断公开只读入口、静态加载与返回', async ({ page }) => {
+  await page.goto('./#settings', { waitUntil: 'domcontentloaded' });
+  await waitForAppReady(page);
+  await page.getByRole('button', { name: '显示运行信息' }).click();
+  await expect(page.getByLabel('显示诊断结果')).toContainText('safeArea');
+  const origin = new URL(page.url()).origin;
+  await page.getByRole('link', { name: '打开原安装内对照页' }).click();
+  await expect(page.getByRole('heading', { name: '静态页还模糊吗？' })).toBeVisible();
+  expect(new URL(page.url()).origin).toBe(origin);
+  await expect(page.locator('#report')).toContainText('installed-context-20261101-r1');
+  await page.getByRole('link', { name: '返回 Recall', exact: true }).click();
+  await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'settings');
+});
+
 test('抽屉显示固定构建版本，刷新图标在移动窄屏与桌面均可触达', async ({ page }) => {
   await seedPage(page);
   await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();

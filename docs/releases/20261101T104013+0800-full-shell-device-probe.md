@@ -166,3 +166,12 @@ This acceptance-evidence follow-up is documentation-only. Local Markdown link
 validation and `git diff --check` are required; app tests/build/deployment are
 not repeated because application/prototype code is unchanged. No production
 operation, data mutation or rollback is part of this update.
+
+## Original App Recheck
+
+2026-11-01T11:14+08:00: the owner returned to the original home-screen Recall
+and confirmed the Logo is still blurred, with a current screenshot. This
+preserves the difference between the original installation and the clear D/E
+preview. It does not establish which remaining runtime/installation difference
+causes it. Next work adds [a read-only same-origin diagnostic entry](./20261101T111411+0800-installed-context-diagnostics.md)
+to the original app, not another independently installed preview or CSS fix.

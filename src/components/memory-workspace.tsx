@@ -13,6 +13,7 @@ import { normalizeMemoryReviewPlan } from '@/services/memory-review';
 import { isMemoryNewCard, normalizeMemoryStudyPreferences, selectMemoryStudyCards } from '@/services/memory-study';
 import { MemoryFolderRows } from '@/components/memory-folder-rows';
 import { MemoryStatusEdge } from '@/components/memory-status-edge';
+import { MemoryDisplayDiagnostics } from '@/components/memory-display-diagnostics';
 import { MemoryCloudStatus, MemoryCloudSettings } from '@/components/memory-cloud';
 import { PWAAppVersion, PWAUpdatePrompt } from '@/components/pwa-update-prompt';
 import type { Card, Deck } from '@/types';
@@ -411,6 +412,7 @@ export function MemoryWorkspace(): JSX.Element {
             <div className="m-home-summary"><div><b>{today}</b><small>今日已练</small></div><div><b>{available.filter(card => card.state === 'review').length}</b><small>已熟悉</small></div><div><b>{available.length}</b><small>在学卡片</small></div></div><div className="m-home-shortcuts"><button onClick={() => navigate('import')}><Upload size={18}/>导入知识</button><button onClick={() => navigate('stats')}><BarChart3 size={18}/>查看统计</button></div></div><div><div className="m-section-head"><h2>我的卡组</h2><button className="m-text" onClick={() => openFolder(null)}>查看全部<ChevronRight size={15}/></button></div><MemoryFolderRows home list={arranged(store.decks.filter(deck => !deck.parentId))} decks={store.decks} cards={available} onOpen={openFolder} onManage={id => setSheet({ kind: 'folder', id })}/>{!store.decks.length && <div className="m-empty"><p>从一个卡组，收好你的知识。</p><button className="m-secondary" onClick={() => setSheet({ kind: 'folder' })}>新建卡组</button></div>}{recent.length > 0 && <section className="m-recent"><div className="m-section-head"><h2>{recentIds.length ? '最近温习' : '随手读一张'}</h2><small>自由浏览</small></div>{recent.map((card, position) => <button key={card.id} onClick={() => read(arranged(available.filter(candidate => candidate.deckId === card.deckId)), false, card.id)}><span className="m-recent-index">{String(position + 1).padStart(2, '0')}</span><span><small>{folderPath(store.decks, card.deckId).map(deck => deck.name).join(' / ')}</small><strong>{card.front || card.bookTitle || '阅读摘录'}</strong></span><ChevronRight size={17}/></button>)}</section>}</div></div></>}
           {route === 'home' && <MemoryCloudStatus onManage={() => navigate('settings')}/>}
           {route === 'settings' && <MemoryCloudSettings/>}
+          {route === 'settings' && <MemoryDisplayDiagnostics/>}
           {['folders', 'cards', 'archived'].includes(route) && <>
             {route === 'archived' && <p className="m-note">不再安排复习。原文和进度仍保留，随时可以移出归档。</p>}
             {route === 'folders' && folder && <button className="m-parent-link" onClick={() => openFolder(currentFolder?.parentId || null)}><ArrowLeft size={16}/>{currentFolder?.parentId ? store.decks.find(deck => deck.id === currentFolder.parentId)?.name : '全部卡组'}</button>}
