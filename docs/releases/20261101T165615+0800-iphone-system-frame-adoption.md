@@ -10,7 +10,10 @@
 - Scope: iPhone standalone viewport boot script, root HTML ordering, tests,
   physical F acceptance evidence and docs. No CSS, card, auth, API, schema,
   manifest/install identity, domain or infrastructure change.
-- Status: implementation and local validation completed; publication pending.
+- Status: implementation, local validation, source push and production upload
+  completed. Public bytes/auth and three browser cases passed; one Chromium
+  startup case failed including its bounded retry. Real-app physical acceptance
+  remains pending, not claimed complete.
 
 ## Evidence And Change
 
@@ -129,10 +132,83 @@ drawer, offline and safe-area behavior remain unverified until owner feedback.
 
 ## Publication And Recovery
 
-Commit/push/deploy IDs/URLs and public checks pending. Reuse `recall-memory`,
-main and <https://recall-memory.pages.dev/> on account
-`751b9fca4f5173fd70e0dfb69cff81e2`. Exact tested/committed bundle only.
-No authenticated production mutation, database migration or credential change.
+2026-11-01T17:11:33+08:00: committed reviewed task changes as
+`b5e79fd804d6255d71a26911294b045e4cc0e62b`.
+2026-11-01T17:11:47+08:00: normal `git push origin HEAD:main` succeeded,
+`1c8d393..b5e79fd`; remote main matched the implementation SHA. No force push,
+new branch, private attachments or unrelated dirty work included.
+
+2026-11-01T17:12:25+08:00: deployed the previously inventoried 202-file root
+bundle, unchanged after tests/commit, using:
+
+```sh
+CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2 npx --yes wrangler@4.156.0 pages deploy dist --project-name recall-memory --branch main --commit-hash b5e79fd804d6255d71a26911294b045e4cc0e62b
+```
+
+- Production deployment: `b15d48db-31e7-453e-b9d7-82667eca7ff5`.
+- Deployment URL: <https://b15d48db.recall-memory.pages.dev/>.
+- Stable production: <https://recall-memory.pages.dev/>.
+- Pages listing confirmed Production/main/source `b5e79fd`; existing account,
+  project and previous `8856d0ab` were rechecked before publication.
+- Worker compiled and uploaded with unchanged Functions/production binding
+  configuration. No authenticated production mutation, database migration,
+  credential, schema, domain or paid-resource change.
+
+### Public Verification
+
+Commands used the same browser overrides and guarded unsandboxed launcher:
+
+```sh
+node /tmp/recall-f-adoption-artifacts.mjs --public
+node /tmp/recall-f-adoption-artifacts.mjs --recovery
+RECALL_URL=https://recall-memory.pages.dev/ node scripts/run-playwright.mjs --grep '系统安全框引导脚本公开可用|原安装显示诊断公开只读入口' --workers=1
+RECALL_URL=https://recall-memory.pages.dev/ node scripts/run-playwright.mjs --grep '原安装显示诊断公开只读入口' --project iphone15-chromium --workers=1 --output /tmp/recall-f-adoption-public-mobile-retry
+```
+
+- 15 public resources returned 200 and matched tested bundle SHA256: root HTML,
+  version, manifest, boot script, SW/Workbox, favicon, three install icons and
+  five static diagnostic documents/scripts/styles. Root HTML and manifest,
+  icon192, diagnostic boot and index each required a second attempt after
+  `curl` SSL connection timeout (exit 28). No mismatched bytes observed.
+- The first aggregate command then failed at anonymous `/api/session` due to
+  SSL timeout. A bounded targeted recovery passed anonymous 401 and four
+  additional main/workspace JS/CSS hashes. Workspace JS first timed out after
+  45s with only 6018 bytes; its second attempt fully matched. Partial responses
+  were not accepted. Completed recovery at 2026-11-01T17:17:01+08:00.
+- First public browser batch completed at 2026-11-01T17:18:21+08:00:
+  3 passed / 1 failed (5.7min). Both engines passed the new boot-script/app/
+  diagnostic-return check; WebKit also passed the full A/B/C/F diagnostic
+  switching and return check. Chromium's latter test failed before interactions
+  at `Readiness: visible-app` (30s poll), showing `正在加载`. These are independent
+  fresh browser contexts, not the owner's installed PWA or card library.
+- The bounded Chromium-only retry completed at
+  2026-11-01T17:22:57+08:00 and failed again at `Readiness: visible-app` before
+  interactions, with the same loading snapshot. Stop retrying this case;
+  full public A/B/C/F navigation in Chromium remains unverified. Both engines
+  passed the new boot/app-return case and all 74 local cases passed. No proven
+  new layout/data regression from this loading failure; exact native/browser
+  cause remains undetermined. No rollback was performed or falsely reported.
+
+Public logs remain local in `/tmp/recall-f-adoption-public-assets.log`,
+`/tmp/recall-f-adoption-public-recovery.log`,
+`/tmp/recall-f-adoption-public-mobile.log` and
+`/tmp/recall-f-adoption-public-mobile-retry.log`. No real card writes, login,
+credential read, user screenshot publication or test seeding on production.
+
+### Owner Handoff And Evidence Follow-Up
+
+Use the existing Recall icon and normal Logo-menu refresh/update to reach
+`1.0-20261101-1656`. Check actual home-page upper edges, scrolling and drawer
+opening/closing, not just the F static document, and provide the new screenshot.
+No separate install, removal, storage clearing or reauthorization is required
+by this change. Native full-app acceptance awaits that feedback.
+
+At 2026-11-01T17:23:47+08:00 the public checks and limits were reconciled into
+this record and the release index. Final evidence is a documentation-only
+follow-up commit touching this record and `docs/RELEASES.md`, discoverable with
+`git log -- docs/releases/20261101T165615+0800-iphone-system-frame-adoption.md`.
+It publishes evidence to main without rebuilding or redeploying the unchanged
+1656 app. Report its actual normal push result after completion.
 
 For a release regression, prior compatible deployment is `8856d0ab` after
 rechecking active production. Same data/auth/budget contracts, but old header
