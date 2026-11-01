@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSeedSnapshot } from '@/data/seed';
 import { migrateFolders } from '@/lib/memory-folders';
-import { archiveMemoryFolder, restoreMemoryCards } from '@/lib/memory-archive';
+import { archiveMemoryFolder, restoreMemoryCards, restoreMemoryFolder } from '@/lib/memory-archive';
 import { dataState } from '@/stores/store-helpers';
 import type { RecallStateSnapshot } from '@/types';
 
@@ -72,6 +72,37 @@ describe('commitMemory queued persistence', () => {
     expect(persisted).toEqual(before);
     expect(dataState(store)).toEqual(before);
     expect(mocks.setState).not.toHaveBeenCalled();
+  });
+
+  it('persists a whole-folder restoration in one write without changing schedules, history or settings', async () => {
+    await commitMemory(current => archiveMemoryFolder(current, current.decks[0].id).snapshot);
+    const before = structuredClone(persisted);
+    mocks.saveSnapshot.mockClear();
+    await commitMemory(current => restoreMemoryFolder(current, current.decks[0].id).snapshot);
+    expect(mocks.saveSnapshot).toHaveBeenCalledOnce();
+    expect(persisted.decks).toEqual(before.decks);
+    expect(persisted.settings).toEqual(before.settings);
+    expect(persisted.reviewLogs).toEqual(before.reviewLogs);
+    expect(persisted.studySessions).toEqual(before.studySessions);
+    expect(persisted.cards).toEqual(before.cards.map(card => {
+      if (card.deckId !== before.decks[0].id) return card;
+      const restored = { ...card };
+      delete restored.archivedAt;
+      return restored;
+    }));
+  });
+
+  it('failed folder restoration leaves the persisted archive and store unchanged and permits retry', async () => {
+    await commitMemory(current => archiveMemoryFolder(current, current.decks[0].id).snapshot);
+    const before = structuredClone(persisted);
+    mocks.setState.mockClear();
+    mocks.saveSnapshot.mockRejectedValueOnce(new Error('disk write failed'));
+    await expect(commitMemory(current => restoreMemoryFolder(current, current.decks[0].id).snapshot)).rejects.toThrow('disk write failed');
+    expect(persisted).toEqual(before);
+    expect(dataState(store)).toEqual(before);
+    expect(mocks.setState).not.toHaveBeenCalled();
+    await commitMemory(current => restoreMemoryFolder(current, current.decks[0].id).snapshot);
+    expect(persisted.cards.filter(card => card.deckId === before.decks[0].id).every(card => !card.archivedAt)).toBe(true);
   });
 
   it('does not mutate or publish store state when a save fails', async () => {

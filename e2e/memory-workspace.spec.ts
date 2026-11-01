@@ -960,6 +960,7 @@ test('整组归档包含深层卡片且仅一次撤销本批，原归档与其�
   await saveShot(page, 'folder-archive-confirm');
   await page.getByRole('button', { name: '确认归档 3 张卡片', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.m-folder[data-folder-id="root"]')).toHaveCount(0);
   const archived = await snapshot(page);
   for (const index of [0, 1, 3]) expect(archived.cards[index]).toEqual({ ...before.cards[index], archivedAt: archived.cards[0].archivedAt });
   expect(archived.cards[2]).toEqual(before.cards[2]);
@@ -968,6 +969,7 @@ test('整组归档包含深层卡片且仅一次撤销本批，原归档与其�
   expect(archived.reviewLogs).toEqual(before.reviewLogs);
   await page.getByRole('button', { name: /撤销归档，剩余/ }).click();
   await expect.poll(async () => (await snapshot(page)).cards).toEqual(before.cards);
+  await expect(page.locator('.m-folder[data-folder-id="root"]')).toHaveCount(1);
   const restored = await snapshot(page);
   expect(restored.decks).toEqual(before.decks);
   expect(restored.reviewLogs).toEqual(before.reviewLogs);
@@ -976,7 +978,7 @@ test('整组归档包含深层卡片且仅一次撤销本批，原归档与其�
   await noOverflow(page);
 });
 
-test('整组归档刷新后持久保留，可逐张恢复且空卡组入口禁用', async ({ page }) => {
+test('整组归档刷新后移到归档目录，可切换仅卡片逐张恢复', async ({ page }) => {
   await seedPage(page, folderArchiveFixture());
   const before = await snapshot(page);
   await page.getByRole('button', { name: '管理回忆方法', exact: true }).click();
@@ -989,10 +991,13 @@ test('整组归档刷新后持久保留，可逐张恢复且空卡组入口禁�
   await page.reload({ waitUntil: 'domcontentloaded' });
   await waitForAppReady(page);
   expect(await snapshot(page)).toEqual(archived);
-  await page.getByRole('button', { name: '管理回忆方法', exact: true }).click();
-  await expect(page.getByRole('button', { name: '归档整个卡组', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: '关闭面板', exact: true }).click();
+  await expect(page.getByRole('button', { name: '管理回忆方法', exact: true })).toHaveCount(0);
   await navigate(page, '已归档');
+  await expect(page.locator('.m-folder[data-folder-id="root"]')).toHaveCount(1);
+  await expect(page.locator('.memory-card-row')).toHaveCount(0);
+  await page.getByRole('button', { name: '筛选与排序', exact: true }).click();
+  await page.getByLabel('内容', { exact: true }).selectOption('仅卡片');
+  await page.getByRole('button', { name: '应用', exact: true }).click();
   await expect(page.locator('.memory-card-row')).toHaveCount(4);
   await page.locator('[data-card-id="second"]').getByRole('button', { name: '移出归档', exact: true }).click();
   await expect.poll(async () => (await snapshot(page)).cards[1]).toEqual(before.cards[1]);
@@ -1003,6 +1008,150 @@ test('整组归档刷新后持久保留，可逐张恢复且空卡组入口禁�
   await page.getByRole('button', { name: '管理回忆方法', exact: true }).click();
   await expect(page.getByRole('button', { name: '归档整个卡组', exact: true })).toBeEnabled();
   await noOverflow(page);
+});
+
+test('归档目录兼容已有整组归档，保留空卡组并按层级浏览和整组恢复', async ({ page }) => {
+  const data = folderArchiveFixture();
+  data.cards = data.cards.map(card => card.deckId === 'outside' ? card : { ...card, archivedAt: '2026-11-02T00:00:00.000Z' });
+  data.decks.push({ ...data.decks[0], id: 'empty', name: '空卡组', parentId: 'outside' });
+  data.decks.push({ ...data.decks[0], id: 'archived-empty', name: '归档空子卡组', parentId: 'root' });
+  await seedPage(page, data, 'folders');
+  const before = await snapshot(page);
+  await expect(page.locator('.m-folder[data-folder-id="root"]')).toHaveCount(0);
+  await page.locator('.m-folder[data-folder-id="outside"] .m-folder-open').click();
+  await expect(page.locator('.m-folder[data-folder-id="empty"]')).toBeVisible();
+  await page.getByRole('button', { name: '管理空卡组', exact: true }).click();
+  await expect(page.getByRole('button', { name: '归档整个卡组', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '关闭面板', exact: true }).click();
+  await navigate(page, '今日复习');
+  await expect(page.locator('.m-folder[data-folder-id="root"]')).toHaveCount(0);
+  await navigate(page, '已归档');
+  await expect(page.locator('.m-folder')).toHaveCount(1);
+  await expect(page.locator('.memory-card-row')).toHaveCount(0);
+  await page.getByRole('searchbox').fill('深层问题');
+  await expect(page.locator('.m-folder[data-folder-id="root"]')).toHaveCount(1);
+  await expect(page.locator('.memory-card-row')).toHaveCount(0);
+  await page.getByRole('searchbox').fill('');
+  await page.getByRole('searchbox').fill('归档空子卡组');
+  await expect(page.locator('.m-folder[data-folder-id="root"]')).toBeVisible();
+  await page.getByRole('searchbox').fill('');
+  await page.locator('.m-folder[data-folder-id="root"] .m-folder-open').click();
+  await expect(page.locator('.m-folder[data-folder-id="archived-empty"]')).toBeVisible();
+  await expect(page.getByRole('button', { name: '移出归档卡组：归档空子卡组', exact: true })).toBeDisabled();
+  await expect(page.locator('.m-folder[data-folder-id="leaf"]')).toBeVisible();
+  await expect(page.locator('[data-card-id="first"]')).toBeVisible();
+  await page.locator('.m-folder[data-folder-id="leaf"] .m-folder-open').click();
+  await expect(page.locator('.m-folder[data-folder-id="deep"]')).toBeVisible();
+  await expect(page.locator('.memory-card-row')).toHaveCount(2);
+  await page.locator('.m-folder[data-folder-id="deep"] .m-folder-open').click();
+  await page.getByRole('button', { name: '返回', exact: true }).click();
+  await expect(page.locator('.m-context')).toHaveText('阅读练习');
+  await page.getByRole('button', { name: '整组移出归档', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('3 张归档卡片');
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  await page.getByRole('button', { name: '全部归档', exact: true }).click();
+  await page.getByRole('button', { name: '移出归档卡组：回忆方法', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('4 张归档卡片');
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  expect(await snapshot(page)).toEqual(before);
+  await page.getByRole('button', { name: '移出归档卡组：回忆方法', exact: true }).click();
+  await page.getByRole('button', { name: '确认移出归档 4 张卡片', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const restored = await snapshot(page);
+  expect(restored.decks).toEqual(before.decks);
+  expect(restored.reviewLogs).toEqual(before.reviewLogs);
+  expect(restored.cards[4]).toEqual(before.cards[4]);
+  for (const index of [0, 1, 2, 3]) {
+    const expected = { ...before.cards[index] };
+    delete expected.archivedAt;
+    expect(restored.cards[index]).toEqual(expected);
+  }
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForAppReady(page);
+  expect(await snapshot(page)).toEqual(restored);
+  await navigate(page, '卡组目录');
+  await expect(page.locator('.m-folder[data-folder-id="root"]')).toBeVisible();
+  await noOverflow(page);
+  await saveShot(page, 'archive-folder-restored');
+});
+
+test('归档复用内容筛选排序，默认分组不重复卡片并使用归档时间', async ({ page }) => {
+  const data = folderArchiveFixture();
+  data.cards = data.cards.map(card => card.deckId === 'outside' ? card : { ...card, archivedAt: '2026-11-02T00:00:00.000Z' });
+  data.decks.push({ ...data.decks[0], id: 'older', name: '较早归档', parentId: null, importedAt: '2030-01-01T00:00:00.000Z' });
+  data.cards.push({ ...data.cards[4], id: 'older-card', deckId: 'older', archivedAt: '2026-11-01T00:00:00.000Z' },
+                  { ...data.cards[4], id: 'loose', front: '单独归档卡片', archivedAt: '2026-11-03T00:00:00.000Z' });
+  await seedPage(page, data, 'archived');
+  await expect(page.locator('.m-folder')).toHaveCount(2);
+  await expect(page.locator('.m-folder').first()).toHaveAttribute('data-folder-id', 'root');
+  await expect(page.locator('.memory-card-row')).toHaveCount(1);
+  await expect(page.locator('[data-card-id="loose"]')).toBeVisible();
+  await page.getByRole('button', { name: '筛选与排序', exact: true }).click();
+  await expect(page.getByLabel('复习状态', { exact: true })).toBeVisible();
+  await page.getByLabel('内容', { exact: true }).selectOption('仅卡组');
+  await page.getByLabel('排序', { exact: true }).selectOption('old');
+  await page.getByRole('button', { name: '应用', exact: true }).click();
+  await expect(page.locator('.memory-card-row')).toHaveCount(0);
+  await expect(page.locator('.m-folder').first()).toHaveAttribute('data-folder-id', 'older');
+  await page.getByRole('button', { name: '筛选与排序', exact: true }).click();
+  await page.getByLabel('内容', { exact: true }).selectOption('仅卡片');
+  await page.getByRole('button', { name: '应用', exact: true }).click();
+  await expect(page.locator('.m-folder')).toHaveCount(0);
+  await expect(page.locator('.memory-card-row')).toHaveCount(6);
+  await expect(page.locator('.memory-card-row').first()).toHaveAttribute('data-card-id', 'older-card');
+  await expect(page.locator('.memory-card-row').last()).toHaveAttribute('data-card-id', 'loose');
+  await page.getByRole('button', { name: '清除筛选', exact: true }).click();
+  await expect(page.locator('.m-folder')).toHaveCount(2);
+  await expect(page.locator('.memory-card-row')).toHaveCount(1);
+  await noOverflow(page);
+  await saveShot(page, 'archive-folder-catalog');
+});
+
+test('归档复习状态筛选使用保留进度和排期，不恢复或评分卡片', async ({ page }) => {
+  const data = fixture();
+  data.cards = data.cards.map(card => ({ ...card, archivedAt: at }));
+  data.cards[1] = { ...data.cards[1], state: 'learning' };
+  data.cards[2] = { ...data.cards[2], state: 'review', nextReviewDate: '2100-01-01T00:00:00.000Z' };
+  await seedPage(page, data, 'archived');
+  const before = await snapshot(page);
+  for (const [status, expected] of [['待学习', 'first'], ['待复习', 'second'], ['已熟悉', 'archived']]) {
+    await page.getByRole('button', { name: '筛选与排序', exact: true }).click();
+    await page.getByLabel('内容', { exact: true }).selectOption('仅卡片');
+    await page.getByLabel('复习状态', { exact: true }).selectOption(status);
+    await page.getByRole('button', { name: '应用', exact: true }).click();
+    await expect(page.locator('.memory-card-row')).toHaveCount(1);
+    await expect(page.locator('.memory-card-row')).toHaveAttribute('data-card-id', expected);
+  }
+  await page.getByRole('button', { name: '筛选与排序', exact: true }).click();
+  await page.getByLabel('内容', { exact: true }).selectOption('仅卡组');
+  await page.getByLabel('复习状态', { exact: true }).selectOption('待复习');
+  await page.getByRole('button', { name: '应用', exact: true }).click();
+  await expect(page.locator('.m-folder')).toHaveCount(1);
+  await expect(page.locator('.memory-card-row')).toHaveCount(0);
+  expect(await snapshot(page)).toEqual(before);
+  await noOverflow(page);
+});
+
+test('归档卡组筛选与恢复在安全区窄屏断点和横屏保持可触达', async ({ page }) => {
+  const data = folderArchiveFixture();
+  data.cards = data.cards.map(card => card.deckId === 'outside' ? card : { ...card, archivedAt: '2026-11-02T00:00:00.000Z' });
+  await seedPage(page, data, 'archived');
+  for (const viewport of [{ width: 393, height: 852 }, { width: 320, height: 852 }, { width: 760, height: 852 }, { width: 761, height: 852 }, { width: 852, height: 393 }]) {
+    await page.setViewportSize(viewport);
+    await page.locator('.memory-app').evaluate(element => { (element as HTMLElement).style.setProperty('--safe-top', '59px'); (element as HTMLElement).style.setProperty('--safe-bottom', '34px'); });
+    for (const name of ['筛选与排序', '移出归档卡组：回忆方法']) {
+      const button = page.getByRole('button', { name, exact: true });
+      await button.scrollIntoViewIfNeeded();
+      const box = (await button.boundingBox())!;
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      await button.click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await page.getByRole('button', { name: '关闭面板', exact: true }).click();
+      await expect(button).toBeFocused();
+    }
+    await noOverflow(page);
+  }
 });
 
 test('整组归档面板在安全区、窄屏和断点保持可读可触达', async ({ page }) => {
