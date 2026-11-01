@@ -5,7 +5,8 @@
   2026-11-01T12:31:46+08:00 after the user explicitly said to continue.
 - Scope: app settings diagnostic entry, same-origin static comparison page,
   Service Worker navigation exception, tests and evidence. Not a blur fix.
-- Status: local validation passed; commit/push/production publication pending.
+- Status: committed, pushed and deployed; public checks passed after bounded
+  network/readiness retries. Original installed-iPhone result remains pending.
 - Source base: `42d2611494c7b7bfdf104e4cffa334f262fce602`,
   `xuda645-eng/Recall` main. Task worktree is the isolated clean copy; unrelated
   dirty files in the original worktrees were preserved.
@@ -91,7 +92,23 @@ the original installation without asking for removal/reinstallation.
 
 ## Publication And Recovery
 
-- Implementation SHA, normal main push outcome and deployment ID/URLs pending.
+- Implementation SHA: `08c6e46c2f452733e74fe27dc074ccbbdde8cca9`.
+  `git push origin HEAD:main` advanced main from `42d2611` to `08c6e46`;
+  `git ls-remote origin refs/heads/main` confirmed the full SHA before deployment.
+- Deployment command started at 2026-11-01T12:54:51+08:00:
+
+  ```sh
+  CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2 npx --yes wrangler@4.156.0 pages deploy dist --project-name recall-memory --branch main --commit-hash 08c6e46c2f452733e74fe27dc074ccbbdde8cca9 --commit-message 'feat: add read-only display diagnostics inside installed PWA'
+  ```
+
+- Successful production deployment: `e31a1318-3c49-48ed-a341-ef310dda5103`.
+  Live origin: <https://recall-memory.pages.dev/>. Immutable deployment:
+  <https://e31a1318.recall-memory.pages.dev/>. The production deployment list
+  confirmed this ID and source `08c6e46` at 2026-11-01T13:11:39+08:00.
+- The clean worktree and all 199 tested bundle files were rechecked against
+  their SHA-256 inventory before publication. Wrangler uploaded 29 changed
+  static files, reused 168, and uploaded the existing Functions bundle and
+  routing/headers. No dirty source, migration, binding or secret change.
 - Reuse existing `recall-memory` production `main`, not the prior synthetic
   preview project aliases. Publish only the exact reviewed committed build.
 - Public checks must exercise the read-only entry only, not mutate the owner's
@@ -104,3 +121,54 @@ the original installation without asking for removal/reinstallation.
   Service Worker update handling, not storage deletion.
 - Native installed-instance result remains unverified and must be supplied
   by the user. This release does not claim to resolve the original blur.
+
+## Public Verification And Retry Evidence
+
+- With the same cached browser paths and guarded launcher:
+
+  ```sh
+  RECALL_URL=https://recall-memory.pages.dev/ RECALL_CHROMIUM=<cached-path> RECALL_WEBKIT=<cached-path> node scripts/run-playwright.mjs --grep '原安装显示诊断公开只读入口' --workers=2 --output=/tmp/recall-installed-diag-live-results
+  ```
+
+  Chromium passed in 1.2 minutes. WebKit failed at `Readiness: sw-control`
+  after the unchanged 300-second timeout. The settings page and new entry
+  rendered, but that first WebKit run did not establish SW control or complete
+  the diagnostic roundtrip. It is recorded as a failure, not a pass.
+- One bounded single-worker WebKit retry used the same test, with
+  `--project iphone15-webkit --workers=1 --reporter=list,json`, JSON output at
+  `/tmp/recall-installed-diag-live-webkit-retry.json` and results at
+  `/tmp/recall-installed-diag-live-webkit-retry-results`. It passed in 1.2
+  minutes without changing assertions, timeout, app code or browser security.
+  Thus both engines eventually verified SW control/cache readiness, local
+  report display, same-origin static navigation and return to settings.
+- The initial public-byte verifier used four concurrent `curl -L --fail
+  --silent --show-error --connect-timeout 10 --max-time 45` requests. It failed
+  with SSL connection timeout on `icons/apple-touch-icon.png`. The required
+  unsandboxed retry failed similarly on `workbox-9c191d2f.js`. A separate
+  version request also timed out despite receiving HTTP 200 and its body;
+  that request was not counted as successful.
+- Recovery changed transport only: one serial, reusable HTTP/1.1 curl process,
+  10-second connect / 30-second per-transfer limits, with each response checked
+  against the validated SHA-256 inventory. All **27 selected public assets**
+  matched: app document/entry assets, workspace JS/CSS, manifest, four PWA
+  icons, SW/Workbox, version and diagnostic HTML/CSS/JS. This passed at
+  2026-11-01T13:12:01+08:00. The final version request completed with HTTP 200,
+  `Cache-Control: no-store` and `1.0-20261101-1114`.
+- Anonymous `GET /api/session` returned 401. No authorized request, fixture
+  import or production-card mutation was performed. Live checks ran in fresh
+  isolated browser contexts, not the owner's authenticated browser.
+- Local tests establish offline first entry/return in both engines and
+  old-to-new SW/data persistence. Public checks establish live cache readiness
+  and online roundtrip, not physical iPhone offline/update acceptance. No
+  release regression was detected in completed checks; no rollback performed.
+- Evidence logs remain local under `/tmp/recall-installed-diag-live-*`;
+  private screenshots, browser state and credentials are not published.
+
+## Device Handoff
+
+Keep the original Recall home-screen icon. Apply the normal app update to
+`1.0-20261101-1114`, then open **Logo menu > 设置与数据 > 顶部显示诊断 >
+打开原安装内对照页**. Report whether this page's Logo upper edge is still
+blurred and supply its screenshot. Return through **返回 Recall**. Do not
+install another icon, clear website data or remove/reinstall the original app.
+This is a new diagnostic entry, not a claim that another refresh fixes blur.
