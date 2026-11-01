@@ -10,8 +10,9 @@
   Both new commits only change release documentation and are retained in the
   delivered history; validated application source and bundle are unaffected.
 - Fixed build version: `1.0-20261101-1854` for all builds and browser checks.
-- Status: local validation passed; source commit/push and production
-  deployment pending. Actual publication outcomes will be appended here.
+- Status: local validation passed, source pushed and production deployed.
+  Public resource/auth and PWA checks passed; complete synthetic live UI remains
+  unverified after the documented startup timeouts. Physical UI unverified.
 - Previous production: `b15d48db-31e7-453e-b9d7-82667eca7ff5`, source
   `b5e79fd804d6255d71a26911294b045e4cc0e62b`, version `1.0-20261101-1656`.
   Verified by read-only Wrangler account/project/production listing. This
@@ -103,9 +104,66 @@ browser simulation is not physical acceptance.
 ## Publication And Recovery
 
 Local final validation completed at 2026-11-01T19:06:26+08:00.
-Commit/push time, implementation SHA, deployment ID/URLs, public verification
-and completion timestamp are pending, not inferred from local validation.
-Documentation evidence is a follow-up commit without another app deployment.
+
+- Implementation: `0105bfa910eefe3b4d710e717ed7fb52c086b6a4`.
+- Source publication: 2026-11-01T19:11:48+08:00, normal
+  `git push origin HEAD:main` succeeded, `aa3ac69..0105bfa`. Remote main matched.
+- The original local commit was `e4e0cc3`, then rebased over two documentation
+  commits from main. Only `docs/RELEASES.md` conflicted; both release rows were
+  preserved. No source/test/config difference from the validated commit after
+  rebase, and all 202 bundle hashes remained identical. No force push used.
+- Production: 2026-11-01T19:13:26+08:00, deployment
+  `363b9fd7-3075-4799-9219-386dffebc8ec`, confirmed Production/main/source
+  `0105bfa` through Pages listing.
+- Deployment URL: <https://363b9fd7.recall-memory.pages.dev/>.
+- Stable origin: <https://recall-memory.pages.dev/>.
+
+```sh
+CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2 npx --yes wrangler@4.156.0 pages deploy dist --project-name recall-memory --branch main --commit-hash 0105bfa910eefe3b4d710e717ed7fb52c086b6a4
+node /private/tmp/recall-weread-selection-artifacts.mjs --public
+RECALL_VERIFY_DIST=/private/tmp/recall-weread-finished-badge-20261101/dist node scripts/run-playwright.mjs --config e2e/weread-public.config.ts
+RECALL_URL=https://recall-memory.pages.dev/ node scripts/run-playwright.mjs --grep '系统安全框引导脚本公开可用' --project iphone15-webkit --workers=1 --output /tmp/recall-weread-selection-public-pwa
+```
+
+Public browser commands include the same executable overrides and approved
+unsandboxed guarded launcher. New browser contexts are anonymous, not the
+owner's browser or installed PWA.
+
+- Public PWA check: 1 passed, verifies current app/boot script, SW activation,
+  required shell precache, read-only diagnostics and return to app.
+- Public artifact/auth browser case: 11 committed resource SHA256 digests and
+  5 anonymous WeRead API gates passed; all gates returned 401/no-store, no
+  cookies or real model input. Version equals `1.0-20261101-1854`/no-store.
+- Independent public resource inventory: 17 live resources matched tested
+  SHA256, including main/workspace/WeRead JS/CSS, root HTML, manifest, all
+  install icons, viewport boot, SW and Workbox. Version no-store passed.
+- The initial uncompressed curl inventory failed on stylesheet SSL timeout
+  and a partial 1360/89759-byte transfer (exit 28). An approved unsandboxed
+  rerun recovered the stylesheet but failed on incomplete index JS download
+  (213754/240291 bytes after 60 seconds, exit 28). A bounded recovery used
+  `curl -L --fail --compressed --connect-timeout 15 --max-time 120 -sS` with
+  two attempts/resource. All 17 then passed; stylesheet and SW SSL timeouts
+  required a second attempt. Partial responses were never accepted as matches.
+- First live UI browser batch: 1 passed / 1 failed. The new synthetic UI
+  fixture incorrectly passed shelf metadata into the strict import book
+  response, rejected as `书籍含有不支持的字段`. It timed out waiting for the
+  confirmation selector after 300 seconds. This was not an application
+  regression: fix the test fixture to project only bookId/title/highlights,
+  add an explicit confirmation-heading assertion and rerun only that case.
+  App bundle remains unchanged; test-only correction lint/typecheck and
+  all 202 inventory hashes passed. Corrected fixture rerun failed before any
+  interactions: connection button was unavailable after the 120000ms startup
+  wait. A final bounded rerun failed at `page.goto` waiting for domcontentloaded
+  after 120000ms. No subsequent retry; full live synthetic UI is unverified,
+  rather than attributing every timeout to a proven network-only root cause.
+  Initial live run did verify four finished-badge states and progress before
+  the malformed import fixture blocked confirmation. Equivalent local mobile
+  confirmation/selection checks passed across both engines.
+
+Documentation/test evidence is a follow-up commit without another app
+deployment. Verification closed at 2026-11-01T19:27:05+08:00; follow-up push
+outcome is reported separately. No rollback is warranted by a malformed test fixture
+or by download timeouts with successful hash recovery.
 
 If this release introduces a confirmed regression, restore the compatible
 previous static deployment `b15d48db-31e7-453e-b9d7-82667eca7ff5` through the

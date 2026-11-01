@@ -23,7 +23,7 @@ test('公网合成书卡标记、顶栏返回和划线全选，不调用真实�
     if (url.pathname === '/api/weread/progress') { await route.fulfill({ json: { bookId: body.bookId, readingProgress: 100 } }); return; }
     if (url.pathname === '/api/weread/book') {
       const book = books.find(book => book.bookId === body.bookId)!;
-      await route.fulfill({ json: { format: 'recall-weread-export-v1', books: [{ ...book, highlights: [
+      await route.fulfill({ json: { format: 'recall-weread-export-v1', books: [{ bookId: book.bookId, title: book.title, highlights: [
         { bookmarkId: 'synthetic-1', markText: '合成原文一，不是真实用户划线。' },
         { bookmarkId: 'synthetic-2', markText: '合成原文二，不是真实用户划线。' },
       ] }] } }); return;
@@ -42,6 +42,7 @@ test('公网合成书卡标记、顶栏返回和划线全选，不调用真实�
   }
   await page.getByRole('button', { name: '合成书籍 0，2 条我的划线' }).click();
   await page.getByRole('button', { name: '下一步 · AI 问题与导入' }).click();
+  await expect(page.getByRole('heading', { name: '让划线变成问题', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '再选一选', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '返回导入', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '选择划线 · 默认全选', exact: true }).click();
