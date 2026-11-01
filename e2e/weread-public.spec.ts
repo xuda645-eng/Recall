@@ -40,6 +40,10 @@ test('公网合成书卡标记、顶栏返回和划线全选，不调用真实�
     await expect(card.locator('.wr-reading > span')).toHaveCount(index === 0 ? 1 : 0);
     await expect(card).toContainText('阅读进度 100%');
   }
+  const next = page.getByRole('button', { name: '下一步 · AI 问题与导入', exact: true });
+  await expect(next).toBeInViewport();
+  const dockAction = (await next.boundingBox())!;
+  expect(852 - dockAction.y - dockAction.height).toBeGreaterThanOrEqual(31);
   await page.getByRole('button', { name: '合成书籍 0，2 条我的划线' }).click();
   await page.getByRole('button', { name: '下一步 · AI 问题与导入' }).click();
   await expect(page.getByRole('heading', { name: '让划线变成问题', exact: true })).toBeVisible();

@@ -284,6 +284,39 @@ test('选书页安全区、触控、窄屏和滚动没有溢出或误选', async
   expect(dockButton!.y + dockButton!.height).toBeLessThanOrEqual(852 - 34);
   await expect(page.locator('.wr-dock')).toContainText('已选 0 本');
 });
+test('长书单底部下一步完整上移，安全区留白且末本书能滚动到按钮上方', async ({ page }, testInfo) => {
+  const calls = await setup(page);
+  await page.route('**/api/weread/books', route => route.fulfill({ json: { books: Array.from({ length: 12 }, (_, index) => ({
+    bookId: `synthetic-dock-${index}`, title: `合成书籍 ${index + 1}`, highlightCount: 2,
+  })), cursor: null } }));
+  const before = await snapshot(page);
+  await page.getByRole('button', { name: '连接微信读书', exact: true }).click();
+  await expect(page.locator('.wr-book')).toHaveCount(12);
+  const next = page.getByRole('button', { name: '下一步 · AI 问题与导入', exact: true });
+  for (const viewport of [{ width: 393, height: 852 }, { width: 603, height: 824 }, { width: 320, height: 740 }, { width: 760, height: 852 }]) {
+    await page.setViewportSize(viewport);
+    await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))));
+    for (const inset of [16, 34]) {
+      await page.locator('.memory-app').evaluate((element, inset) => { (element as HTMLElement).style.setProperty('--safe-bottom', `${inset}px`); }, inset);
+      await page.locator('.memory-content').evaluate(element => { element.scrollTop = 0; });
+      await expect(next).toBeInViewport();
+      const button = (await next.boundingBox())!;
+      expect(button.height).toBeGreaterThanOrEqual(44);
+      expect(viewport.height - button.y - button.height).toBeGreaterThanOrEqual(inset + 16 - 1);
+      await page.locator('.memory-content').evaluate(element => { element.scrollTop = element.scrollHeight; });
+      const last = (await page.locator('.wr-book').last().boundingBox())!;
+      const dock = (await page.locator('.wr-dock').boundingBox())!;
+      expect(last.y + last.height).toBeLessThanOrEqual(dock.y + 1);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+      await expect(page.locator('.wr-dock')).toContainText('已选 0 本');
+    }
+  }
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.locator('.memory-content').evaluate(element => { element.scrollTop = 0; });
+  await page.screenshot({ path: `/tmp/recall-weread-raised-dock-${testInfo.project.name}.png` });
+  expect(await snapshot(page)).toEqual(before);
+  expect(calls).toEqual([]);
+});
 test('草稿写入失败不调用模型，恢复存储后才继续', async ({ page }) => {
   const calls = await setup(page);
   await choose(page);

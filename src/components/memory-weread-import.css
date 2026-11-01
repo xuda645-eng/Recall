@@ -60,7 +60,7 @@
 .wr-counts small { font-size: 10px; }
 .wr-book-foot { font-size: 10px; color: var(--muted); margin-top: 7px !important; }
 .wr-book-foot span { color: var(--wr-olive); }
-.wr-dock { position: sticky; bottom: calc(-1 * var(--safe-bottom) - 24px); z-index: 4; background: var(--paper); margin: 18px -2px 0; padding: 14px 2px calc(var(--safe-bottom) + 12px); border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+.wr-dock { position: sticky; bottom: 0; z-index: 4; background: var(--paper); margin: 18px -2px 0; padding: 14px 2px calc(var(--safe-bottom) + 16px); border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
 .wr-dock > div { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; }
 .wr-dock > div > span { color: var(--muted); font-size: 11px; }
 .wr-dock > .m-primary, .wr-dock > .m-secondary { width: 100%; min-height: 52px; }
