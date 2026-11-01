@@ -100,3 +100,18 @@
 - Obtain the exact handoff commit SHA from this task branch after the record is
   committed. Do not mistake the unchanged application baseline for a newly
   deployed build.
+
+## Task Branch Publication
+
+- Evidence commit: `a3a4ac2e4aafba0c2fcb91a24a745f9f7b49ce71`.
+- `git diff --cached --check` passed before committing. The commit contains only
+  this record; no credentials, task-local runtime configuration or app changes.
+- `git push --set-upstream origin codex/weread-endpoint-20261102` succeeded with
+  a normal new-branch push to `xuda645-eng/Recall`.
+- `git ls-remote origin refs/heads/codex/weread-endpoint-20261102` returned the
+  exact evidence commit above. The task worktree had no uncommitted tracked
+  changes after that push.
+- This publication outcome is appended in a documentation-only follow-up on
+  the same task branch. The final handoff SHA is reported after its push.
+- Main and production remain unchanged by this task; production endpoint
+  activation and the grouping implementation remain pending integration/work.
