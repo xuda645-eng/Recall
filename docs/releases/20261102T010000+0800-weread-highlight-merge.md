@@ -9,7 +9,8 @@
 - Branch: `codex/weread-endpoint-20261102`.
 - Application baseline: `1c64e517c9ce4030895073ce6e2ec16958c95fda`.
 - Prerequisite handoff: `de8525b022b85de6ffd93d0204024aea29f3f052`.
-- Implementation and preview source SHA: append after the task commit/push.
+- Implementation and preview source SHA:
+  `f91c013967398af14c74bb521f6fb11ad40a44e2`.
 - Shared release index is reserved for the integration owner. Unrelated dirty
   changes in the original supplied worktree were preserved without modification.
 - No production deployment, production secret change, D1 migration, owner
@@ -134,12 +135,68 @@
 - Before preview publication at `2026-11-02T01:03:24+08:00`, production listing
   showed `dd286cc8-ab18-4ec5-92e5-e31dd9b3c92d`, source `59f70c5`, on `main`.
   This observation is not this task's production release or rollback target.
-- Preview address, deployment ID, commit SHA and verification: append after
-  task-branch publication. Preview must not change main/production or call real
-  AI. Only synthetic no-AI demo is offered; real online operations unavailable.
+- Implementation committed at `2026-11-02T01:05:28+08:00`. Initial normal
+  `git push origin codex/weread-endpoint-20261102` could not read HTTPS username
+  under the sandbox. The exact escalated retry succeeded, moving the remote
+  task branch from `de8525b` to `f91c013`; read-only `git ls-remote` confirmed
+  the full source SHA. No force push, main push or unrelated files included.
+- Rebuilt only after the serial PWA tests completed:
+  `RECALL_BUILD_VERSION=1.0-20261102-0100 pnpm build`. All 202 output files
+  were hashed, and deployment privacy scanning found no live endpoint,
+  real-book ID, credentials or private card content. Working tree was clean.
+- Preview deployed using Wrangler 4.156.0 and the verified existing account,
+  `pages deploy dist --project-name recall-memory --branch codex-weread-merge-20261102 --commit-hash f91c013967398af14c74bb521f6fb11ad40a44e2`.
+  No `--commit-dirty=true` or source-map upload. Wrangler's warning about the
+  intentionally omitted preview D1 binding was retained; no binding was added.
+- Preview deployment ID: `f0b1de97-3505-4967-857a-9bc80bed34fe`.
+  Fixed URL: <https://f0b1de97.recall-memory.pages.dev>.
+  Task alias: <https://codex-weread-merge-20261102.recall-memory.pages.dev>.
+  Cloudflare listing confirmed `Preview`, unique non-main branch and source
+  `f91c013`. Production listing still showed
+  `dd286cc8-ab18-4ec5-92e5-e31dd9b3c92d` / `59f70c5` after this deployment.
+- Preview cloud features stay unavailable. Read-only secret-list recheck first
+  hit npm-cache EPERM, then succeeded via approved escalation with zero preview
+  secrets. No cache ownership or account security changes were made. Post-deploy
+  listing had the same sandbox failure and approved read-only recovery.
+- Public core/grouping code, styles, manifest, all eight icons, version and
+  Workbox assets returned 200 and matched committed hashes. The first Node
+  request timed out, and the first curl script rejected the normal `index.html`
+  308 canonical redirect; follow-redirect recovery passed those 16 assets.
+  Fixed-domain `sw.js` TLS timed out on three attempts; the same preview's alias
+  returned 200 and the exact `sw.js` hash with JavaScript MIME. Version is
+  no-store. Alias anonymous auth/sync/books/merge returned 401 without production
+  fallback. Logs and JSON: `/tmp/recall-merge-preview-assets-recovery-20261102.log`,
+  `/tmp/recall-merge-preview-assets-20261102.json` and
+  `/tmp/recall-merge-preview-assets-sw-api-20261102.json`.
+- Public Chromium simulation at 393x852/DPR 3 passed synthetic review, question
+  editing, split/combine, explicit local demo import, original/order checks,
+  safe-area/narrow/breakpoint/landscape geometry, SW control and offline reload
+  persistence, with zero model calls. WebKit completed the online actions but
+  initially timed out waiting 60 seconds for SW control. A diagnostic 180-second
+  recovery obtained control, then `context.setOffline(true)` reload returned
+  `WebKit encountered an internal error`. A later fixed-domain online-only run
+  completed the same actions but strict page-error checking found a background
+  `/api/auth/session` access-control error. No app fix or browser safeguard
+  weakening was made. These failed public attempts are not full passes; public
+  WebKit offline reopening remains unverified despite local isolated-build PWA
+  tests passing. No physical iPhone acceptance is claimed.
+- Alias online-only WebKit recheck also completed all demo actions but recorded
+  the same background page error. Detailed diagnostics showed cancelled module
+  requests and CSS/SW import errors from the smoke script navigating again while
+  the first document was still loading. Recovery initializes the synthetic
+  snapshot before first navigation instead of immediately reloading. On this
+  corrected script WebKit online review/edit/split/combine/import, exact original
+  text/order, mobile geometry and zero model calls all passed with zero page
+  errors. Evidence: `/tmp/recall-merge-preview-webkit-preload-20261102.log` and
+  `/tmp/recall-merge-preview-webkit-browser-20261102.json`. This online pass does
+  not erase the earlier failures or verify public WebKit offline reopening.
 - Preview steps: open WeRead import, select the explicitly synthetic merge demo,
   inspect 4 originals into 2 groups, edit a question, split/recombine and confirm
   only if you want demo cards stored in that preview origin's local library.
+- Preview is available over HTTPS without a login for the synthetic demo. No
+  automatic expiry was configured; the fixed deployment remains subject to
+  hosting retention, and the unique alias changes only if this task deploys
+  again. Device-local demo cards are separate from the production origin.
 - Shared interface overlap: `src/types.ts`, `shared/server-validation.ts`,
   `functions/api/[[path]].ts`, WeRead transport/import/job modules, workspace
   sorting/editing and Markdown guard. Integration must combine these additively
@@ -151,5 +208,11 @@
   unpublished developer task. Removing a preview does not roll back local cards.
   Future asset rollback does not undo grouped data; old validators lack grouped
   provenance support, so assess compatibility before any production rollback.
+- Evidence finalized at `2026-11-02T01:17:43+08:00`; documentation-only follow-up
+  is committed/pushed on the same task branch without another app deployment.
+  Main and the production endpoint remain unchanged by this task. The app
+  implementation and preview are fixed at `f91c013`; follow-up documentation is
+  the final branch handoff. Public WebKit offline and physical iPhone acceptance
+  remain integration/acceptance limits, not passing release evidence.
 - See [import contract](../WEREAD_IMPORT.md), [PWA checks](../PWA.md),
   [hosting](../DEPLOYMENT.md) and [cloud safety](../CLOUD_SYNC.md).
