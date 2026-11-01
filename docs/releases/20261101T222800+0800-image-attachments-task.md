@@ -56,7 +56,8 @@ whole files. `docs/RELEASES.md` is left to the integration owner.
 
 Initial full checks: 1430 unit tests, 194 synthetic cloud tests, lint zero
 errors/132 existing warnings, app/cloud TypeScript passed. Task Skill tests
-passed 52 tests. Final delivery checks completed on 2026-11-01, Asia/Shanghai:
+passed 52 tests. Final delivery checks ran across 2026-11-01/2026-11-02,
+Asia/Shanghai:
 
 - `node node_modules/vitest/vitest.mjs run --coverage`: 85 files, 1439 tests
   passed. Includes stable image-renderer rerender, complete backup validation,
@@ -174,5 +175,70 @@ That newer production release is outside this image task and is not replaced.
 The integration owner must recheck current main/production and revalidate the
 combined source, rather than treating this older task baseline as current main.
 
-Implementation SHA, branch push and preview outcomes: pending final task commit.
+## Fixed Task Handoff - 2026-11-02
+
+- Implementation SHA: `de9b3e8be0b83f4cff1aa4ed5458593406ff5199`.
+- Branch `codex/image-attachments-20261101` pushed normally to
+  `xuda645-eng/Recall`, tracking the corresponding remote branch. Initial
+  sandbox push could not read HTTPS credentials; approved same-command retry
+  using system credentials succeeded. No credentials were printed or rewritten.
+- Fixed-commit local HTTPS D1 rerun passed both engines after the final queue
+  finalization fix: `/tmp/recall-image-cloud-committed-20261102`, two tests.
+- Exact validated build comparison passed for all 202 app files and all 205
+  preview manifest hashes before deployment. Worktree was clean at publication.
+- Existing-project non-main preview command used `--branch image-attachments-20261101`
+  and `--commit-hash de9b3e8be0b83f4cff1aa4ed5458593406ff5199`, without a dirty
+  flag. It uploaded 30 changed assets, reused 172, compiled the dedicated
+  deny-all-API worker and deployed successfully. Preview's intentionally absent
+  DB binding generated a Wrangler warning; no production DB binding was added.
+- Preview deployment ID: `88351020-e9f7-4823-bb31-a43fd46ade5a`.
+- Fixed URL: `https://88351020.recall-memory.pages.dev/media-demo.html`.
+- Task alias: `https://image-attachments-20261101.recall-memory.pages.dev/media-demo.html`.
+- Deployment listing confirmed environment Preview, branch
+  `image-attachments-20261101`, source `de9b3e8`. Production remained
+  `dd286cc8-ab18-4ec5-92e5-e31dd9b3c92d`, source `59f70c5`, after this upload.
+- Hosted preview is public and synthetic-only, with no production sync/AI.
+  Anyone can open it; imported data stays on that preview browser origin.
+  There is no promised expiry, but a deployment can be removed or the task
+  alias superseded. Fixed URL is preferred for reproducible acceptance.
+- Steps: download the synthetic package from the landing page; open Recall
+  import; choose the package; confirm two cards; open all cards from the menu;
+  open a question, show its answer and click the screenshot. Also check edit
+  add/remove/replace and settings' complete image backup. Do not use the preview
+  as a replacement for the real library or its sync service.
+- Public guarded Chromium/WebKit acceptance command
+  `RECALL_MEDIA_PREVIEW_URL=https://88351020.recall-memory.pages.dev/ ... node scripts/run-playwright.mjs --config e2e/media-preview.config.ts --workers=1 --output=/tmp/recall-image-public-preview-20261102`
+  did not start: automatic approval review timed out twice, including the
+  allowed retry. No browser launch bypass was attempted. Public interactive
+  flows/SW activation and physical iPhone acceptance remain unverified, despite
+  complete local simulation evidence. The committed public preview suite is
+  available to the integrator for approved rerun.
+- Read-only public curl retrieval confirmed the landing and correct version.
+  Node-native aggregate HTTP checking stalled and was stopped; switched to
+  bounded curl-backed verification instead. A large aggregate attempt stalled
+  and was stopped; narrowed to 25 critical assets/API endpoints. Initial pass
+  had six TLS/body timeout failures. Serial bounded retries confirmed SW,
+  maskable/apple-touch icons and sync/WeRead API isolation. The retry helper's
+  streamed stdout package hash was not counted as a pass; a fresh single curl
+  download confirmed the exact 44652-byte package SHA-256
+  `506480bfde80beb5d5258f3e9fa7e86bcd8244909507515f31aafad6299f6a2f`, matching
+  the validated artifact. All 25 selected resources matched or returned the
+  expected 401 deny-all response across attempts, not in one aggregate pass.
+  Evidence: `/tmp/recall-image-public-http-20261102.json`,
+  `/tmp/recall-image-public-http-retry-20261102.json` and
+  `/tmp/recall-image-public-http-combined-20261102.json`. Root/index JS/CSS,
+  workspace/Markdown chunks, manifest/icons, SW, landing, version and package
+  are covered, not all 205 files or browser execution. Task alias landing also
+  retrieved successfully. No network-only cause or product regression is
+  inferred from these transient failures.
+- The isolated local HTTPS server has been stopped after validation. Restart
+  with the local-only setup commands above if cloud testing is needed. The
+  installed global Skill remains unchanged; integrate/install deliberately.
+
+The follow-up documentation commit contains only task evidence; it does not
+replace this validated preview or redeploy any app. There is no unresolved
+known product regression from the review; the material verification gap is
+post-deployment browser execution, not local mobile or synthetic D1 tests.
+Outcome recorded at `2026-11-02T00:21:35+08:00`; downloaded public synthetic
+package also passed the actual in-memory parser/repeat-import verification.
 Production status: not pushed to main, not deployed to production.
