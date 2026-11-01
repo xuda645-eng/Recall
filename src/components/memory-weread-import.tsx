@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { useRecallStore } from '@/stores/recall-store';
 import { commitMemory } from '@/services/memory-actions';
 import { applyWereadImport, buildWereadDrafts, parseWereadExport, planWereadImport, WEREAD_MAX_BYTES, type WereadBook, type WereadDraft, type WereadImportPlan, type WereadImportResult, type WereadKind } from '@/lib/memory-weread';
-import { generateWereadQuestion, loadOnlineBook, loadOnlineBooks } from '@/services/weread-online';
+import { loadOnlineBook, loadOnlineBooks } from '@/services/weread-online';
+import { generateWereadQuestions, WEREAD_AI_CONCURRENCY } from '@/services/weread-question-batch';
 import { checkWereadBudget } from '@/services/weread-job-storage';
 import { AI_DAILY_MODEL_ATTEMPTS } from '../../shared/weread-ai';
 import './memory-weread-import.css';
@@ -193,22 +194,16 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy }: Memory
     let succeeded = 0;
     try {
       await checkWereadBudget(candidates.length, abort.signal);
-      for (const [index, draft] of candidates.entries()) {
-        if (abort.signal.aborted) break;
-        setProgress(`AI 生成 ${index + 1}/${candidates.length}，已成功 ${succeeded} 条`);
-        try {
-          const result = await generateWereadQuestion(draft.highlight.markText, aiSummary, abort.signal);
-          if (!mounted.current || abort.signal.aborted || current !== generation.current) break;
-          setDrafts(old => old.map(item => item.id === draft.id ? { ...item, kind: 'qa', question: result.question, aiSummary: result.summary ?? undefined } : item));
-          setAiStatus(old => ({ ...old, [draft.id]: 'AI 已生成，请检查问题是否可由原文回答' }));
-          succeeded++;
-        } catch (value) {
-          if (abort.signal.aborted) break;
-          setAiStatus(old => ({ ...old, [draft.id]: `生成失败：${message(value)}` }));
-          setError(message(value));
-          break;
-        }
-      }
+      setProgress(`AI 最多 ${WEREAD_AI_CONCURRENCY} 并发，已成功 ${succeeded}/${candidates.length} 条`);
+      await generateWereadQuestions(candidates, aiSummary, abort.signal, (draft, result) => {
+        if (!mounted.current || abort.signal.aborted || current !== generation.current) return;
+        setDrafts(old => old.map(item => item.id === draft.id ? { ...item, kind: 'qa', question: result.question, aiSummary: result.summary ?? undefined } : item));
+        setAiStatus(old => ({ ...old, [draft.id]: 'AI 已生成，请检查问题是否可由原文回答' }));
+        succeeded++;
+        setProgress(`AI 最多 ${WEREAD_AI_CONCURRENCY} 并发，已成功 ${succeeded}/${candidates.length} 条`);
+      }, (draft, value) => {
+        if (mounted.current && !abort.signal.aborted && current === generation.current) setAiStatus(old => ({ ...old, [draft.id]: `生成失败：${message(value)}` }));
+      });
     } catch (value) {
       if (mounted.current && !abort.signal.aborted && current === generation.current) setError(message(value));
     } finally {
@@ -289,7 +284,7 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy }: Memory
           <label><input type="checkbox" disabled={generating} checked={aiSummary} onChange={event => setAiSummary(event.target.checked)}/>同时生成辅助摘要（不是原文答案）</label>
           <button type="button" disabled={generating} onClick={() => void generate()}>AI 生成所选问题</button>
           {generating && <button type="button" onClick={() => controller.current?.abort()}>停止生成</button>}
-          <small>所选划线依次生成，已有问题不重做。单条最多 6000 字；每日全空间最多 {AI_DAILY_MODEL_ATTEMPTS} 次模型尝试，失败也计入；每小时最多 120 次请求。停止或失败保留本页草稿。仅点击后发送原文。</small>
+          <small>所选划线最多 {WEREAD_AI_CONCURRENCY} 并发生成，已有问题不重做。单条最多 6000 字；每日全空间最多 {AI_DAILY_MODEL_ATTEMPTS} 次模型尝试，失败也计入；每小时最多 120 次请求。停止或失败保留本页草稿。仅点击后发送原文。</small>
           {progress && <p role="status">{progress}</p>}
         </div>}
         {drafts.map((draft, index) => <article className="m-weread-card m-panel" key={draft.id}>

@@ -184,6 +184,39 @@ describe('authenticated online WeRead and AI', () => {
     expect(JSON.parse(request.input).originalHighlight).toBe(original);
     expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_entities').get()).toEqual({ count: 0 });
   });
+  it('allows four simultaneous independent questions and counts/cache-saves each without writing cards', async () => {
+    let active = 0;
+    let maximum = 0;
+    let release!: () => void;
+    const waiting = new Promise<void>(resolve => { release = resolve; });
+    const fetcher = vi.fn(async () => {
+      active++; maximum = Math.max(maximum, active);
+      await waiting;
+      active--;
+      return Response.json(ai);
+    });
+    vi.stubGlobal('fetch', fetcher);
+    const inputs = Array.from({ length: 4 }, (_, index) => ({ markText: `${original}\nSynthetic ${index}`, summary: false }));
+    const batch = Promise.all(inputs.map(input => api('weread/question', input)));
+    try {
+      await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(4));
+      expect(maximum).toBe(4);
+    } finally { release(); }
+    expect((await batch).map(response => response.status)).toEqual([200, 200, 200, 200]);
+    expect(db.sqlite.prepare("SELECT attempts FROM import_request_limits WHERE bucket = 'ai-model'").get()).toEqual({ attempts: 4 });
+    for (const input of inputs) expect((await api('weread/question', input)).status).toBe(200);
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_entities').get()).toEqual({ count: 0 });
+  });
+  it('four concurrent requests at the daily boundary never exceed the remaining model budget', async () => {
+    db.sqlite.prepare('INSERT INTO import_request_limits VALUES (?, ?, ?, ?)').run('personal', 'ai-model', Math.floor(Date.now() / 86400000) * 86400000, 298);
+    const fetcher = vi.fn(async () => Response.json(ai));
+    vi.stubGlobal('fetch', fetcher);
+    const replies = await Promise.all(Array.from({ length: 4 }, (_, index) => api('weread/question', { markText: `${original}\nSynthetic ${index}`, summary: false })));
+    expect(replies.map(response => response.status).sort()).toEqual([200, 200, 429, 429]);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(db.sqlite.prepare("SELECT attempts FROM import_request_limits WHERE bucket = 'ai-model'").get()).toEqual({ attempts: 300 });
+  });
   it('fails closed on upgrade, HTTP error, invalid or incomplete AI, and hides upstream secrets', async () => {
     for (const value of [{ upgrade_info: { instructions: 'synthetic-weread' } }, { errcode: 401, errmsg: 'synthetic-weread' }]) {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(value)));

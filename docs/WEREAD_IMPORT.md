@@ -36,7 +36,7 @@ Agent Skill，不将 `WEREAD_API_KEY` 或火山引擎密钥放入前端。
 [划线契约](https://github.com/Tencent/WeChatReading/blob/main/skills/notes.md)、
 [书籍契约](https://github.com/Tencent/WeChatReading/blob/main/skills/book.md)。
 每日 300 次模型尝试与图片支持是独立事项。用户随后确认取消单次
-20 个问题的限制；在线和手动 AI 路径均依次处理全部选中划线，仍受
+20 个问题的限制；在线和手动 AI 路径均最多 4 并发处理全部选中划线，仍受
 下文的每日额度、请求频率、文件容量和单条长度保护。
 
 ## 在线选择交互
@@ -120,7 +120,8 @@ under **其他导入方式**, with the legacy manual preview and generation work
 Select books, click **下一步 · AI 问题与导入**, inspect the scope and select
 individual highlights if needed. Click **生成并自动导入** to consent to the
 displayed originals and changed-card updates. All selected highlights are
-processed serially; there is no separate 20-question per-action ceiling. A book
+processed with at most four concurrent model requests; there is no separate
+20-question per-action ceiling. A book
 with more than 20 highlights does not require manually choosing batches of 20.
 New originals longer than 6000
 characters require manual handling. All required questions must succeed before
@@ -139,6 +140,21 @@ schema validation does not guarantee semantic correctness. Review and edit
 questions in the resulting card group. Pause, network failure or model failure
 retains successful questions without importing an incomplete batch. Retry only
 the remaining questions; import-stage failure retries the import, not AI.
+
+Requests refill the four-slot pool as results are saved. Results are associated
+with their original highlight IDs, not response order; job merges and IndexedDB
+writes remain serial. A model error or save failure stops new dispatch, then
+already-running successful responses are retained before reporting failure.
+Pause aborts browser requests, ignores late responses and stops new dispatch.
+Up to four upstream calls may already have started and may still be charged.
+Concurrency does not add a server-side background job: iOS can suspend a PWA
+in the background, and closing it still stops the browser-managed batch.
+
+On 2026-11-01 a four-request direct endpoint probe using synthetic originals,
+the same request/schema contract and no retries returned four valid HTTP 200
+responses in 1831ms total (1342-1761ms per request). This establishes small-batch
+feasibility, not sustained-load capacity or a guaranteed fourfold speedup. The
+probe did not access personal highlights, Recall cards, its cache or D1 quota.
 
 Automatic-job drafts are saved transactionally in a separate local IndexedDB
 `recall-weread-drafts`, with a seven-day validity window. Refresh or reopening
@@ -170,7 +186,8 @@ and a seven-day question cache, separate from cards/sync entities.
 
 - Each AI request accepts 1-6000 characters and caps output at 384 tokens.
 - Both online automatic and manual AI paths process all selected candidates
-  serially, with no 20-question truncation or consent ceiling. Stop prevents
+  with at most four concurrent requests, with no 20-question truncation or
+  consent ceiling. Stop prevents
   future calls but an already started upstream call may still finish and be
   charged. Successful questions are not regenerated on retry. Automatic jobs
   persist across refresh; manual drafts remain only in the current page.

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, BookOpen, Check, ChevronRight, LoaderCircle, Pause, Search, SlidersHorizontal } from 'lucide-react';
 import { useRecallStore } from '@/stores/recall-store';
 import { commitMemory } from '@/services/memory-actions';
-import { generateWereadQuestion, loadOnlineBook, loadOnlineBooks, loadOnlineProgress, type WereadOnlineBook } from '@/services/weread-online';
+import { loadOnlineBook, loadOnlineBooks, loadOnlineProgress, type WereadOnlineBook } from '@/services/weread-online';
+import { generateWereadQuestions, WEREAD_AI_CONCURRENCY } from '@/services/weread-question-batch';
 import { applyWereadImport, buildWereadDrafts, parseWereadExport, planWereadImport, type WereadDraft } from '@/lib/memory-weread';
 import { createWereadJob, jobUpdates, needsQuestion, pendingQuestions, safeJobPlan, type WereadJob } from '@/lib/weread-job';
 import { checkWereadBudget, discardWereadJob, loadWereadJob, saveWereadJob, withWereadJobLock } from '@/services/weread-job-storage';
@@ -146,12 +147,10 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal,
         await checkWereadBudget(candidates.length, controller.signal);
         next = { ...next, status: 'generating', error: '' };
         await persist(next);
-        for (const draft of candidates) {
-          if (controller.signal.aborted) break;
-          const result = await generateWereadQuestion(draft.highlight.markText, false, controller.signal);
+        await generateWereadQuestions(candidates, false, controller.signal, async (draft, result) => {
           next = { ...next, generated: [...next.generated, draft.id], drafts: next.drafts.map(item => item.id === draft.id ? { ...item, kind: 'qa', question: result.question, aiSummary: undefined } : item) };
           await persist(next);
-        }
+        });
         if (controller.signal.aborted || !mounted.current) { await persist({ ...next, status: 'paused' }); return; }
         next = { ...next, status: 'importing' }; await persist(next);
         let receipt: WereadJob['receipt'];
@@ -241,7 +240,7 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal,
       <div className="wr-confirm-books">{confirmedBooks.map(book => <div key={book.bookId}><Cover book={book}/><span><strong>{book.title}</strong><small>{drafts.filter(draft => draft.book.bookId === book.bookId && draft.include).length} 条已选划线</small></span></div>)}</div>
       <div className="wr-confirm-count"><span>本次生成</span><strong>{questionCount}<small> 个问题</small></strong></div>
       {!!changes.length && <div className="wr-changes"><h2>{changes.length} 张已有卡片的原文发生变化</h2><p>默认保留已有内容；勾选后才更新，复习进度保留。</p>{changes.map(draft => <label key={draft.id}><input type="checkbox" checked={updates.has(draft.id)} onChange={event => setUpdates(old => { const next = new Set(old); if (event.target.checked) next.add(draft.id); else next.delete(draft.id); return next; })}/><span>{draft.book.title} · {draft.highlight.markText.slice(0, 60)}</span></label>)}</div>}
-      <p className="wr-consent">确认后，仅所选原文发送至火山 AI，依次生成全部问题。每日最多 {AI_DAILY_MODEL_ATTEMPTS} 次模型尝试，每小时最多 120 次请求；限流或失败保留进度。全部成功后自动导入，原文不改写；已有相同划线保留。AI 可能出错，导入后可查看和编辑。</p>
+      <p className="wr-consent">确认后，仅所选原文发送至火山 AI，最多 {WEREAD_AI_CONCURRENCY} 并发生成全部问题。每日最多 {AI_DAILY_MODEL_ATTEMPTS} 次模型尝试，每小时最多 120 次请求；限流或失败保留进度。全部成功后自动导入，原文不改写；已有相同划线保留。AI 可能出错，导入后可查看和编辑。</p>
       <button className="m-secondary wr-more" aria-expanded={showHighlights} onClick={() => setShowHighlights(!showHighlights)}>选择划线 · 默认全选</button>
       {showHighlights && <div className="wr-highlight-options"><label className="wr-highlight-all"><input ref={selectAllHighlights} type="checkbox" checked={drafts.length > 0 && included.length === drafts.length} disabled={busy || !drafts.length} onChange={event => { const include = event.target.checked; setDrafts(old => old.map(draft => ({ ...draft, include }))); }}/><span>全选 / 全不选<small>已选 {included.length} / {drafts.length} 条划线</small></span></label>{drafts.map(draft => <label key={draft.id}><input type="checkbox" checked={draft.include} disabled={busy} onChange={event => setDrafts(old => old.map(item => item.id === draft.id ? { ...item, include: event.target.checked } : item))}/><span><small>{draft.book.title} · {draft.highlight.chapterTitle}</small>{draft.highlight.markText}</span></label>)}</div>}
       <div className="wr-dock"><button className="m-primary" disabled={busy || !included.length || !!confirmationError} onClick={() => void confirm()}>生成并自动导入<ArrowRight size={17}/></button></div>

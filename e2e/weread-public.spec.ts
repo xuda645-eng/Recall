@@ -65,6 +65,62 @@ test('公网合成书卡标记、顶栏返回和划线全选，不调用真实�
   expect(await context.cookies()).toEqual([]);
 });
 
+test('公网应用四并发合成生成保持问题对应，不读取真实书籍或调用真实模型', async ({ page, context }) => {
+  const base = 'https://recall-memory.pages.dev';
+  const seed = createSeedSnapshot(new Date('2026-10-01T00:00:00.000Z'));
+  const initial = { ...seed, decks: [], cards: [], reviewLogs: [], studySessions: [], settings: { ...seed.settings, onboardingComplete: true } };
+  const highlights = Array.from({ length: 8 }, (_, index) => ({ bookmarkId: `synthetic-${index}`, markText: `第 ${index} 条合成原文，不是真实用户划线。` }));
+  const calls: string[] = [];
+  let active = 0;
+  let maximum = 0;
+  let release!: () => void;
+  const waiting = new Promise<void>(resolve => { release = resolve; });
+  await context.route('**/*', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    expect(url.origin).toBe(base);
+    if (!url.pathname.startsWith('/api/')) { expect(request.method()).toBe('GET'); await route.continue(); return; }
+    expect(request.headers().cookie).toBeUndefined();
+    if (url.pathname === '/api/auth/session') { await route.fulfill({ status: 503, json: { error: 'synthetic-local-only' } }); return; }
+    if (url.pathname === '/api/weread/books') { await route.fulfill({ json: { books: [{ bookId: 'synthetic', title: '合成测试书', highlightCount: 8 }], cursor: null } }); return; }
+    if (url.pathname === '/api/weread/budget') { await route.fulfill({ json: { remaining: 300 } }); return; }
+    const body = request.postDataJSON();
+    if (url.pathname === '/api/weread/question') {
+      const index = highlights.findIndex(highlight => highlight.markText === body.markText);
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(body.summary).toBe(false);
+      calls.push(body.markText); active++; maximum = Math.max(maximum, active);
+      if (calls.length <= 4) await waiting;
+      await new Promise(resolve => setTimeout(resolve, (8 - index) * 20));
+      active--;
+      await route.fulfill({ json: { question: `第 ${index} 条合成原文提出了什么具体内容？`, summary: null, cached: false } }); return;
+    }
+    expect(body.bookId).toBe('synthetic');
+    if (url.pathname === '/api/weread/progress') { await route.fulfill({ json: { bookId: 'synthetic', readingProgress: null } }); return; }
+    if (url.pathname === '/api/weread/book') { await route.fulfill({ json: { format: 'recall-weread-export-v1', books: [{ bookId: 'synthetic', title: '合成测试书', highlights }] } }); return; }
+    throw new Error(`Unmocked production API prohibited: ${url.pathname}`);
+  });
+  await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await expect(page.locator('.memory-app')).toBeVisible({ timeout: 120000 });
+  await page.evaluate(data => { localStorage.setItem('recall.snapshot.v1', JSON.stringify(data)); location.hash = 'weread'; }, initial);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: '连接微信读书', exact: true }).click();
+  await page.getByRole('button', { name: '合成测试书，8 条我的划线' }).click();
+  await page.getByRole('button', { name: '下一步 · AI 问题与导入' }).click();
+  await expect(page.locator('.wr-consent')).toContainText('最多 4 并发');
+  try {
+    await page.getByRole('button', { name: '生成并自动导入' }).click();
+    await expect.poll(() => calls.length).toBe(4);
+    expect(maximum).toBe(4);
+    release();
+    await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+    const data = await page.evaluate(() => JSON.parse(localStorage.getItem('recall.snapshot.v1')!));
+    expect(data.cards.map((card: { back: string }) => card.back)).toEqual(highlights.map(highlight => highlight.markText));
+    expect(data.cards.map((card: { front: string }) => card.front)).toEqual(highlights.map((_, index) => `第 ${index} 条合成原文提出了什么具体内容？`));
+    expect(calls).toHaveLength(8); expect(maximum).toBe(4);
+    expect(await context.cookies()).toEqual([]);
+  } finally { release(); }
+});
 test('公网已提交资源逐字节校验，匿名微信读书端点不授权且不写卡片', async ({ page, context }) => {
   const directory = process.env.RECALL_VERIFY_DIST;
   if (!directory) throw new Error('RECALL_VERIFY_DIST must point to the committed production bundle');

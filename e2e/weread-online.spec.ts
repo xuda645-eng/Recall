@@ -371,10 +371,10 @@ test('变化项默认不更新，明确勾选才更新内容且保留编号、�
 });
 
 test('停止生成保留已完成草稿，忽略迟到响应，不自动导入部分结果', async ({ page, api }) => {
-  api.books = booksFixture(3);
+  api.books = booksFixture(6);
   const pending = gate();
   api.question = async (request, index) => {
-    if (index === 2) await pending.waiting;
+    if (index > 1) await pending.waiting;
     return { body: { question: index === 2 ? '迟到响应，不能写回已停止草稿。' : editedQuestion, summary: null, cached: false } };
   };
   await boot(page);
@@ -383,18 +383,18 @@ test('停止生成保留已完成草稿，忽略迟到响应，不自动导入�
   const secondPrompt = await prompt(page, 2).inputValue();
   try {
     await page.getByRole('button', { name: aiAction, exact: true }).tap();
-    await expect.poll(() => api.questionRequests.length).toBe(2);
+    await expect.poll(() => api.questionRequests.length).toBe(5);
     await expect(prompt(page, 1)).toHaveValue(editedQuestion);
-    await expect(page.getByRole('status').filter({ hasText: /2\s*\/\s*3.*已成功\s*1|成功\s*1\s*\/\s*3/ }).first()).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: /已成功\s*1\s*\/\s*6/ }).first()).toBeVisible();
     await touchTarget(stopAction(page));
     await stopAction(page).tap();
     await expect(page.getByRole('button', { name: aiAction, exact: true })).toBeEnabled();
     pending.release();
-    await expect.poll(() => api.settledQuestions).toBe(2);
+    await expect.poll(() => api.settledQuestions).toBe(5);
     await settleUI(page);
     await expect(prompt(page, 2)).toHaveValue(secondPrompt);
     await expect(prompt(page, 1)).toHaveValue(editedQuestion);
-    expect(api.questionRequests).toHaveLength(2);
+    expect(api.questionRequests).toHaveLength(5);
     await originals(page, [api.books[0]]);
     expect(await snapshot(page)).toEqual(before);
     await page.getByRole('button', { name: '返回导入', exact: true }).tap();
@@ -434,6 +434,33 @@ test('部分生成失败不自动导入，错误解除后可重试并明确确�
   expect((await snapshot(page)).cards).toHaveLength(2);
 });
 
+test('手动路径四并发乱序生成，问题仍对应原文且确认前不导入', async ({ page, api }) => {
+  api.books = booksFixture(9);
+  const pending = gate();
+  let active = 0;
+  let maximum = 0;
+  api.question = async (_request, index) => {
+    active++; maximum = Math.max(maximum, active);
+    if (index <= 4) await pending.waiting;
+    await new Promise(resolve => setTimeout(resolve, (10 - index) * 15));
+    active--;
+    return { body: { question: `第 ${index} 条原创划线需要回忆什么？`, summary: null, cached: false } };
+  };
+  await boot(page);
+  const before = await snapshot(page);
+  await drafts(page);
+  try {
+    await page.getByRole('button', { name: aiAction, exact: true }).tap();
+    await expect.poll(() => api.questionRequests.length).toBe(4);
+    expect(maximum).toBe(4);
+    pending.release();
+    await generated(page, 9);
+    expect(maximum).toBe(4);
+    for (let index = 1; index <= 9; index++) await expect(prompt(page, index)).toHaveValue(`第 ${index} 条原创划线需要回忆什么？`);
+    expect(await snapshot(page)).toEqual(before);
+    await originals(page, [api.books[0]]);
+  } finally { pending.release(); }
+});
 test('一次 AI 操作生成全部21条，重试不重复请求且原文和手动导入边界保持', async ({ page, api }) => {
   api.books = booksFixture(21);
   await boot(page);
