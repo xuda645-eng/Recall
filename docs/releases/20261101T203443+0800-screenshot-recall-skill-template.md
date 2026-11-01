@@ -10,7 +10,7 @@
 - Scope: private-local Skill implementation and installation, a new user-owned
   blank Lark template, and this sanitized documentation record/index.
 - Status: implementation validated and installed, template created and fetched
-  back; documentation publication pending.
+  back; documentation record normally pushed, evidence follow-up prepared.
 - No Recall product code, application data, schema, cloud API, authentication,
   origin, paid infrastructure or deployed bundle changed.
 
@@ -49,6 +49,12 @@ its local project mirror is `skills/lark-yellow-to-recall/`. Installation change
 only task-related files and preserved the previous installation in an independent
 temporary backup. The template URL is delivered only in the user chat.
 
+Installed artifact SHA256 at `2026-11-01T20:37:38+08:00`:
+
+- `SKILL.md`: `59104617613f7e1996d51523c2dcda67c2f3c597a2500e9cab96f82f8bbbe85e`.
+- `scripts/recall_batch.py`:
+  `830c957679fd9f57201afb58caca8b872e10f45c735288f970ec9eb026cbfee4`.
+
 Baseline repository main was `aa3ac69cb4ed60e4154d2e6079aedca5299f3870`.
 After checking a clean worktree and remote commits, normal fetch/fast-forward
 updated it to `1dc2c66960c9e78d531f39043be1cf263db3574b` before editing. No reset,
@@ -80,6 +86,15 @@ force push, new branch, stash or unrelated worktree modification occurred.
   full fetch verified one table, four rows, three cells per row and no images.
 - Install equality, local reference links, UI metadata, template source/remote
   structure, document links and whitespace checks are repeated before publication.
+- Installed-package verification followed the captured
+  `2026-11-01T20:36:26+08:00` clock: all 50 tests passed again with bytecode writes
+  disabled; Skill structure passed; all 10 source/installed files matched.
+  `/tmp/recall-screenshot-skill-check-20261101.py` verified local reference links,
+  metadata, punctuation and both 3x4 templates, plus release-index/record links.
+  `git diff --check` and staged diff checks passed.
+- At `2026-11-01T20:37:38+08:00`, removed only the task-generated Lark draft
+  workspace after successful creation/fetch. The live template, temporary
+  read-only verification evidence and previous Skill backup were retained.
 - Windows Obsidian vault and Graphify are unavailable on this Mac. State the
   limitation and route through the project handoff/map plus targeted inspection.
   No product code was edited, so no graph update is possible or needed here.
@@ -90,8 +105,14 @@ force push, new branch, stash or unrelated worktree modification occurred.
 
 ## Publication And Compatible Recovery
 
-- Documentation source SHA/push result: pending; append observed outcomes after
-  publication in the required documentation-only follow-up.
+- Documentation source:
+  `9064ee27feb56250c803b30bef6435582bc50245`. At the captured
+  `2026-11-01T20:37:14+08:00` clock, normal `git push origin HEAD:main` succeeded
+  (`1dc2c66..9064ee2`). Independent `git ls-remote origin refs/heads/main`
+  matched the full record SHA. Only the sanitized record and index were staged.
+- Evidence follow-up: documentation-only update to this record/index; final
+  SHA and observed push result are reported in chat without another recursive
+  self-describing commit. No app deployment follows this evidence update.
 - App deployment: not applicable; keep `https://recall-memory.pages.dev/` and
   its existing bundle unchanged.
 - Previous production evidence, not revalidated by this task:
