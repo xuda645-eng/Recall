@@ -2,8 +2,9 @@
 
 - Record: `20261101T090121+0800-status-edge-device-probe`.
 - Scope: isolated synthetic prototype, tests and evidence corrections only.
-- Status: local validation passed; preview publication pending. No production
-  fix or physical acceptance is claimed.
+- Status: r2 isolated preview published; local checks passed, public verification
+  has network-related limits recorded below. No production fix or physical
+  acceptance is claimed.
 - Start: 2026-11-01T08:56:52+08:00; local validation completed approximately
   2026-11-01T09:02:00+08:00.
 - Source base: `9a7608c625fb07772526e6c34accba0002e161f0`, user-owned
@@ -125,3 +126,48 @@ Commands ran with the existing dependency symlink, without package installation:
 - Windows Obsidian paths and Graphify were unavailable on this Mac at bootstrap;
   targeted source inspection used the provided map and existing task evidence.
   Graph refresh remains unavailable; no vault or generated graph was modified.
+
+## Revised Preview Delivery
+
+- At approximately 2026-11-01T09:10:00+08:00, r2 source
+  `467ae942e91da4e2d298e065d148e782eac847c6` was committed and pushed normally
+  to main. Syntax, focused lint and diff checks passed; the local redirected-
+  document browser suite again passed 15 checks with one explicit WebKit
+  offline skip. No production sources changed after the earlier full app checks.
+- Exported the committed static files and repeated the same preview deployment
+  command with `--commit-hash 467ae942e91da4e2d298e065d148e782eac847c6`.
+  Deployment ID: `3d883c6b-476d-4df5-99ed-ad22c476469a`.
+- Phone handoff: `https://3d883c6b.recall-memory.pages.dev/`.
+  Alias: `https://ios27-edge-20261101.recall-memory.pages.dev/`.
+  The first URL identifies these exact r2 bytes and should be used for device
+  comparison. Its predecessor `6833e2a0` is not recommended for testing.
+- The in-app browser visibly loaded the r2 comparison title, A/B/C choices and
+  browser-mode warning. This is only a desktop viewing check, not installed
+  iPhone acceptance. The tab is retained for the user.
+- Pages CLI reconfirmed production remains `2ac571d2`, source `a319c3b`.
+  No production deployment or data operation occurred.
+- Nine of ten downloadable r2 static resources matched committed bytes through
+  curl. The remaining `icon-192.png` request repeatedly hit TLS-connect timeouts
+  (including a bounded retry and a single-resource recovery). Its committed
+  bytes are unchanged from r1, where the public byte comparison passed; an
+  r2 direct byte comparison is not claimed. Browser SW readiness checks require
+  the icon in the static asset cache, but do not replace a byte comparison.
+- `/api/state` returned HTTP 404 and matched the static error page. A helper
+  verification loop also attempted Wrangler's generated local `.wrangler`
+  directory and received HTTP 404; that directory is not a published asset.
+  The reviewed deployment output contains ten files plus `_headers`.
+- Native blur and physical PWA behavior remain the next blocking evidence for
+  any production fix. This is an online diagnostic handoff, not a finished fix
+  or a claim that the website can turn off iOS's native visual effect.
+- r2 public suite: same launcher/config/engine variables with
+  `STATUS_EDGE_URL=https://3d883c6b.recall-memory.pages.dev/`: 14 passed, one
+  Chromium B first-frame check timed out at navigation before assertions, one
+  explicit WebKit offline skip. The Chromium canonical-document and offline
+  A/B/C navigation checks passed, confirming the hosting correction for this
+  tested browser. One bounded retry using `--project iphone15-chromium --grep
+  'b: first animation' --workers=1` passed (17.9s suite duration).
+  Thus 15 public checks passed across attempts, not one clean initial run.
+- Final evidence follow-up is documentation-only (this section, release index,
+  phone URL). It does not trigger a third preview or any production release.
+  Remaining scope: user's physical iPhone comparison, actual installation and
+  native insets/blur/offline cold launch; r2 icon-192 direct byte check as noted.

@@ -7,8 +7,8 @@ safe-area sampling attempt therefore failed physical acceptance.
 
 ## Phone Check
 
-Use the HTTPS preview URL recorded in
-[the task record](../../docs/releases/20261101T090121+0800-status-edge-device-probe.md).
+Use [the r2 HTTPS preview](https://3d883c6b.recall-memory.pages.dev/), with
+validation limits in [the task record](../../docs/releases/20261101T090121+0800-status-edge-device-probe.md).
 Add this page separately to the home screen as **Recall 顶部对照**, identified by
 an amber T icon. Do not delete, reinstall or clear data for the real Recall app.
 Launch the test icon and confirm the page reports home-screen PWA mode.
