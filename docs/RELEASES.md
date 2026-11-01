@@ -98,6 +98,7 @@ retroactively marked verified just because a deployment still exists.
 
 | Release | Scope | Result | Record |
 |---|---|---|---|
+| `20261101T134408+0800-weread-daily-300` | Daily AI attempts 100 to 300 / shared server-client budget / boundary tests | Local checks passed after documented mobile measurement retry; publication pending | [WeRead daily budget 300](./releases/20261101T134408+0800-weread-daily-300.md) |
 | `20261101T133526+0800-installed-context-variants` | A/B/C comparison inside original PWA / native blur reproduction | 1393 unit/68 mobile checks passed; publication and native variant results pending; real app header unchanged | [Original-context variant comparison](./releases/20261101T133526+0800-installed-context-variants.md) |
 | `20261101T111411+0800-installed-context-diagnostics` | Original-PWA read-only display report / same-origin static comparison | `08c6e46` deployed as `e31a1318`, version `1114`; 1385 unit/66 mobile checks and public checks passed after recorded retries; original-iPhone static page also blurred | [Original installed-context diagnostics](./releases/20261101T111411+0800-installed-context-diagnostics.md) |
 | `20261101T104013+0800-full-shell-device-probe` | Actual-source D/E shell probe / physical evidence | `cb055bf` preview `898bd7f7`; user confirms D/E both clear in installed PWA, production symptom not reproduced; no production fix claimed | [Full shell device comparison](./releases/20261101T104013+0800-full-shell-device-probe.md) |

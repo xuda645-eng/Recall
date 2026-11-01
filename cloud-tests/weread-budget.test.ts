@@ -31,7 +31,7 @@ describe('private WeRead budget preflight', () => {
     const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
     expect((await api('weread/budget', {}, false)).status).toBe(401);
     expect((await api('weread/budget', {}, true, 'https://evil.test')).status).toBe(403);
-    expect(await (await api('weread/budget', {})).json()).toEqual({ remaining: 100 });
+    expect(await (await api('weread/budget', {})).json()).toEqual({ remaining: 300 });
     expect(fetcher).not.toHaveBeenCalled();
   });
   it('rejects arbitrary bodies and missing configured service', async () => {
@@ -39,9 +39,9 @@ describe('private WeRead budget preflight', () => {
     env.ARK_API_KEY = undefined;
     expect((await api('weread/budget', {})).status).toBe(503);
   });
-  it.each([0, 1, 37, 99, 100, 101, Number.MAX_SAFE_INTEGER])('returns a bounded integer remainder for %i attempts', async attempts => {
+  it.each([0, 1, 37, 99, 100, 101, 299, 300, 301, Number.MAX_SAFE_INTEGER])('returns a bounded integer remainder for %i attempts', async attempts => {
     seed(attempts);
-    expect(await (await api('weread/budget', {})).json()).toEqual({ remaining: Math.max(0, 100 - attempts) });
+    expect(await (await api('weread/budget', {})).json()).toEqual({ remaining: Math.max(0, 300 - attempts) });
   });
   it.each([-1, 0.5, 'bad-count', Number.MAX_SAFE_INTEGER + 1])('fails closed on invalid persisted count %j', async attempts => {
     seed(attempts);
@@ -60,8 +60,8 @@ describe('private WeRead budget preflight', () => {
     db.executedStatements.length = 0;
     const first = await api('weread/budget', {});
     const second = await api('weread/budget', {});
-    expect(await first.json()).toEqual({ remaining: 89 });
-    expect(await second.json()).toEqual({ remaining: 89 });
+    expect(await first.json()).toEqual({ remaining: 289 });
+    expect(await second.json()).toEqual({ remaining: 289 });
     expect(db.executedStatements).toEqual([]);
     expect(db.sqlite.prepare('SELECT * FROM import_request_limits ORDER BY space_id, bucket, window_start').all()).toEqual(before);
     expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_entities').get()).toEqual({ count: 0 });
@@ -71,13 +71,13 @@ describe('private WeRead budget preflight', () => {
     expect(first.headers.get('Access-Control-Allow-Origin')).toBeNull();
   });
   it('uses the same UTC window as the model limiter on rollover', async () => {
-    seed(100);
+    seed(300);
     vi.spyOn(Date, 'now').mockReturnValue(windowStart + day - 1);
     expect(await (await api('weread/budget', {})).json()).toEqual({ remaining: 0 });
     vi.spyOn(Date, 'now').mockReturnValue(windowStart + day);
-    expect(await (await api('weread/budget', {})).json()).toEqual({ remaining: 100 });
+    expect(await (await api('weread/budget', {})).json()).toEqual({ remaining: 300 });
     seed(2, undefined, undefined, windowStart + day);
-    expect(await (await api('weread/budget', {})).json()).toEqual({ remaining: 98 });
+    expect(await (await api('weread/budget', {})).json()).toEqual({ remaining: 298 });
   });
   it.each(['ARK_API_KEY', 'ARK_ENDPOINT_ID', 'ARK_BASE_URL'] as const)('does not report budget without %s', async key => {
     env[key] = undefined;

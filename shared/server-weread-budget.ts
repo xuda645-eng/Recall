@@ -1,7 +1,7 @@
 import { ApiError, isRecord, json, readJson } from './server';
 import type { ServerEnv } from './server';
 import type { AuthenticatedDevice } from './server-auth';
-import { arkResponsesUrl } from './weread-ai';
+import { AI_DAILY_MODEL_ATTEMPTS, arkResponsesUrl } from './weread-ai';
 
 export async function wereadBudget(request: Request, env: ServerEnv, auth: AuthenticatedDevice): Promise<Response> {
   const input = await readJson(request, 1024);
@@ -13,5 +13,5 @@ export async function wereadBudget(request: Request, env: ServerEnv, auth: Authe
     .bind(auth.session.spaceId, 'ai-model', start).first<{ attempts: unknown }>();
   const attempts = count === null ? 0 : count.attempts;
   if (typeof attempts !== 'number' || !Number.isSafeInteger(attempts) || attempts < 0) throw new ApiError(503, 'Service unavailable');
-  return json({ remaining: Math.max(0, 100 - attempts) });
+  return json({ remaining: Math.max(0, AI_DAILY_MODEL_ATTEMPTS - attempts) });
 }

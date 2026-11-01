@@ -171,12 +171,14 @@ describe('authenticated online WeRead and AI', () => {
     expect(value.books[0].highlights).toEqual([{ bookmarkId: 'mark-1', markText: original, chapterUid: '1', chapterTitle: '第一章' }]);
     expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_entities').get()).toEqual({ count: 0 });
   });
-  it('generates checked questions, caches exact content, never changes library', async () => {
+  it('generates the final allowed question, reuses its cache at the daily cap and never changes library', async () => {
+    db.sqlite.prepare('INSERT INTO import_request_limits VALUES (?, ?, ?, ?)').run('personal', 'ai-model', Math.floor(Date.now() / 86400000) * 86400000, 299);
     const fetcher = vi.fn().mockImplementation(() => Promise.resolve(Response.json(ai))); vi.stubGlobal('fetch', fetcher);
     const first = await (await api('weread/question', { markText: original, summary: false })).json();
     expect(first.cached).toBe(false);
     expect((await (await api('weread/question', { markText: original, summary: false })).json()).cached).toBe(true);
     expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(await (await api('weread/budget', {})).json()).toEqual({ remaining: 0 });
     const request = JSON.parse(fetcher.mock.calls[0][1].body);
     expect(request.store).toBe(false); expect(request.max_output_tokens).toBe(384);
     expect(JSON.parse(request.input).originalHighlight).toBe(original);
@@ -195,8 +197,20 @@ describe('authenticated online WeRead and AI', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('synthetic-ark', { status: 401 })));
     expect(await (await api('weread/question', { markText: original, summary: false })).text()).not.toContain('synthetic-ark');
   });
-  it('limits failed model calls to 100 daily and cannot use arbitrary upstream URLs', async () => {
-    db.sqlite.prepare('INSERT INTO import_request_limits VALUES (?, ?, ?, ?)').run('personal', 'ai-model', Math.floor(Date.now() / 86400000) * 86400000, 100);
+  it('allows the 300th model attempt, counts its failure and rejects the 301st', async () => {
+    db.sqlite.prepare('INSERT INTO import_request_limits VALUES (?, ?, ?, ?)').run('personal', 'ai-model', Math.floor(Date.now() / 86400000) * 86400000, 299);
+    const fetcher = vi.fn().mockResolvedValue(new Response('synthetic-model-failure', { status: 502 }));
+    vi.stubGlobal('fetch', fetcher);
+    expect(await (await api('weread/budget', {})).json()).toEqual({ remaining: 1 });
+    expect((await api('weread/question', { markText: original, summary: false })).status).toBe(502);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(await (await api('weread/budget', {})).json()).toEqual({ remaining: 0 });
+    expect((await api('weread/question', { markText: original, summary: false })).status).toBe(429);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(db.sqlite.prepare("SELECT attempts FROM import_request_limits WHERE space_id = 'personal' AND bucket = 'ai-model'").get()).toEqual({ attempts: 300 });
+  });
+  it('caps model calls at 300 daily and cannot use arbitrary upstream URLs', async () => {
+    db.sqlite.prepare('INSERT INTO import_request_limits VALUES (?, ?, ?, ?)').run('personal', 'ai-model', Math.floor(Date.now() / 86400000) * 86400000, 300);
     const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
     expect((await api('weread/question', { markText: original, summary: false })).status).toBe(429);
     env.ARK_BASE_URL = 'https://evil.test/api/v3';

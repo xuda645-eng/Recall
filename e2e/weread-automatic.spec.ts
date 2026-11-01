@@ -6,7 +6,7 @@ const original = ['  原创划线一。\n\n说明观点与条件。  ', '原创�
 const questions = ['第一条原创材料提出了什么观点和条件？', '第二条原创材料需要回忆哪个条件？'];
 const seed = () => ({ ...createSeedSnapshot(), cards: [], decks: [], reviewLogs: [], studySessions: [], settings: { ...createSeedSnapshot().settings, onboardingComplete: true } });
 async function snapshot(page: Page) { return page.evaluate(() => JSON.parse(localStorage.getItem('recall.snapshot.v1') || 'null')); }
-async function setup(page: Page, count = 2, fail = false, budget = 100) {
+async function setup(page: Page, count = 2, fail = false, budget = 300) {
   const calls: string[] = [];
   let failed = false;
   const marks = Array.from({ length: count }, (_, index) => ({ bookmarkId: `mark-${index}`, markText: original[index] || `原创第 ${index} 条划线。`, chapterUid: '1', chapterTitle: '原创章节' }));

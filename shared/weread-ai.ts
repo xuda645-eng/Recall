@@ -1,4 +1,5 @@
 export const QUESTION_VERSION = 'weread-question-v1';
+export const AI_DAILY_MODEL_ATTEMPTS = 300;
 export const AI_MAX_CHARS = 6000;
 export const AI_MAX_OUTPUT_TOKENS = 384;
 export const questionSchema = {

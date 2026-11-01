@@ -1,7 +1,7 @@
 import { ApiError, isRecord, json, readJson, sha256 } from './server';
 import type { ServerEnv } from './server';
 import type { AuthenticatedDevice } from './server-auth';
-import { AI_MAX_CHARS, QUESTION_VERSION, arkResponsesUrl, parseQuestionResponse, questionRequest, validateQuestion } from './weread-ai';
+import { AI_DAILY_MODEL_ATTEMPTS, AI_MAX_CHARS, QUESTION_VERSION, arkResponsesUrl, parseQuestionResponse, questionRequest, validateQuestion } from './weread-ai';
 
 async function limit(env: ServerEnv, space: string, bucket: string, maximum: number, duration: number): Promise<void> {
   const now = Date.now(), window = Math.floor(now / duration) * duration;
@@ -143,7 +143,7 @@ export async function wereadQuestion(request: Request, env: ServerEnv, auth: Aut
   if (old) {
     try { return json({ ...validateQuestion(JSON.parse(old.value_json), input.summary), cached: true }); } catch { /* Regenerate invalid cached output. */ }
   }
-  await limit(env, space, 'ai-model', 100, 86400000);
+  await limit(env, space, 'ai-model', AI_DAILY_MODEL_ATTEMPTS, 86400000);
   const response = await upstream(url, env.ARK_API_KEY, questionRequest(env.ARK_ENDPOINT_ID, input.markText, input.summary));
   let result: { question: string; summary: string | null };
   try { result = parseQuestionResponse(response, input.summary); } catch { throw new ApiError(502, 'AI 输出未通过检查，请重试或手动出题'); }

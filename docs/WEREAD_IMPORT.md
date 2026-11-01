@@ -138,11 +138,15 @@ and a seven-day question cache, separate from cards/sync entities.
 - Each AI request accepts 1-6000 characters and caps output at 384 tokens.
 - The UI sends serial requests, at most 20 per action; stop prevents future
   calls but an already started upstream call may still finish and be charged.
-- All devices in the personal space share a hard 100-model-attempt UTC-day
+- All devices in the personal space share a hard 300-model-attempt UTC-day
   budget (failures count), plus 120 AI requests/hour including cache hits.
   The UI reads remaining budget before sending originals. This is conservative
   and not a reservation: other devices can consume budget meanwhile, and cached
   questions may not require model attempts. The server cap remains authoritative.
+  This is an application cost/usage safeguard, not a provider's model limit.
+  The owner approved increasing it from 100 to 300 on 2026-11-01. Existing
+  attempts remain counted; the change does not reset usage, make calls free or
+  automatically run additional generation. UTC midnight is 08:00 in China.
 - WeRead read requests share 120/hour; online imports cap five books and 1000
   highlights per batch, with strict 5MiB validation.
 - No automatic whole-book sync, paid infrastructure, external knowledge or

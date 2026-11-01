@@ -1,4 +1,5 @@
 import { validateWereadJob, type WereadJob } from '@/lib/weread-job';
+import { AI_DAILY_MODEL_ATTEMPTS } from '../../shared/weread-ai';
 
 let connection: Promise<IDBDatabase> | undefined;
 function database(): Promise<IDBDatabase> {
@@ -48,6 +49,6 @@ export async function checkWereadBudget(required: number, signal: AbortSignal): 
   const response = await fetch('/api/weread/budget', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}', signal });
   if (!response.ok) throw new Error(response.status === 401 ? '请先授权当前设备，再生成问题' : 'AI 额度暂时无法检查，请稍后重试；尚未发送原文');
   const value = await response.json();
-  if (!Number.isSafeInteger(value.remaining) || value.remaining < 0 || value.remaining > 100) throw new Error('AI 额度响应无效，尚未发送原文');
+  if (!Number.isSafeInteger(value.remaining) || value.remaining < 0 || value.remaining > AI_DAILY_MODEL_ATTEMPTS) throw new Error('AI 额度响应无效，尚未发送原文');
   if (required > value.remaining) throw new Error(`今日最多还可尝试 ${value.remaining} 个问题，请缩小范围或明天继续；尚未发送原文`);
 }
