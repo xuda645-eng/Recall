@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { RecallStateSnapshot } from "@/types";
 import { buildExportPayload, mergeImportPayload, parseImportPayload } from "./import-export";
+import { applyWereadImport, buildWereadDrafts, isWereadHighlightImported, planWereadImport } from '@/lib/memory-weread';
+import { buildMergedWereadDraft } from '@/lib/memory-weread-merge';
 
 const snapshot: RecallStateSnapshot = {
   decks: [
@@ -67,6 +69,29 @@ const snapshot: RecallStateSnapshot = {
 };
 
 describe("import/export", () => {
+  it('round-trips ordered grouped originals, IDs and archived progress without allowing singleton reimport', async () => {
+    const empty = { ...snapshot, cards: [], decks: [], studySessions: [], reviewLogs: [] };
+    const book = { bookId: 'roundtrip-book', title: 'Original roundtrip book' };
+    const members = [
+      { bookmarkId: 'first', markText: ' First original.\r\n ', chapterUid: 'chapter', chapterIdx: 1, range: '10-40' },
+      { bookmarkId: 'second', markText: '\tSecond original.\r\n ', chapterUid: 'chapter', chapterIdx: 1, range: '50-80' },
+    ];
+    const draft = await buildMergedWereadDraft(empty, book, members, 'How do these originals relate?');
+    const imported = applyWereadImport(empty, planWereadImport(empty, [draft]), new Set()).snapshot;
+    imported.cards[0] = { ...imported.cards[0], state: 'review', reps: 9, stability: 12, archivedAt: '2026-11-02T00:00:00Z' };
+    imported.reviewLogs = [{ id: 'group-review', cardId: imported.cards[0].id, rating: 'good', reviewDate: '2026-11-02T00:00:00Z', stability: 12, difficulty: 4, elapsedDays: 3, scheduledDays: 12 }];
+    imported.studySessions = [{ id: 'group-session', deckId: imported.decks[0].id, startedAt: '2026-11-02T00:00:00Z', endedAt: '2026-11-02T00:01:00Z', cardsStudied: 1 }];
+    const parsed = parseImportPayload(JSON.stringify(buildExportPayload(imported)));
+    const restored = mergeImportPayload(empty, parsed);
+    expect(restored.cards).toEqual(imported.cards);
+    expect(restored.reviewLogs).toEqual(imported.reviewLogs);
+    expect(restored.cards[0].back).toBe(members.map(member => member.markText).join('\n\n'));
+    expect(restored.cards[0].sourceRef?.highlights).toEqual(members);
+    for (const member of members) expect(isWereadHighlightImported(restored, book.bookId, member.bookmarkId)).toBe(true);
+    expect(buildWereadDrafts(restored, [{ ...book, highlights: members }], [book.bookId])).toEqual([]);
+    const repeated = await buildMergedWereadDraft(restored, book, members, 'Not a replacement question');
+    expect(applyWereadImport(restored, planWereadImport(restored, [repeated]), new Set())).toMatchObject({ added: 0, updated: 0, skipped: 1 });
+  });
   it("exports versioned recall data", () => {
     const payload = buildExportPayload(snapshot, new Date("2026-06-01T12:00:00.000Z"));
 

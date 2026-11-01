@@ -1,6 +1,7 @@
 import { cloudSettingKeys, entityKey } from './cloud';
 import type { CloudEntity, CloudMutation, EntityKind } from './cloud';
 import { ApiError, MAX_PAYLOAD_BYTES, isRecord, validId } from './server';
+import { MERGE_MAX_CHARS, MERGE_MAX_MEMBERS, validateMergeBatch, wereadRangeStart } from './weread-merge';
 
 const kinds: EntityKind[] = ['deck', 'card', 'reviewLog', 'studySession', 'setting'];
 const ratings = ['again', 'hard', 'good', 'easy'];
@@ -37,6 +38,22 @@ function number(value: unknown, minimum = 0, maximum = Number.MAX_SAFE_INTEGER, 
 function choice(value: unknown, allowed: string[]): string {
   if (typeof value !== 'string' || !allowed.includes(value)) invalid();
   return value;
+}
+
+function validateWereadMembers(source: Record<string, unknown>, back: unknown): void {
+  if (!Array.isArray(source.highlights) || !source.highlights.length || source.highlights.length > MERGE_MAX_MEMBERS) invalid();
+  const members = source.highlights.map(value => record(value, ['bookmarkId', 'markText', 'chapterUid', 'chapterIdx', 'range']));
+  const head = members[0];
+  if (head.bookmarkId !== source.bookmarkId || head.chapterUid !== source.chapterUid
+    || (source.chapterIdx !== undefined && source.chapterIdx !== head.chapterIdx) || (source.range !== undefined && source.range !== head.range)
+    || members.some(member => member.chapterUid !== source.chapterUid || member.chapterIdx !== head.chapterIdx)) invalid();
+  try {
+    const batch = validateMergeBatch({ bookId: source.bookId, chapterUid: source.chapterUid, chapterIdx: head.chapterIdx,
+      highlights: members.map(member => ({ id: member.bookmarkId, markText: member.markText, range: member.range })),
+    });
+    const original = batch.highlights.map(highlight => highlight.markText).join('\n\n');
+    if (original !== back || original.length > MERGE_MAX_CHARS) invalid();
+  } catch { invalid(); }
 }
 
 function date(value: unknown, nullable = false): void {
@@ -144,11 +161,14 @@ export function validateEntity(entity: Pick<CloudEntity, 'kind' | 'id' | 'value'
         if (Object.hasOwn(value, key)) text(value[key], 20_000);
       }
       if (Object.hasOwn(value, 'sourceRef')) {
-        const source = record(value.sourceRef, ['provider', 'bookId', 'bookmarkId'], ['chapterUid']);
+        const source = record(value.sourceRef, ['provider', 'bookId', 'bookmarkId'], ['chapterUid', 'chapterIdx', 'range', 'highlights']);
         choice(source.provider, ['weread']);
         text(source.bookId, 256, true);
         text(source.bookmarkId, 256, true);
         if (Object.hasOwn(source, 'chapterUid')) text(source.chapterUid, 256, true);
+        if (Object.hasOwn(source, 'chapterIdx')) number(source.chapterIdx, 0, Number.MAX_SAFE_INTEGER, true);
+        if (Object.hasOwn(source, 'range') && wereadRangeStart(source.range) === null) invalid();
+        if (Object.hasOwn(source, 'highlights')) validateWereadMembers(source, value.back);
       }
       schedule(value);
       for (const key of ['reps', 'lapses', 'learningSteps']) number(value[key], 0, Number.MAX_SAFE_INTEGER, true);

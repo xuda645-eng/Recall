@@ -8,6 +8,8 @@ import { checkWereadBudget } from '@/services/weread-job-storage';
 import { AI_DAILY_MODEL_ATTEMPTS } from '../../shared/weread-ai';
 import './memory-weread-import.css';
 import { MemoryWereadOnlineImport } from './memory-weread-online-import';
+import { MemoryWereadMergeImport } from './memory-weread-merge-import';
+import { createMergeSession } from '@/lib/weread-merge-session';
 
 export interface MemoryWereadImportProps {
   onClose: () => void;
@@ -61,6 +63,7 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy }: Memory
   const [aiSummary, setAiSummary] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState('');
+  const [merging, setMerging] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const generation = useRef(0), mounted = useRef(true), lock = useRef(false), completed = useRef(false);
   const busy = useRef(false), busyCallback = useRef(onBusy);
@@ -247,6 +250,11 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy }: Memory
     : '可在线连接真实微信读书笔记本，或载入本地文件。AI 逐条生成问题，划线原文始终作为答案。密钥仅在服务端，必须先授权当前设备。';
   const statusLabel = (status: 'new' | 'change' | 'duplicate') => status === 'new' ? t('memory.weread.newCard', '新增卡片') : status === 'change' ? t('memory.weread.changedCard', '有变化，默认保留已有内容') : t('memory.weread.duplicateCard', '重复，保留已有卡片');
   const kindLabel = (kind: WereadKind) => kind === 'qa' ? t('memory.weread.questionKind', '问题 + 原文') : kind === 'task' ? t('memory.weread.taskKind', '回忆任务 + 原文') : t('memory.weread.excerptKind', '保留摘录，不强行出题');
+  let mergeError = '';
+  if (stage === 'drafts') {
+    try { createMergeSession(useRecallStore.getState(), drafts); } catch (value) { mergeError = message(value); }
+  }
+  if (merging) return <MemoryWereadMergeImport drafts={drafts} onClose={() => setMerging(false)} onComplete={onComplete} onBusy={reportBusy}/>;
 
   return <section aria-label={t('memory.weread.importTitle', '微信读书 Skill 导出导入')} aria-busy={loading || pending}>
     <header className="m-weread-heading">
@@ -285,6 +293,7 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy }: Memory
       </>}
       {stage === 'drafts' && <>
         <p className="m-source-notice">每条划线生成一个问题；已有问题和手动编辑保留。AI 可能出错，请核对；默认回忆任务不是 AI 输出。停止或失败时保留已生成草稿，不自动导入。</p>
+        {!demo && <div className="wr-merge-choice"><strong>也可以按关联合并新划线</strong><p>需要 chapterIdx 与 range 定位信息。先分组预览，再确认导入；不会重组旧卡片。</p><button className="m-secondary" disabled={generating || !!mergeError} onClick={() => setMerging(true)}>智能合并划线</button>{mergeError && <small>{mergeError}。仍可逐条导入。</small>}</div>}
         {!demo && <div className="m-panel">
           <label><input type="checkbox" disabled={generating} checked={aiSummary} onChange={event => setAiSummary(event.target.checked)}/>同时生成辅助摘要（不是原文答案）</label>
           <button type="button" disabled={generating} onClick={() => void generate()}>AI 生成所选问题</button>

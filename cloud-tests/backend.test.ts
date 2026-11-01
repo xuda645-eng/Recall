@@ -23,6 +23,14 @@ function card(id = 'card-1', deckId = 'deck-1') {
   };
 }
 
+function mergedCard(count = 2) {
+  const id = `weread-group:${'a'.repeat(64)}`;
+  const highlights = Array.from({ length: count }, (_, index) => ({ bookmarkId: `mark-${index + 1}`,
+    markText: `  Original observation ${index + 1}.\nKeep whitespace.  `, chapterUid: 'chapter-1', chapterIdx: 0, range: `${index * 10}-100` }));
+  return { ...card(id), contentKind: 'qa', recallKind: 'question', back: highlights.map(highlight => highlight.markText).join('\n\n'),
+    sourceRef: { provider: 'weread', bookId: 'book-1', bookmarkId: 'mark-1', chapterUid: 'chapter-1', highlights } };
+}
+
 function change(kind: CloudChange['kind'], id: string, value: unknown, expectedRevision = 0): CloudChange {
   return { kind, id, value, expectedRevision };
 }
@@ -563,6 +571,80 @@ describe('Recall Pages auth and D1 sync', () => {
       change('card', 'card-1', { ...card(), sourceRef: { provider: 'weread', bookId: 'book', bookmarkId: 'mark', cookie: 'secret' } }),
     ]) expect((await sync(owner.cookie, mutation([entry], 1))).status).toBe(400);
     expect(db.sqlite.prepare('SELECT revision FROM spaces').get()).toMatchObject({ revision: 1 });
+  });
+
+  it.each([1, 2, 4])('syncs and reopens %i exact ordered WeRead sources with a compact group card ID', async count => {
+    const owner = await paired();
+    const value = mergedCard(count);
+    expect(value.id.length).toBeLessThanOrEqual(128);
+    expect((await sync(owner.cookie, mutation([change('deck', 'deck-1', deck()), change('card', value.id, value)]))).status).toBe(200);
+    const saved = await (await api('/api/sync', { cookie: owner.cookie })).json() as CloudState;
+    expect(saved.entities.find(entity => entity.kind === 'card')?.value).toEqual(value);
+    expect(db.sqlite.prepare('SELECT revision FROM spaces').get()).toMatchObject({ revision: 1 });
+  });
+
+  it('accepts ascending starts without interpreting the second range component or rewriting originals', () => {
+    const value = mergedCard();
+    value.sourceRef.highlights[0].range = '0002-9999';
+    value.sourceRef.highlights[1].range = '10-0';
+    const original = structuredClone(value);
+    expect(() => validateEntity({ kind: 'card', id: value.id, value })).not.toThrow();
+    expect(value).toEqual(original);
+  });
+
+  it.each([null, [], {}, [null], mergedCard(5).sourceRef.highlights].map(highlights => ({ highlights })))('rejects empty, malformed or oversized grouped provenance: %j', async ({ highlights }) => {
+    const owner = await paired();
+    const value = mergedCard();
+    expect((await sync(owner.cookie, mutation([change('deck', 'deck-1', deck()),
+      change('card', value.id, { ...value, sourceRef: { ...value.sourceRef, highlights } })]))).status).toBe(400);
+    expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_entities').get()).toEqual({ count: 0 });
+    expect(db.sqlite.prepare('SELECT revision FROM spaces').get()).toMatchObject({ revision: 0 });
+  });
+
+  it.each(['first-id', 'source-chapter', 'member-chapter', 'chapter-index', 'duplicate', 'reorder', 'equal-start',
+    'range', 'missing-field', 'extra-field', 'credential', 'unsafe-original', 'unsafe-id', 'long-id', 'negative-index',
+    'fractional-index', 'string-index', 'joined-back', 'trimmed-back', 'too-long',
+  ])('rejects inconsistent grouped provenance (%s) before any library or receipt changes', async fault => {
+    const owner = await paired();
+    const value = mergedCard();
+    const source = value.sourceRef, first = source.highlights[0], second = source.highlights[1];
+    if (fault === 'first-id') source.bookmarkId = 'another-mark';
+    if (fault === 'source-chapter') source.chapterUid = 'another-chapter';
+    if (fault === 'member-chapter') second.chapterUid = 'another-chapter';
+    if (fault === 'chapter-index') second.chapterIdx = 1;
+    if (fault === 'duplicate') second.bookmarkId = first.bookmarkId;
+    if (fault === 'reorder') source.highlights.reverse();
+    if (fault === 'equal-start') second.range = '0000-1';
+    if (fault === 'range') second.range = '1-9007199254740992';
+    if (fault === 'missing-field') delete (second as Partial<typeof second>).range;
+    if (fault === 'extra-field') Object.assign(second, { answer: 'not allowed' });
+    if (fault === 'credential') Object.assign(second, { cookie: 'synthetic-only' });
+    if (fault === 'unsafe-original') second.markText = 'java\nscript:run';
+    if (fault === 'unsafe-id') second.bookmarkId = 'mark\n2';
+    if (fault === 'long-id') second.bookmarkId = 'x'.repeat(201);
+    if (fault === 'negative-index') first.chapterIdx = second.chapterIdx = -1;
+    if (fault === 'fractional-index') first.chapterIdx = second.chapterIdx = 0.5;
+    if (fault === 'string-index') Object.assign(first, { chapterIdx: '0' });
+    if (fault === 'too-long') first.markText = second.markText = 'x'.repeat(3000);
+    value.back = source.highlights.map(highlight => highlight.markText).join('\n\n');
+    if (fault === 'joined-back') value.back = source.highlights.map(highlight => highlight.markText).join('\n');
+    if (fault === 'trimmed-back') value.back = value.back.trim();
+    expect((await sync(owner.cookie, mutation([change('deck', 'deck-1', deck()), change('card', value.id, value)]))).status).toBe(400);
+    expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_entities').get()).toEqual({ count: 0 });
+    expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM mutation_receipts').get()).toEqual({ count: 0 });
+    expect(db.sqlite.prepare('SELECT revision FROM spaces').get()).toMatchObject({ revision: 0 });
+  });
+
+  it('preserves an already synced group and revision when its source or answer is tampered', async () => {
+    const owner = await paired();
+    const value = mergedCard();
+    expect((await sync(owner.cookie, mutation([change('deck', 'deck-1', deck()), change('card', value.id, value)]))).status).toBe(200);
+    const modified = structuredClone(value);
+    modified.sourceRef.highlights[1].markText += ' Changed original.';
+    expect((await sync(owner.cookie, mutation([change('card', value.id, modified, 1)], 1))).status).toBe(400);
+    const saved = await (await api('/api/sync', { cookie: owner.cookie })).json() as CloudState;
+    expect(saved.entities.find(entity => entity.kind === 'card')?.value).toEqual(value);
+    expect(saved.revision).toBe(1);
   });
 
   it.each([

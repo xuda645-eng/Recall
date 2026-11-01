@@ -32,6 +32,7 @@ export function planMemoryImport(s:RecallStateSnapshot,document:MarkdownDocument
 }
 export function applyMemoryImport(s:RecallStateSnapshot,plan:MarkdownPlan,updates:Set<string>):{snapshot:RecallStateSnapshot;text:string;added:number;updated:number;skipped:number} {
   if(snapshotFingerprint(s)!==plan.fingerprint)throw new Error('数据已变化，请重新校验后导入');
+  if(plan.rows.some(row=>row.existing?.sourceRef?.highlights&&row.status==='change'&&updates.has(row.entry.id)&&row.entry.back!==row.existing.back))throw new Error('合并划线原文不能由 Markdown 改写，请保留原文并只修改问题');
   const next={...s,decks:[...s.decks],cards:[...s.cards]},lines=plan.document.text.split('\n');let added=0,updated=0,skipped=0;
   for(const row of plan.rows){const e=row.entry;let card=row.existing;if(row.status==='new'||row.status==='change'&&updates.has(e.id)){let id=plan.parentId;for(const name of e.path){let d=next.decks.find(d=>(d.parentId??null)===id&&d.name===name);if(!d){d={id:createId('deck'),name,parentId:id,description:'',color:'slate',createdAt:plan.document.batchAt,updatedAt:plan.document.batchAt,importedAt:plan.document.batchAt};next.decks.push(d);}id=d.id;}
       const fields={deckId:id!,front:e.front,back:e.back,contentKind:e.kind,bookTitle:e.bookTitle,chapter:e.chapter,updatedAt:plan.document.batchAt,lastImportedAt:plan.document.batchAt};if(card){card={...card,...fields};next.cards=next.cards.map(c=>c.id===card!.id?card!:c);updated++;}else{card=newMemoryCard({...fields,id:e.id,importedAt:e.importedAt},plan.document.batchAt);next.cards.push(card);added++;}
