@@ -3,7 +3,8 @@
 - ID: `20261101T104013+0800-full-shell-device-probe`.
 - Start: 2026-11-01T10:40:13+08:00.
 - Scope: isolated prototype build, tests, evidence; production unchanged.
-- Status: local verification passed; preview publication pending.
+- Status: isolated full-shell preview published and browser checks passed;
+  native D/E comparison pending. Production unchanged.
 - Source base: `4ca87a39f9b7721f84de70ab750ffa1418843142`,
   `xuda645-eng/Recall` main. Work performed in clean existing isolated
   worktree; unrelated CWD/primary-worktree changes preserved.
@@ -93,3 +94,47 @@ or vault content changed. This was already disclosed in the preceding work.
   correct only its own preview. No production rollback is required because
   the production deployment is untouched. No proven blur-free production
   target exists, so do not roll back unrelated features speculatively.
+
+## Published Outcome
+
+- Approximately 2026-11-01T10:49+08:00: implementation
+  `cb055bf6977587ef91eee9e8403f5342bb7003e9` committed and pushed normally to
+  `xuda645-eng/Recall` main using existing authenticated HTTPS, with no force
+  push or dirty deployment. Task worktree clean after implementation commit.
+- Exact validated `dist/status-shell` copied to an isolated static directory.
+  A local SHA-256 inventory covers all 203 build files; no Functions/config,
+  credentials or private data included. Wrangler treated 201 as static uploads
+  plus `_headers` and routing metadata.
+- Command: `CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2
+  npx --yes wrangler@4.156.0 pages deploy . --project-name recall-memory
+  --branch ios27-shell-20261101 --commit-hash
+  cb055bf6977587ef91eee9e8403f5342bb7003e9` from the isolated directory.
+- Deployment: `898bd7f7-a0cf-467c-9dbb-8955ef505d02` (Preview only).
+  URL: `https://898bd7f7.recall-memory.pages.dev/`.
+  Alias: `https://ios27-shell-20261101.recall-memory.pages.dev/`.
+- 2026-11-01T10:51:00+08:00: production remains `2ac571d2`, source `a319c3b`.
+  Preview index matched local bytes; `/api/auth/session` returned HTTP 404
+  matching the static error page. No production source/hosting/data changed.
+- Public command: with the same engine paths and
+  `STATUS_SHELL_URL=https://898bd7f7.recall-memory.pages.dev/`, run
+  `node scripts/run-playwright.mjs --config
+  prototypes/status-shell/playwright.config.ts --workers=2`: five passed,
+  one explicit macOS WebKit offline skip, in 1.7 minutes. Both engines passed
+  D/E actual-shell layout and network-fence checks; Chromium passed full
+  Service Worker-controlled offline D/E navigation with synthetic local data.
+- In-app browser initially timed out navigating and then showed the loading
+  screen. A later read of the same tab confirmed the complete D/E panel,
+  synthetic cards, disabled cloud message and `1040` version. The tab was
+  retained for the user. No phone acceptance is inferred from it.
+- Direct public resource checks matched probe controls/data, manifest, both
+  icons, Service Worker, version file and three shell CSS files. Boot script
+  and reader CSS initially timed out in curl despite bounded retry; final
+  single-resource recovery is recorded below. Browser network-fence behavior
+  passed independently. No certificate checks were disabled.
+- This final record/README/index follow-up is documentation-only and does not
+  trigger another preview or production deployment. Physical result for D/E
+  remains outstanding; the production blur is not declared fixed.
+- Final single-resource curl recovery succeeded: both the network-fence boot
+  script and reader CSS matched local bytes. All 12 selected public resources
+  plus the HTML document are byte-verified. Full 203-file public hashing was
+  not performed; Workbox-controlled offline shell checks passed separately.

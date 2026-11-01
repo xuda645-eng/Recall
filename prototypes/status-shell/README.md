@@ -25,7 +25,8 @@ an existing snapshot. Production-origin execution is rejected by a guard.
 
 ## Interpretation And Phone Handoff
 
-The current HTTPS URL is in the [task record](../../docs/releases/20261101T104013+0800-full-shell-device-probe.md).
+Open the [full-shell HTTPS preview](https://898bd7f7.recall-memory.pages.dev/).
+Validation details are in the [task record](../../docs/releases/20261101T104013+0800-full-shell-device-probe.md).
 Install separately as **Recall 完整壳对照**, without removing or reinstalling
 Recall. First check D, then E only if D is blurred. Verify the mode label says
 home-screen PWA. Check initial appearance, scroll and drawer open/close.
