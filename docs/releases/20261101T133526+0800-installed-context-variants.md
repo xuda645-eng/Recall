@@ -8,7 +8,8 @@
 - Fixed build version: `1.0-20261101-1335`.
 - Scope: static read-only diagnostic page, its precache query matching, tests
   and physical-result documentation. Real app header/styles/data unchanged.
-- Status: local validation passed; commit/push/publication pending.
+- Status: committed, pushed and deployed; public resource and live browser
+  checks passed. Native variant results remain pending.
 
 ## Evidence And Purpose
 
@@ -89,11 +90,54 @@ clear. Native results for these new original-context variants remain pending.
 
 ## Publication And Recovery
 
-Commit/push/deployment SHA/ID/URLs and public verification pending. Reuse
-`recall-memory`, existing account `751b9fca4f5173fd70e0dfb69cff81e2`, main
-and <https://recall-memory.pages.dev/>. No authenticated production tests.
+- Source SHA: `51421fc7676e66af04d4aff01c8ebe7c306eaab2`. Normal
+  `git push origin HEAD:main` advanced `6a77341` to `51421fc`;
+  `git ls-remote origin refs/heads/main` confirmed the full SHA.
+- At 2026-11-01T13:43:24+08:00, deployed the unchanged 200-file tested bundle
+  from the clean task worktree using:
+
+  ```sh
+  CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2 npx --yes wrangler@4.156.0 pages deploy dist --project-name recall-memory --branch main --commit-hash 51421fc7676e66af04d4aff01c8ebe7c306eaab2 --commit-message 'feat: compare header variants inside original installed PWA'
+  ```
+
+- Production deployment: `1279e5dc-511b-4b94-a57e-30ad662bcbfa`.
+  Stable origin: <https://recall-memory.pages.dev/>. Immutable deployment:
+  <https://1279e5dc.recall-memory.pages.dev/>. Production list verified source
+  `51421fc`, this ID and prior `e31a1318` at 2026-11-01T13:44:41+08:00.
+- Wrangler uploaded 30 changed assets, reused 168 and uploaded unchanged
+  Functions plus routing/headers. No dirty-source flag, force push, new
+  project, migration, binding, secret or authenticated production test.
+- At 2026-11-01T13:44:39+08:00, a single reusable serial HTTP/1.1 curl process
+  with 10-second connect and 30-second per-transfer limits checked **28 public
+  resources** against the local SHA-256 inventory. App HTML/entry chunks,
+  workspace JS/CSS, manifest/four icons, SW/Workbox, version and all four
+  diagnostic files matched. Anonymous `GET /api/session` returned 401.
+  Version response completed with HTTP 200, `Cache-Control: no-store` and
+  `1.0-20261101-1335`. No failed asset transfer or retry in this release.
+- Live Chromium/WebKit read-only check uses the guarded launcher, cached
+  paths, `RECALL_URL=https://recall-memory.pages.dev/` and
+  `node scripts/run-playwright.mjs --grep '原安装显示诊断公开只读入口'
+  --workers=1 --output=/tmp/recall-installed-variants-live-results`.
+  **Two passed**, no skips/retries, in 2.9 minutes (Chromium 1.7 minutes,
+  WebKit 1.1 minutes). Both establish SW control/cache readiness, report
+  display, online full-document A/B/C navigation and original-origin return.
+  Do not count native installed-iPhone acceptance or live offline/update
+  acceptance from these checks or local tests. No regression detected in
+  completed checks; no rollback performed.
 
 Compatible rollback target for a regression is the previous `e31a1318`
 deployment, after rechecking active production to avoid overwriting another
 release. It has the same data/schema/auth contracts, not a blur-free header.
 Use existing Pages rollback only; never reset D1 or device storage.
+
+## Device Handoff
+
+Update the original Recall normally to `1.0-20261101-1335`, then use the same
+**Logo menu > 设置与数据 > 顶部显示诊断 > 打开原安装内对照页** entry.
+A retains the reproduced baseline. Compare B and C on first open and after
+scrolling, and report which is clear with a screenshot showing the selected
+variant. No separate installation, authorization, real-card import or data
+clear is needed. Returning via **返回 Recall** preserves the original app.
+
+Publication evidence is committed/pushed separately as documentation only;
+it does not rebuild or redeploy the unchanged validated app bundle.
