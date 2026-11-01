@@ -117,9 +117,18 @@ DRM bypass and whole-book extraction were not attempted.
 
 ## Publication And Recovery
 
-Documentation commit/push are pending at record creation. Actual source identity,
-push outcome and completion time will be appended in a documentation-only
-follow-up. This does not trigger an app deployment.
+At `2026-11-01T14:28:09+08:00`, research commit
+`9e52ebcae47914c578064063adc2280c2231e84a` was pushed normally to `main`:
+`891af26..9e52ebc`. `git ls-remote origin refs/heads/main` verified that exact
+full SHA. The initial sandbox `git push origin main` failed with macOS Keychain
+error `-67674` and `could not read Username: Device not configured`; the same
+push succeeded through approved unsandboxed execution. No credential changes,
+force-push, app deployment or unrelated worktree edits occurred.
+
+This evidence is appended in a documentation-only follow-up commit, located by
+`git log --grep='record WeRead image research publication'`. Its normal push
+outcome and final completion time are reported to the user rather than starting
+an endless chain of self-recording commits. It does not trigger an app release.
 
 Current and previous app deployment for this task are both `d6bc9380`; this task
 does not change production bytes or data. A documentation correction uses a new
