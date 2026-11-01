@@ -19,15 +19,24 @@ describe('bounded persistent WeRead job', () => {
     job.drafts[0].question = '如何说明这条原创材料的结论？';
     expect(pendingQuestions(job).map(draft => draft.id)).toEqual([drafts[1].id]);
   });
-  it('requires a bounded twenty-question consent and keeps overlong excerpts unsent', () => {
+  it.each([21, 101, 300, 1000])('accepts all %i selected highlights without a twenty-question ceiling', count => {
+    const { snapshot, drafts } = fixture(count);
+    const job = createWereadJob(snapshot, drafts, new Set());
+    expect(pendingQuestions(job)).toHaveLength(count);
+    expect(validateWereadJob(JSON.parse(JSON.stringify(job)))).toEqual(job);
+    job.generated = drafts.slice(0, 21).map(draft => draft.id);
+    job.drafts = job.drafts.map((draft, index) => index < 21 ? { ...draft, kind: 'qa', question: '这个原创段落提出了什么具体观点？' } : draft);
+    expect(validateWereadJob(JSON.parse(JSON.stringify(job)))).toEqual(job);
+    expect(pendingQuestions(job)).toHaveLength(count - 21);
+  });
+  it('retains the existing import capacity and overlong-original guards', () => {
+    const oversized = fixture(1001);
+    expect(() => createWereadJob(oversized.snapshot, oversized.drafts, new Set())).toThrow('1000');
     const { snapshot, drafts } = fixture(21);
-    expect(() => createWereadJob(snapshot, drafts, new Set())).toThrow('20');
-    drafts[20].include = false;
-    expect(createWereadJob(snapshot, drafts, new Set()).drafts).toHaveLength(20);
     drafts[0].highlight.markText = '原'.repeat(6001);
     expect(() => createWereadJob(snapshot, drafts, new Set())).toThrow('6000');
     drafts[0].kind = 'excerpt'; drafts[0].question = '';
-    expect(pendingQuestions(createWereadJob(snapshot, drafts, new Set()))).toHaveLength(19);
+    expect(pendingQuestions(createWereadJob(snapshot, drafts, new Set()))).toHaveLength(20);
   });
   it('stored originals, kinds and identities are validated before reuse', () => {
     const { snapshot, drafts } = fixture();

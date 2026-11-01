@@ -19,6 +19,14 @@ describe('WeRead daily budget validation', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ remaining: 0 })));
     await expect(checkWereadBudget(1, new AbortController().signal)).rejects.toThrow('今日最多还可尝试 0');
   });
+  it.each([21, 101, 300])('accepts a %i-question scope when daily budget is sufficient', async count => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ remaining: 300 })));
+    await expect(checkWereadBudget(count, new AbortController().signal)).resolves.toBeUndefined();
+  });
+  it('rejects a large scope exceeding the remaining daily budget before sending originals', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ remaining: 100 })));
+    await expect(checkWereadBudget(101, new AbortController().signal)).rejects.toThrow('今日最多还可尝试 100');
+  });
   it('does not request a budget when no model attempts are needed', async () => {
     const fetcher = vi.fn();
     vi.stubGlobal('fetch', fetcher);

@@ -1,7 +1,6 @@
 import type { RecallStateSnapshot } from '@/types';
 import { buildWereadDrafts, parseWereadExport, planWereadImport, type WereadDraft, type WereadImportPlan } from './memory-weread';
 
-export const WEREAD_JOB_MAX_QUESTIONS = 20;
 export type WereadJobStatus = 'ready' | 'generating' | 'paused' | 'generation-failed' | 'importing' | 'import-failed' | 'done';
 export interface WereadJob {
   id: 'active';
@@ -32,7 +31,6 @@ export function createWereadJob(snapshot: RecallStateSnapshot, drafts: WereadDra
   const job: WereadJob = { id: 'active', version: 1, createdAt: new Date(now).toISOString(), expiresAt: now + 7 * 86400000,
     status: 'ready', drafts: plan.rows.map(row => ({ ...row.draft, existingId: row.existingId, originalUnchanged: row.status === 'duplicate' || row.draft.originalUnchanged })), generated: [], updates: [...updates],
     consent: Object.fromEntries(plan.rows.map(row => [row.draft.id, row.existing ? contentIdentity(row.existing) : null])), error: '' };
-  if (pendingQuestions(job).length > WEREAD_JOB_MAX_QUESTIONS) throw new Error('每次最多生成 20 个问题，请在“选择划线”中缩小范围');
   if (pendingQuestions(job).some(draft => draft.highlight.markText.length > 6000)) throw new Error('部分划线超过 AI 的 6000 字限制，请取消选择或改为手动整理');
   return job;
 }
@@ -78,8 +76,7 @@ export function validateWereadJob(value: unknown): WereadJob {
     try { parsed = JSON.parse(identity); } catch { throw new Error('任务确认记录无效'); }
     if (!Array.isArray(parsed) || typeof parsed[0] !== 'string' || typeof parsed[1] !== 'string') throw new Error('任务确认记录无效');
   }
-  if (job.generated.some(id => !job.drafts.some(draft => draft.id === id && draft.kind === 'qa' && draft.question.trim()))
-    || job.generated.length + pendingQuestions(job).length > WEREAD_JOB_MAX_QUESTIONS) throw new Error('任务问题范围无效');
+  if (job.generated.some(id => !job.drafts.some(draft => draft.id === id && draft.kind === 'qa' && draft.question.trim()))) throw new Error('任务问题范围无效');
   if (job.receipt && (!['added', 'updated', 'skipped'].every(key => Number.isSafeInteger(job.receipt![key as 'added']) && job.receipt![key as 'added'] >= 0)
     || !Array.isArray(job.receipt.deckIds) || job.receipt.deckIds.some(id => typeof id !== 'string'))) throw new Error('任务完成记录无效');
   return job;

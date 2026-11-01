@@ -6,6 +6,7 @@ import { generateWereadQuestion, loadOnlineBook, loadOnlineBooks, loadOnlineProg
 import { applyWereadImport, buildWereadDrafts, parseWereadExport, planWereadImport, type WereadDraft } from '@/lib/memory-weread';
 import { createWereadJob, jobUpdates, needsQuestion, pendingQuestions, safeJobPlan, type WereadJob } from '@/lib/weread-job';
 import { checkWereadBudget, discardWereadJob, loadWereadJob, saveWereadJob, withWereadJobLock } from '@/services/weread-job-storage';
+import { AI_DAILY_MODEL_ATTEMPTS } from '../../shared/weread-ai';
 import type { MemoryWereadImportProps } from './memory-weread-import';
 
 function Cover({ book }: { book: { title: string; cover?: string | null } }): JSX.Element {
@@ -227,10 +228,10 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal 
       <div className="wr-confirm-books">{confirmedBooks.map(book => <div key={book.bookId}><Cover book={book}/><span><strong>{book.title}</strong><small>{drafts.filter(draft => draft.book.bookId === book.bookId && draft.include).length} 条已选划线</small></span></div>)}</div>
       <div className="wr-confirm-count"><span>本次生成</span><strong>{questionCount}<small> 个问题</small></strong></div>
       {!!changes.length && <div className="wr-changes"><h2>{changes.length} 张已有卡片的原文发生变化</h2><p>默认保留已有内容；勾选后才更新，复习进度保留。</p>{changes.map(draft => <label key={draft.id}><input type="checkbox" checked={updates.has(draft.id)} onChange={event => setUpdates(old => { const next = new Set(old); if (event.target.checked) next.add(draft.id); else next.delete(draft.id); return next; })}/><span>{draft.book.title} · {draft.highlight.markText.slice(0, 60)}</span></label>)}</div>}
-      <p className="wr-consent">确认后，仅所选原文发送至火山 AI。全部生成成功后自动导入，原文不改写；已有相同划线保留。AI 可能出错，导入后可查看和编辑。</p>
-      <button className="m-secondary wr-more" aria-expanded={showHighlights} onClick={() => setShowHighlights(!showHighlights)}>选择划线 · 每次最多生成 20 个问题</button>
+      <p className="wr-consent">确认后，仅所选原文发送至火山 AI，依次生成全部问题。每日最多 {AI_DAILY_MODEL_ATTEMPTS} 次模型尝试，每小时最多 120 次请求；限流或失败保留进度。全部成功后自动导入，原文不改写；已有相同划线保留。AI 可能出错，导入后可查看和编辑。</p>
+      <button className="m-secondary wr-more" aria-expanded={showHighlights} onClick={() => setShowHighlights(!showHighlights)}>选择划线 · 默认全选</button>
       {showHighlights && <div className="wr-highlight-options">{drafts.map(draft => <label key={draft.id}><input type="checkbox" checked={draft.include} onChange={event => setDrafts(old => old.map(item => item.id === draft.id ? { ...item, include: event.target.checked } : item))}/><span><small>{draft.book.title} · {draft.highlight.chapterTitle}</small>{draft.highlight.markText}</span></label>)}</div>}
-      <div className="wr-dock"><button className="m-primary" disabled={busy || !included.length || questionCount > 20 || !!confirmationError} onClick={() => void confirm()}>生成并自动导入<ArrowRight size={17}/></button><button className="m-text" disabled={busy} onClick={() => { setStage('books'); setError(''); }}>再选一选</button></div>
+      <div className="wr-dock"><button className="m-primary" disabled={busy || !included.length || !!confirmationError} onClick={() => void confirm()}>生成并自动导入<ArrowRight size={17}/></button><button className="m-text" disabled={busy} onClick={() => { setStage('books'); setError(''); }}>再选一选</button></div>
     </> : job ? <>
       {done ? <><div className="wr-done-symbol"><Check size={30}/></div><header className="wr-heading wr-done-heading"><h1>让读过的，留得住。</h1><p>导入完成 · 原文已保留</p></header><div className="wr-receipt">{[[job.receipt?.added || 0, '新增卡片'], [job.receipt?.updated || 0, '更新卡片'], [job.receipt?.skipped || 0, '跳过已有']].map(([value, title]) => <div key={title}><strong>{value}</strong><span>{title}</span></div>)}</div></>
         : <><header className="wr-heading"><span className="wr-eyebrow">READING INTO MEMORY</span><h1>{job.status === 'import-failed' ? '问题已好，导入未完成' : paused ? '进度已为你保留' : job.status === 'importing' ? '正在放进你的卡组' : '正在把划线变成问题'}</h1><p>{paused ? '已完成的问题保留，继续时不重做。' : '一条划线，一个问题。原文始终保留。'}</p></header><div className="wr-job-summary"><div><span>问题生成进度</span><strong>{job.generated.length}<small> / {totalJob}</small></strong></div><Meter value={totalJob ? job.generated.length / totalJob * 100 : 100}/><p>01 生成问题 <span>02 自动导入</span></p></div></>}

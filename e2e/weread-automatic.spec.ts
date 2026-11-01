@@ -6,7 +6,7 @@ const original = ['  原创划线一。\n\n说明观点与条件。  ', '原创�
 const questions = ['第一条原创材料提出了什么观点和条件？', '第二条原创材料需要回忆哪个条件？'];
 const seed = () => ({ ...createSeedSnapshot(), cards: [], decks: [], reviewLogs: [], studySessions: [], settings: { ...createSeedSnapshot().settings, onboardingComplete: true } });
 async function snapshot(page: Page) { return page.evaluate(() => JSON.parse(localStorage.getItem('recall.snapshot.v1') || 'null')); }
-async function setup(page: Page, count = 2, fail = false, budget = 300) {
+async function setup(page: Page, count = 2, fail: boolean | number = false, budget = 300, delay = 200) {
   const calls: string[] = [];
   let failed = false;
   const marks = Array.from({ length: count }, (_, index) => ({ bookmarkId: `mark-${index}`, markText: original[index] || `原创第 ${index} 条划线。`, chapterUid: '1', chapterTitle: '原创章节' }));
@@ -26,8 +26,9 @@ async function setup(page: Page, count = 2, fail = false, budget = 300) {
     if (url.pathname === '/api/weread/question') {
       expect(body.summary).toBe(false);
       calls.push(body.markText);
-      if (fail && body.markText === original[1] && !failed) { failed = true; await route.fulfill({ status: 502, json: { error: 'synthetic-failure' } }); return; }
-      await new Promise(resolve => setTimeout(resolve, 200));
+      const failAt = fail === true ? 1 : typeof fail === 'number' ? fail : null;
+      if (failAt !== null && body.markText === marks[failAt].markText && !failed) { failed = true; await route.fulfill({ status: 502, json: { error: 'synthetic-failure' } }); return; }
+      if (delay) await new Promise(resolve => setTimeout(resolve, delay));
       await route.fulfill({ json: { question: questions[marks.findIndex(mark => mark.markText === body.markText)] || '这个原创段落提出了什么具体观点？', summary: null, cached: false } }); return;
     }
     throw new Error(`Unexpected API route ${url.pathname}`);
@@ -104,16 +105,81 @@ test('失败全批不导入，刷新保留已成功问题且不续跑，重试�
   expect(calls.filter(value => value === original[1])).toHaveLength(2);
   expect((await snapshot(page)).cards.map((card: { back: string }) => card.back)).toEqual(original);
 });
-test('超过20条需缩小划线范围，额度不足不发原文或导入', async ({ page }) => {
-  const calls = await setup(page, 21, false, 0);
+test('单次101条默认全选并全部生成导入，重复导入不重做问题', async ({ page }) => {
+  const calls = await setup(page, 101, false, 300, 0);
   await choose(page);
-  await expect(page.getByRole('button', { name: '生成并自动导入' })).toBeDisabled();
-  await page.getByRole('button', { name: '选择划线 · 每次最多生成 20 个问题' }).click();
-  await page.locator('.wr-highlight-options input').last().uncheck();
-  await page.getByRole('button', { name: '生成并自动导入' }).click();
-  await expect(page.getByRole('alert')).toContainText('今日最多还可尝试 0');
+  await expect(page.locator('.wr-confirm-count')).toContainText('101');
+  await expect(page.getByRole('button', { name: '生成并自动导入' })).toBeEnabled();
+  await page.getByRole('button', { name: '选择划线 · 默认全选' }).click();
+  await expect(page.locator('.wr-highlight-options input:checked')).toHaveCount(101);
   expect(calls).toEqual([]);
   expect((await snapshot(page)).cards).toHaveLength(0);
+  await page.getByRole('button', { name: '生成并自动导入' }).click();
+  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible({ timeout: 30000 });
+  const data = await snapshot(page);
+  expect(data.cards).toHaveLength(101);
+  expect(data.cards.map((card: { back: string }) => card.back)).toEqual(calls);
+  expect(new Set(calls).size).toBe(101);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.getByRole('button', { name: '继续选择其他书' }).click();
+  await page.getByRole('button', { name: '阅读的回声，101 条我的划线' }).click();
+  await page.getByRole('button', { name: '下一步 · AI 问题与导入' }).click();
+  await expect(page.locator('.wr-confirm-count')).toContainText('0');
+  await page.getByRole('button', { name: '生成并自动导入' }).click();
+  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  expect(calls).toHaveLength(101);
+  expect((await snapshot(page)).cards).toHaveLength(101);
+});
+test('超过20条仍受每日剩余额度保护，不发原文或导入', async ({ page }) => {
+  const calls = await setup(page, 101, false, 100, 0);
+  await choose(page);
+  await expect(page.getByRole('button', { name: '生成并自动导入' })).toBeEnabled();
+  await page.getByRole('button', { name: '生成并自动导入' }).click();
+  await expect(page.getByRole('alert')).toContainText('今日最多还可尝试 100');
+  expect(calls).toEqual([]);
+  expect((await snapshot(page)).cards).toHaveLength(0);
+});
+test('超过20个成功问题的任务失败后刷新可恢复，重试只处理剩余并整批导入', async ({ page }) => {
+  const calls = await setup(page, 41, 25, 300, 0);
+  await choose(page);
+  await page.getByRole('button', { name: '生成并自动导入' }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  expect(calls).toHaveLength(26);
+  expect((await snapshot(page)).cards).toHaveLength(0);
+  const completed = calls.slice(0, 25);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '进度已为你保留' })).toBeVisible();
+  await expect(page.locator('.wr-job-summary strong')).toContainText('25');
+  await page.waitForTimeout(300);
+  expect(calls).toHaveLength(26);
+  await page.getByRole('button', { name: '重试并继续' }).click();
+  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  expect(calls).toHaveLength(42);
+  for (const text of completed) expect(calls.filter(value => value === text)).toHaveLength(1);
+  expect((await snapshot(page)).cards.map((card: { back: string }) => card.back)).toEqual([...new Set(calls)]);
+});
+test('大批量任务超过20条后可以主动暂停，刷新不续跑且已完成问题不重做', async ({ page }) => {
+  const calls = await setup(page, 41, false, 300, 50);
+  await choose(page);
+  await page.getByRole('button', { name: '生成并自动导入' }).click();
+  await expect.poll(async () => Number.parseInt(await page.locator('.wr-job-summary strong').innerText(), 10)).toBeGreaterThan(20);
+  await page.getByRole('button', { name: '暂停，保留进度' }).click();
+  await expect(page.getByRole('heading', { name: '进度已为你保留' })).toBeVisible();
+  const count = Number.parseInt(await page.locator('.wr-job-summary strong').innerText(), 10);
+  expect(count).toBeGreaterThan(20);
+  expect(count).toBeLessThan(41);
+  expect((await snapshot(page)).cards).toHaveLength(0);
+  const completed = calls.slice(0, count);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '进度已为你保留' })).toBeVisible();
+  const pausedCalls = calls.length;
+  await page.waitForTimeout(300);
+  expect(calls).toHaveLength(pausedCalls);
+  await page.getByRole('button', { name: '重试并继续' }).click();
+  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  for (const text of completed) expect(calls.filter(value => value === text)).toHaveLength(1);
+  expect(new Set(calls).size).toBe(41);
+  expect((await snapshot(page)).cards.map((card: { back: string }) => card.back)).toEqual([...new Set(calls)]);
 });
 test('选书页安全区、触控、窄屏和滚动没有溢出或误选', async ({ page }) => {
   await setup(page);

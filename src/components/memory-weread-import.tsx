@@ -4,6 +4,8 @@ import { useRecallStore } from '@/stores/recall-store';
 import { commitMemory } from '@/services/memory-actions';
 import { applyWereadImport, buildWereadDrafts, parseWereadExport, planWereadImport, WEREAD_MAX_BYTES, type WereadBook, type WereadDraft, type WereadImportPlan, type WereadImportResult, type WereadKind } from '@/lib/memory-weread';
 import { generateWereadQuestion, loadOnlineBook, loadOnlineBooks } from '@/services/weread-online';
+import { checkWereadBudget } from '@/services/weread-job-storage';
+import { AI_DAILY_MODEL_ATTEMPTS } from '../../shared/weread-ai';
 import './memory-weread-import.css';
 import { MemoryWereadOnlineImport } from './memory-weread-online-import';
 
@@ -176,13 +178,14 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy }: Memory
   async function generate(): Promise<void> {
     if (busy.current || lock.current || demo) return;
     const candidates = drafts.filter(draft => draft.include && draft.kind !== 'excerpt' && !draft.originalUnchanged
-      && !draft.highlight.question?.trim() && !aiStatus[draft.id]?.startsWith('AI 已生成') && !aiStatus[draft.id]?.startsWith('手动')).slice(0, 20);
+      && !draft.highlight.question?.trim() && !aiStatus[draft.id]?.startsWith('AI 已生成') && !aiStatus[draft.id]?.startsWith('手动'));
     if (!candidates.length) { setProgress('没有需要生成的问题：已有问题和手动编辑均保留'); return; }
     const abort = new AbortController(); controller.current = abort;
     const current = ++generation.current;
     reportBusy(true); setGenerating(true); setError(''); setPlan(null);
     let succeeded = 0;
     try {
+      await checkWereadBudget(candidates.length, abort.signal);
       for (const [index, draft] of candidates.entries()) {
         if (abort.signal.aborted) break;
         setProgress(`AI 生成 ${index + 1}/${candidates.length}，已成功 ${succeeded} 条`);
@@ -199,6 +202,8 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy }: Memory
           break;
         }
       }
+    } catch (value) {
+      if (mounted.current && !abort.signal.aborted && current === generation.current) setError(message(value));
     } finally {
       if (mounted.current && current === generation.current) {
         setProgress(`${abort.signal.aborted ? '已停止' : '本轮结束'}：成功 ${succeeded}/${candidates.length}。可继续生成、重试或手动编辑；尚未导入卡库。`);
@@ -275,9 +280,9 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy }: Memory
         <p className="m-source-notice">每条划线生成一个问题；已有问题和手动编辑保留。AI 可能出错，请核对；默认回忆任务不是 AI 输出。停止或失败时保留已生成草稿，不自动导入。</p>
         {!demo && <div className="m-panel">
           <label><input type="checkbox" disabled={generating} checked={aiSummary} onChange={event => setAiSummary(event.target.checked)}/>同时生成辅助摘要（不是原文答案）</label>
-          <button type="button" disabled={generating} onClick={() => void generate()}>AI 生成问题（最多 20 条）</button>
+          <button type="button" disabled={generating} onClick={() => void generate()}>AI 生成所选问题</button>
           {generating && <button type="button" onClick={() => controller.current?.abort()}>停止生成</button>}
-          <small>单条最多 6000 字；每轮最多 20 条，可继续下一轮；每日全空间最多 100 次模型调用，失败也计入。仅点击后发送原文。</small>
+          <small>所选划线依次生成，已有问题不重做。单条最多 6000 字；每日全空间最多 {AI_DAILY_MODEL_ATTEMPTS} 次模型尝试，失败也计入；每小时最多 120 次请求。停止或失败保留本页草稿。仅点击后发送原文。</small>
           {progress && <p role="status">{progress}</p>}
         </div>}
         {drafts.map((draft, index) => <article className="m-weread-card m-panel" key={draft.id}>

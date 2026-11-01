@@ -35,8 +35,9 @@ Agent Skill，不将 `WEREAD_API_KEY` 或火山引擎密钥放入前端。
 官方依据：[Skill 介绍](https://weread.qq.com/r/weread-skills)、
 [划线契约](https://github.com/Tencent/WeChatReading/blob/main/skills/notes.md)、
 [书籍契约](https://github.com/Tencent/WeChatReading/blob/main/skills/book.md)。
-每日 300 次模型尝试与图片支持是独立事项；它也没有取消当前每次操作
-最多 20 个问题的限制。
+每日 300 次模型尝试与图片支持是独立事项。用户随后确认取消单次
+20 个问题的限制；在线和手动 AI 路径均依次处理全部选中划线，仍受
+下文的每日额度、请求频率、文件容量和单条长度保护。
 
 ## 文件契约
 
@@ -112,8 +113,10 @@ under **其他导入方式**, with the legacy manual preview and generation work
 
 Select books, click **下一步 · AI 问题与导入**, inspect the scope and select
 individual highlights if needed. Click **生成并自动导入** to consent to the
-displayed originals and changed-card updates. At most 20 questions per consent;
-larger scopes require fewer selected highlights. New originals longer than 6000
+displayed originals and changed-card updates. All selected highlights are
+processed serially; there is no separate 20-question per-action ceiling. A book
+with more than 20 highlights does not require manually choosing batches of 20.
+New originals longer than 6000
 characters require manual handling. All required questions must succeed before
 the batch is written through the normal atomic card-save path. Each selected new
 highlight gets one question; its exact original text remains the answer. No
@@ -160,17 +163,26 @@ The additive migration `20261031_weread_ai.sql` creates only import rate limits
 and a seven-day question cache, separate from cards/sync entities.
 
 - Each AI request accepts 1-6000 characters and caps output at 384 tokens.
-- The UI sends serial requests, at most 20 per action; stop prevents future
-  calls but an already started upstream call may still finish and be charged.
+- Both online automatic and manual AI paths process all selected candidates
+  serially, with no 20-question truncation or consent ceiling. Stop prevents
+  future calls but an already started upstream call may still finish and be
+  charged. Successful questions are not regenerated on retry. Automatic jobs
+  persist across refresh; manual drafts remain only in the current page.
 - All devices in the personal space share a hard 300-model-attempt UTC-day
   budget (failures count), plus 120 AI requests/hour including cache hits.
-  The UI reads remaining budget before sending originals. This is conservative
+  Both paths read remaining budget before sending originals. If the remaining
+  budget is insufficient for the pending scope, no originals are sent; select
+  fewer highlights or continue after the next UTC-day reset. This is conservative
   and not a reservation: other devices can consume budget meanwhile, and cached
   questions may not require model attempts. The server cap remains authoritative.
   This is an application cost/usage safeguard, not a provider's model limit.
   The owner approved increasing it from 100 to 300 on 2026-11-01. Existing
   attempts remain counted; the change does not reset usage, make calls free or
   automatically run additional generation. UTC midnight is 08:00 in China.
+  Hourly rate limits still apply to large jobs. If reached during generation,
+  the job stops with successful questions retained; resume explicitly after
+  the rate-limit window resets. No background retries or incomplete automatic
+  imports are introduced by removing the per-action ceiling.
 - WeRead read requests share 120/hour; online imports cap five books and 1000
   highlights per batch, with strict 5MiB validation.
 - No automatic whole-book sync, paid infrastructure, external knowledge or

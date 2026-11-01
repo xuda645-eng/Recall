@@ -5,7 +5,7 @@ import type { Card, RecallStateSnapshot } from '../src/types';
 
 const origin = `http://127.0.0.1:${Number(process.env.RECALL_WEREAD_PORT || 4197)}`;
 const at = '2026-10-01T00:00:00.000Z';
-const aiAction = 'AI 生成问题（最多 20 条）';
+const aiAction = 'AI 生成所选问题';
 const editedQuestion = '我编辑的问题：这个结论的适用条件是什么？';
 const aiSummary = '合成辅助摘要，不是划线原文。';
 const longQuestion = '为什么主动回忆能检验理解？\n\n' + '先说明结论、条件和依据，再检查自己的遗漏。\n\n'.repeat(45);
@@ -67,6 +67,7 @@ class WereadApi {
   questionRequests: QuestionRequest[] = [];
   settledQuestions = 0;
   shelfFailures = 0;
+  budget = 300;
   unexpectedRequests: string[] = [];
   pageErrors: string[] = [];
   question: (request: QuestionRequest, index: number) => Promise<MockReply> = async request => ({
@@ -89,7 +90,7 @@ class WereadApi {
         await route.fulfill({ status: 503, json: { error: '合成本地测试，不启用云同步。' } });
         return;
       }
-      if (!['/api/weread/books', '/api/weread/book', '/api/weread/question'].includes(url.pathname)) {
+      if (!['/api/weread/books', '/api/weread/book', '/api/weread/budget', '/api/weread/question'].includes(url.pathname)) {
         this.unexpectedRequests.push(`${request.method()} ${url.pathname}`);
         await route.abort('blockedbyclient');
         return;
@@ -98,7 +99,10 @@ class WereadApi {
       expect(request.headers()['content-type']).toContain('application/json');
       expect(url.search).toBe('');
       const body: Record<string, unknown> = request.postDataJSON();
-      if (url.pathname === '/api/weread/books') {
+      if (url.pathname === '/api/weread/budget') {
+        expect(body).toEqual({});
+        await route.fulfill({ json: { remaining: this.budget } });
+      } else if (url.pathname === '/api/weread/books') {
         expect(Object.keys(body).filter(key => key !== 'cursor')).toEqual([]);
         expect(body.cursor === undefined || body.cursor === 2).toBe(true);
         this.shelfRequests.push(body as { cursor?: number });
@@ -430,20 +434,34 @@ test('部分生成失败不自动导入，错误解除后可重试并明确确�
   expect((await snapshot(page)).cards).toHaveLength(2);
 });
 
-test('一次 AI 操作最多请求 20 条，第 21 条原文和草稿保持不变', async ({ page, api }) => {
+test('一次 AI 操作生成全部21条，重试不重复请求且原文和手动导入边界保持', async ({ page, api }) => {
   api.books = booksFixture(21);
   await boot(page);
   const before = await snapshot(page);
   await drafts(page);
-  const untouched = await prompt(page, 21).inputValue();
   await page.getByRole('button', { name: aiAction, exact: true }).tap();
-  await generated(page, 20);
-  expect(api.questionRequests).toHaveLength(20);
-  expect(new Set(api.questionRequests.map(request => request.markText)).size).toBe(20);
-  await expect(prompt(page, 21)).toHaveValue(untouched);
+  await generated(page, 21);
+  expect(api.questionRequests).toHaveLength(21);
+  expect(new Set(api.questionRequests.map(request => request.markText)).size).toBe(21);
+  await expect(prompt(page, 21)).toHaveValue(`AI 问题：${api.books[0].highlights[20].markText.trim().split('\n')[0]}？`);
+  await page.getByRole('button', { name: aiAction, exact: true }).tap();
+  await expect(page.getByRole('status')).toContainText('没有需要生成的问题');
+  expect(api.questionRequests).toHaveLength(21);
   await originals(page, [api.books[0]]);
   await noOverflow(page);
   expect(await snapshot(page)).toEqual(before);
+});
+test('手动路径大批量生成先检查每日额度，不足时不发送任何原文', async ({ page, api }) => {
+  api.books = booksFixture(21);
+  api.budget = 20;
+  await boot(page);
+  const before = await snapshot(page);
+  await drafts(page);
+  await page.getByRole('button', { name: aiAction, exact: true }).tap();
+  await expect(page.getByRole('alert')).toContainText('今日最多还可尝试 20');
+  expect(api.questionRequests).toEqual([]);
+  expect(await snapshot(page)).toEqual(before);
+  await originals(page, [api.books[0]]);
 });
 
 test('iPhone 15 长问题与原文独立滚动，安全区、触控与纵向阅读不误评分或切卡', async ({ page, context, browserName, api }) => {
