@@ -88,3 +88,40 @@ Commands ran with the existing dependency symlink, without package installation:
 - Native iOS 27.0.1 blur, actual home-screen installation, offline cold launch
   and iOS update lifecycle remain unverified. If baseline A does not reproduce,
   do not infer that B/C solve the production issue.
+
+## First Preview And Hosting Correction
+
+- 2026-11-01T09:03:26+08:00: source
+  `2b06f4cd5eecc8874646d2981d5e0466673e8e15` committed and pushed normally to
+  main. Sandboxed push first failed with `could not read Username`; the exact
+  `git push origin HEAD:main` succeeded using existing credentials after
+  escalation. Unrelated worktrees remained untouched.
+- Static files exported by `git archive HEAD:prototypes/status-edge/site` to
+  an isolated directory without Functions or Wrangler ancestors. Published
+  with `wrangler@4.156.0 pages deploy . --project-name recall-memory --branch
+  ios27-edge-20261101 --commit-hash 2b06f4cd5eecc8874646d2981d5e0466673e8e15`.
+  No dirty override. Preview ID `6833e2a0-7c9b-45be-822a-8b1ecae817e6`, URL
+  `https://6833e2a0.recall-memory.pages.dev/`. Do not use this first revision
+  as the phone handoff; it has the navigation/cache issue described below.
+- Around 2026-11-01T09:07:40+08:00, production still `2ac571d2`, version
+  `1.0-20261101-0230`. Ten downloadable preview assets matched committed bytes;
+  CSP/noindex headers present, `/api/state` returned the static 404 page.
+- Initial Python urllib asset verification failed because its local CA chain
+  could not verify the issuer. No TLS verification was disabled. System curl
+  was used instead; sandbox TLS timeout recovered after approved escalation.
+- Public command with `STATUS_EDGE_URL=https://6833e2a0.recall-memory.pages.dev/`
+  and the same browser variables/launcher/config: 12 passed, 3 failed, 1 skip.
+  All seven WebKit online checks passed. Chromium had a cache-readiness timeout,
+  a navigation timeout and offline `net::ERR_FAILED`. One bounded single-worker
+  retry (`--project iphone15-chromium --grep 'a: geometry|browser-mode|manifest
+  identity' --workers=1`) recovered A, but online switching and offline
+  navigation still failed. These failures are not counted as passes.
+- 2026-11-01T09:08:31+08:00: `curl -I .../index.html` confirmed Cloudflare's
+  HTTP 308 redirect to `/`. The first worker cached the redirected index
+  response. Revision r2 caches the canonical directory URL instead. The local
+  probe server now reproduces the hosting redirect, and the offline test also
+  asserts a cached, non-redirected document before disabling the network.
+  No A/B/C visual mechanism or production code changed in this correction.
+- Windows Obsidian paths and Graphify were unavailable on this Mac at bootstrap;
+  targeted source inspection used the provided map and existing task evidence.
+  Graph refresh remains unavailable; no vault or generated graph was modified.

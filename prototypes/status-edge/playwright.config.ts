@@ -22,7 +22,7 @@ export default defineConfig({
     { name: 'iphone15-webkit', use: { browserName: 'webkit', launchOptions: { executablePath: process.env.RECALL_WEBKIT } } },
   ],
   webServer: remote ? undefined : {
-    command: 'node ../../scripts/serve-task-preview.mjs site 4397',
+    command: 'node server.mjs',
     url: 'http://127.0.0.1:4397', reuseExistingServer: false, timeout: 15000,
   },
 });

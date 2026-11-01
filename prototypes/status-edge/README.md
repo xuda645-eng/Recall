@@ -38,7 +38,9 @@ in the existing `recall-memory` project. Do not deploy the app's `dist/`, root
 Functions, root Wrangler config or real data. `site/` has no API client,
 credentials, cookies, LocalStorage, IndexedDB, remote scripts or analytics.
 It uses a distinct manifest ID and preview-origin-scoped static Service Worker
-cache. The worker handles only an explicit static-asset allowlist and never
+cache. The worker caches the canonical directory document rather than the
+host's redirected `index.html` response. The local server reproduces that
+redirect for regression checks. The worker handles only an explicit static-asset allowlist and never
 deletes other caches. A custom 404 avoids SPA fallback for `/api/*` paths.
 
 Publish an exported `site/` outside the app tree to avoid Wrangler discovering

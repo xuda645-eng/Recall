@@ -50,7 +50,7 @@ function updateDiagnostics() {
   const safe = getComputedStyle(document.querySelector('#safe-probe'));
   const viewport = window.visualViewport;
   document.querySelector('#diagnostics').textContent = JSON.stringify({
-    build: 'status-edge-20261101-r1',
+    build: 'status-edge-20261101-r2',
     variant: selectedCase.toUpperCase(),
     navigatorStandalone: navigator.standalone ?? null,
     displayModeStandalone: matchMedia('(display-mode: standalone)').matches,

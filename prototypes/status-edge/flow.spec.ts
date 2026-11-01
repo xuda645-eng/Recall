@@ -115,6 +115,12 @@ test('manifest identity, offline navigation and screenshots (Chromium)', async (
   await page.goto('/?case=a');
   await expect(page.locator('body')).toHaveAttribute('data-cache-ready', 'true');
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  const cachedDocument = await page.evaluate(async () => {
+    const cache = await caches.open('recall-status-edge-20261101-r2');
+    const response = await cache.match(new URL('./', location.href).href);
+    return { exists: !!response, redirected: response?.redirected };
+  });
+  expect(cachedDocument).toEqual({ exists: true, redirected: false });
   const manifest = await page.evaluate(async () => (await fetch('./manifest.webmanifest')).json());
   expect(manifest.id).toBe('/recall-status-edge-20261101');
   expect(manifest.display).toBe('standalone');
