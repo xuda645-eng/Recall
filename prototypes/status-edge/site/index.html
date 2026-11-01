@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN" data-case="a">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#353532">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Recall 顶部对照">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./boot.js"></script>
+  <script src="./probe.js" defer></script>
+  <title>Recall 顶部对照 - 非正式版</title>
+</head>
+<body>
+  <div class="status-edge" aria-hidden="true"></div>
+  <div class="app">
+  <aside class="drawer" id="drawer" aria-label="对照菜单" inert>
+    <strong class="wordmark">Recall</strong>
+    <p>顶部对照 · 仅合成内容</p>
+    <button id="close-drawer">返回对照页</button>
+    <p>观察右侧同一个 Logo 的上边缘。抽屉不包含你的卡组。</p>
+  </aside>
+  <div class="shell">
+    <header class="bar">
+      <button id="brand" aria-label="打开对照菜单" aria-controls="drawer" aria-expanded="false">
+        <svg viewBox="0 0 100 100" aria-hidden="true"><path d="M23 15h32c27 0 34 32 12 45l19 25H64L43 57v28H23z" fill="white"/><path d="M54 23c-1 10-4 14-14 15 10 1 13 5 14 15 1-10 4-14 14-15-10-1-13-5-14-15" fill="currentColor"/></svg>
+      </button>
+      <div class="context">今日复习</div>
+      <button id="plus" aria-label="显示测试说明">+</button>
+    </header>
+    <div class="content">
+      <main>
+        <p class="eyebrow">独立测试 PWA · 不连接正式数据</p>
+        <h1 id="case-title">A · 现有结构</h1>
+        <p id="case-description"></p>
+        <nav class="cases" aria-label="切换对照方案">
+          <a href="./?case=a" data-case-link="a">A 现有</a>
+          <a href="./?case=b" data-case-link="b">B 纯色层</a>
+          <a href="./?case=c" data-case-link="c">C 吸顶栏</a>
+        </nav>
+        <p class="notice" id="mode">正在识别运行模式</p>
+        <p class="instructions">先看刚打开时的 Logo，再向下滚动，最后点 Logo 开关菜单。切换方案会整页加载，避免上一组样式残留。</p>
+        <section class="sample">
+          <p>合成示例 · 不保存评分</p>
+          <strong>今天，温习一点。</strong>
+          <p>观察顶部黑色 Logo、标题和加号的上缘是否清晰，而不是外侧阴影。</p>
+          <div class="lines" aria-hidden="true"></div>
+        </section>
+        <h2>这不是正式 Recall</h2>
+        <p>只需把这个测试页另存为主屏幕图标。原来的 Recall 不用删除、不用重装，也不要清理 Safari 数据。</p>
+        <p id="cache-status" role="status">正在准备测试页离线缓存</p>
+        <details>
+          <summary>查看本机诊断信息</summary>
+          <pre id="diagnostics"></pre>
+          <p>这些数值只显示在本机，没有上传、分析或追踪服务。</p>
+        </details>
+        <section class="reading">
+          <h2>滚动对照区</h2>
+          <p>这段占位内容用于上下滑动。A、B 的正文在内部滚动；C 使用页面滚动和吸顶栏。三个方案的控件尺寸、顶距和阴影保持一致。</p>
+          <p>三个方案都只是待验证的实验，不代表已经关闭 iOS 的系统模糊。如果 A 没有复现模糊，也请说明，这意味着简化页面尚未覆盖正式版的触发条件。</p>
+        </section>
+        <footer>status-edge-20261101-r1 · <span id="footer-case"></span></footer>
+      </main>
+    </div>
+    <button class="scrim" aria-label="关闭对照菜单" hidden></button>
+  </div>
+  </div>
+  <div id="safe-probe" aria-hidden="true"></div>
+</body>
+</html>
