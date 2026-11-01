@@ -12,6 +12,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <link rel="manifest" href="../manifest.webmanifest">
   <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+  <script src="./boot.js"></script>
   <link rel="stylesheet" href="./styles.css">
   <script src="./diagnostics.js" defer></script>
   <title>Recall 原安装内显示对照</title>
@@ -31,6 +32,13 @@
         <p class="eyebrow">原安装实例内 · 只读 · 不加载卡片</p>
         <h1>静态页还模糊吗？</h1>
         <p id="mode" role="status">正在识别运行模式</p>
+        <nav class="cases" aria-label="原安装内顶部方案">
+          <a href="./?status-case=a" data-case-link="a">A 现有</a>
+          <a href="./?status-case=b" data-case-link="b">B 纯色层</a>
+          <a href="./?status-case=c" data-case-link="c">C 吸顶栏</a>
+        </nav>
+        <p id="case-description"></p>
+        <p>这次仍在原图标内比较，不是之前清晰的独立测试 PWA。切换会整页重载，不保存选择。先看刚打开时的上缘，再上下滚动。请反馈哪个方案清晰，并附上页面截图。</p>
         <p>这是从原 Recall 打开的同域静态页，没有加载卡片、云同步或完整应用脚本。只看 Logo、标题和加号上缘，不把外侧阴影当作模糊。</p>
         <p>请反馈“仍模糊”或“清晰”，并附上本页截图。不要另装图标，也不要删除或重装原应用。</p>
         <a class="return" href="../#settings">返回 Recall</a>
@@ -39,7 +47,7 @@
         <p>数值只展示在这里，不写入存储，也不会自动发送。</p>
         <pre id="report" aria-label="静态页显示信息"></pre>
         <p>系统安装状态无法由网页完整读取。即使这里清晰，也不能单凭这一页确定原因。</p>
-        <footer>installed-context-20261101-r1</footer>
+        <footer>installed-context-20261101-r2</footer>
       </main>
     </div>
   </div>

@@ -6,7 +6,7 @@
 - Scope: app settings diagnostic entry, same-origin static comparison page,
   Service Worker navigation exception, tests and evidence. Not a blur fix.
 - Status: committed, pushed and deployed; public checks passed after bounded
-  network/readiness retries. Original installed-iPhone result remains pending.
+  network/readiness retries. Original installed-iPhone static page also blurred.
 - Source base: `42d2611494c7b7bfdf104e4cffa334f262fce602`,
   `xuda645-eng/Recall` main. Task worktree is the isolated clean copy; unrelated
   dirty files in the original worktrees were preserved.
@@ -172,3 +172,18 @@ Keep the original Recall home-screen icon. Apply the normal app update to
 blurred and supply its screenshot. Return through **返回 Recall**. Do not
 install another icon, clear website data or remove/reinstall the original app.
 This is a new diagnostic entry, not a claim that another refresh fixes blur.
+
+## Original Installed Static Page Result
+
+2026-11-01T13:34+08:00: the owner's new screenshot shows the same upper-edge
+blur on the static page's Logo and controls. The visible label reports
+home-screen PWA mode. This establishes that the symptom occurs without the
+React workspace, card rendering or cloud scripts. It does not establish the
+original installation itself, rather than native viewport/edge behavior, as
+the cause. The screenshot includes an expanded Dynamic Island/live activity;
+earlier blurred screenshots do not, so this is not evidence that the activity
+is necessary. The private screenshot is not published.
+
+The original-context reproduction is now available. Next compare painted
+safe-area and sticky/document-scroll variants inside this same diagnostic
+page, without changing the real app's header or installing another icon.

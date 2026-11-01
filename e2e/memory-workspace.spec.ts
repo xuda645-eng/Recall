@@ -202,7 +202,12 @@ test('原安装静态诊断离线进入并返回，未访问过的页面已预�
   else await context.setOffline(true);
   await page.getByRole('link', { name: '打开原安装内对照页' }).click();
   await expect(page.getByRole('heading', { name: '静态页还模糊吗？' })).toBeVisible();
-  await expect(page.locator('#report')).toContainText('installed-context-20261101-r1');
+  await expect(page.locator('#report')).toContainText('installed-context-20261101-r2');
+  for (const variant of ['b', 'c', 'a']) {
+    await page.locator(`[data-case-link="${variant}"]`).click();
+    await expect(page.locator('html')).toHaveAttribute('data-case', variant);
+    await expect(page.locator('#report')).toContainText(`"variant": "${variant.toUpperCase()}"`);
+  }
   await page.getByRole('link', { name: '返回 Recall', exact: true }).click();
   await waitForAppReady(page);
   expect(await snapshot(page)).toEqual(before);
@@ -218,9 +223,87 @@ test('原安装显示诊断公开只读入口、静态加载与返回', async ({
   await page.getByRole('link', { name: '打开原安装内对照页' }).click();
   await expect(page.getByRole('heading', { name: '静态页还模糊吗？' })).toBeVisible();
   expect(new URL(page.url()).origin).toBe(origin);
-  await expect(page.locator('#report')).toContainText('installed-context-20261101-r1');
+  await expect(page.locator('#report')).toContainText('installed-context-20261101-r2');
+  for (const variant of ['b', 'c', 'a']) {
+    await page.locator(`[data-case-link="${variant}"]`).click();
+    await expect(page.locator('html')).toHaveAttribute('data-case', variant);
+    await expect(page.locator('#report')).toContainText(`"variant": "${variant.toUpperCase()}"`);
+    expect(new URL(page.url()).origin).toBe(origin);
+  }
   await page.getByRole('link', { name: '返回 Recall', exact: true }).click();
   await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'settings');
+});
+
+test('原安装三方案保持控件几何、触摸和滚动，切换不读写存储或调用API', async ({ page }) => {
+  test.skip(!!process.env.RECALL_URL, 'Storage guards and inset stress use local isolated contexts');
+  await seedPage(page);
+  const before = await snapshot(page);
+  await page.addInitScript(() => {
+    if (!location.pathname.includes('/status-diagnostics/')) return;
+    Object.defineProperty(navigator, 'standalone', { configurable: true, value: true });
+    for (const method of ['getItem', 'setItem', 'removeItem', 'clear']) {
+      Object.defineProperty(Storage.prototype, method, { value: () => { throw new Error('Diagnostic storage access'); } });
+    }
+    window.fetch = () => { throw new Error('Diagnostic network request'); };
+  });
+  await page.goto('./status-diagnostics/?status-case=invalid');
+  await expect(page.locator('html')).toHaveAttribute('data-case', 'a');
+  for (const variant of ['a', 'b', 'c']) {
+    await page.locator('html').evaluate(element => element.setAttribute('data-previous-document', 'true'));
+    await page.locator(`[data-case-link="${variant}"]`).click();
+    await expect(page.locator('html')).toHaveAttribute('data-case', variant);
+    expect(await page.locator('html').getAttribute('data-previous-document')).toBeNull();
+    await expect(page.locator(`[data-case-link="${variant}"]`)).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#mode')).toContainText(`PWA · ${variant.toUpperCase()}`);
+    for (const inset of [0, 20, 59, 96]) {
+      await page.evaluate(value => {
+        document.documentElement.style.setProperty('--safe-top', `${value}px`);
+        document.documentElement.style.setProperty('--safe-bottom', '34px');
+      }, inset);
+      await page.getByRole('button', { name: '重新读取显示信息' }).click();
+      const logo = (await page.locator('.brand').boundingBox())!;
+      expect(logo).toMatchObject({ y: inset + 10, width: 48, height: 48 });
+      expect(await page.locator('.brand').evaluate(element => getComputedStyle(element).borderRadius)).toBe('14px');
+      expect(await page.locator('.bar').evaluate(element => getComputedStyle(element).gap)).toBe('8px');
+      const report = JSON.parse((await page.locator('#report').textContent())!);
+      expect(report.barPosition).toBe(variant === 'c' ? 'sticky' : 'fixed');
+      if (variant === 'b') {
+        expect(report.sampler).toMatchObject({ height: inset + 10, backgroundClip: 'border-box', pointerEvents: 'none' });
+        expect(await page.locator('.brand').evaluate(element => {
+          const box = element.getBoundingClientRect();
+          return element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+        })).toBe(true);
+      }
+      if (variant === 'c') expect(report.sampler.display).toBe('none');
+      await noOverflow(page);
+    }
+    for (const width of [320, 393, 760, 761, 852]) {
+      await page.setViewportSize({ width, height: width === 852 ? 393 : 852 });
+      await noOverflow(page);
+      for (const target of ['.brand', '#refresh', '.cases a']) {
+        for (const element of await page.locator(target).all()) {
+          const box = (await element.boundingBox())!;
+          expect(box.width).toBeGreaterThanOrEqual(44);
+          expect(box.height).toBeGreaterThanOrEqual(44);
+        }
+      }
+    }
+    await page.setViewportSize({ width: 393, height: 852 });
+    await page.evaluate(() => {
+      document.documentElement.style.setProperty('--safe-top', '59px');
+      const scrolling = document.documentElement.dataset.case === 'c' ? document.scrollingElement : document.querySelector('.content');
+      scrolling!.scrollTop = 240;
+    });
+    await page.getByRole('button', { name: '重新读取显示信息' }).click();
+    const scrolledReport = JSON.parse((await page.locator('#report').textContent())!);
+    expect(scrolledReport.scrollOwner).toBe(variant === 'c' ? 'document' : 'content');
+    expect(scrolledReport.scrollTop).toBeGreaterThan(0);
+    expect((await page.locator('.brand').boundingBox())!.y).toBe(69);
+    await saveShot(page, `installed-case-${variant}`);
+  }
+  await page.getByRole('link', { name: '返回 Recall', exact: true }).click();
+  await waitForAppReady(page);
+  expect(await snapshot(page)).toEqual(before);
 });
 
 test('抽屉显示固定构建版本，刷新图标在移动窄屏与桌面均可触达', async ({ page }) => {
