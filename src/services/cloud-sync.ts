@@ -6,6 +6,7 @@ import { dataState } from '@/stores/store-helpers';
 import { validateImportSnapshot } from '@/services/repository';
 import { acknowledgeMutation, backupKey, pendingChanges, readJournal, reconcileCloud, type CloudJournal } from '@/services/cloud-cache';
 import { applyEntities, type CloudState, type DeviceSession, type TrustedDevice } from '../../shared/cloud';
+import { pauseMediaSync, synchronizeMedia } from '@/services/media-sync';
 
 type SyncPhase = 'checking' | 'local' | 'unauthorized' | 'syncing' | 'synced' | 'offline' | 'pending' | 'conflict' | 'error';
 interface CloudStatus {
@@ -58,6 +59,7 @@ function refreshCounts(): void {
 function syncFailure(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
   const unauthorized = error instanceof ApiError && error.status === 401;
+  if (unauthorized) pauseMediaSync();
   const unavailable = error instanceof ApiError && error.status === 503;
   useCloudSync.setState({ phase: unauthorized ? 'unauthorized' : !navigator.onLine ? 'offline' : unavailable && !useCloudSync.getState().session ? 'local' : 'error', error: message });
   try { refreshCounts(); }
@@ -84,10 +86,11 @@ export async function listTrustedDevices(): Promise<TrustedDevice[]> { return (a
 export async function issueDeviceCode(): Promise<{ code: string; expiresAt: number }> { return api('auth/codes', 'POST', {}); }
 export async function revokeDevice(id: string): Promise<void> {
   await api(`auth/devices/${encodeURIComponent(id)}`, 'DELETE');
-  if (useCloudSync.getState().session?.device.id === id) useCloudSync.setState({ phase: 'unauthorized', error: '本机授权已撤销，本地缓存仍保留。' });
+  if (useCloudSync.getState().session?.device.id === id) { pauseMediaSync(); useCloudSync.setState({ phase: 'unauthorized', error: '本机授权已撤销，本地缓存仍保留。' }); }
 }
 export async function logoutDevice(): Promise<void> {
   await api('auth/logout', 'POST', {});
+  pauseMediaSync();
   useCloudSync.setState({ phase: 'unauthorized', error: '本机授权已退出，待同步数据和缓存仍保留。' });
 }
 
@@ -123,6 +126,7 @@ async function performSync(): Promise<void> {
       const changes = pendingChanges(dataState(useRecallStore.getState()), journal);
       if (!changes.length) {
         useCloudSync.setState({ phase: 'synced', error: '', lastSyncedAt: new Date().toISOString() });
+        void synchronizeMedia(useCloudSync.getState().session!.spaceId).catch(() => {});
         return;
       }
       await commitMemory(current => current, (current, latest) => {
@@ -188,6 +192,7 @@ export function startCloudSync(): () => void {
   })();
   return () => {
     stopped = true;
+    pauseMediaSync();
     clearInterval(poll);
     if (timer) clearTimeout(timer);
     window.removeEventListener('recall-cache-saved', onSaved);
