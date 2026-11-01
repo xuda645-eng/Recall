@@ -1193,6 +1193,7 @@ test('PWA部署路径manifest、Service Worker及断网重开和复习持久化'
   await expect(page.locator('.memory-content').getByRole('heading', { level: 1 })).toBeVisible();
   await navigate(page, '导入');
   await expect(page.getByRole('button', { name: '选择 Markdown 文件', exact: true })).toBeVisible();
+  await page.getByText('其他方式', { exact: true }).click();
   await page.getByRole('button', { name: '其他导入：CSV / Anki / Recall', exact: true }).click();
   await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'compat');
   await expect(page.locator('.memory-content').getByRole('heading', { level: 1 })).toBeVisible();

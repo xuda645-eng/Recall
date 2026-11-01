@@ -1,0 +1,26 @@
+.m-import-start { max-width: 600px; margin: 0 auto; }
+.m-import-heading { margin: 4px 0 24px; }
+.m-import-heading h1 { font: 500 25px/1.5 var(--serif); }
+.m-import-heading p { margin-top: 7px; color: var(--muted); font-size: 14px; }
+.m-import-sources { display: grid; gap: 10px; }
+.memory-app .m-import-source { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 92px; padding: 18px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--card-paper); color: var(--ink); text-align: left; }
+.m-import-source-icon { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 12px; background: var(--soft); color: var(--ink); }
+.m-import-source-copy { display: grid; gap: 4px; flex: 1; min-width: 0; }
+.m-import-source-copy strong { font-size: 16px; font-weight: 650; }
+.m-import-source-copy small { font-size: 13px; overflow-wrap: anywhere; }
+.m-import-source > svg { flex: none; color: var(--muted); }
+.m-import-more { margin-top: 22px; border-top: 1px solid var(--line); }
+.m-import-more > summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 52px; color: var(--muted); font-size: 14px; cursor: pointer; list-style: none; }
+.m-import-more > summary::-webkit-details-marker { display: none; }
+.m-import-more[open] > summary > svg { transform: rotate(180deg); }
+.m-import-secondary { padding-bottom: 4px; }
+.memory-app .m-import-secondary > button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 0; text-align: left; color: var(--ink); }
+.m-import-secondary > button > span { display: grid; gap: 3px; min-width: 0; flex: 1; }
+.m-import-secondary strong { font-size: 14px; font-weight: 600; }
+.m-import-secondary small { font-size: 12px; }
+.m-import-help { display: flex; flex-wrap: wrap; gap: 4px 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+.memory-app .m-import-help button { padding: 10px 0; color: var(--muted); font-size: 13px; }
+@media (max-width: 360px) {
+  .memory-app .m-import-source { gap: 10px; padding: 16px 12px; }
+  .m-import-source-copy small { font-size: 12px; }
+}

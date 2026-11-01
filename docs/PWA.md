@@ -27,6 +27,8 @@ Pages 项目 `recall-memory`，GitHub 仅托管源码。
 
 ## 已实现的产品逻辑
 
+- 导入首屏将 Markdown、带图包、微信读书作为三个同级常用入口；手动添加、
+  CSV/Anki/Recall 和格式示例默认收进“其他方式”。文件仍先预览再确认。
 - 纸白底色、石墨色主卡、48 x 48 Logo、48px 三段式 appbar。
 - iPhone 主屏幕安装态使用已获 F 真机清晰反馈的浏览器自动安全框。
   根 HTML 仍以 `viewport-fit=cover` 为默认，解析期只读引导脚本只在

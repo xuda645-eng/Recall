@@ -13,7 +13,7 @@ test('独立 HTTPS 预览可导入合成带图包、放大与备份，所有 API
   const content = await sample.body();
   await page.getByRole('link', { name: '2. 打开 Recall 导入' }).click();
   await page.locator('input[type=file]').setInputFiles({ name: 'synthetic.recall-media.json', mimeType: 'application/json', buffer: content });
-  await expect(page.getByText('1 张图片', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^1 张图片 ·/)).toBeVisible();
   await page.getByRole('button', { name: '确认导入', exact: true }).click();
   await expect(page.getByText('新增 2，更新 0，跳过 0')).toBeVisible();
   await page.goto('/#cards'); await page.reload();
