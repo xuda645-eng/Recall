@@ -12,8 +12,9 @@
   manifest/install identity, domain or infrastructure change.
 - Status: implementation, local validation, source push and production upload
   completed. Public bytes/auth and three browser cases passed; one Chromium
-  startup case failed including its bounded retry. Real-app physical acceptance
-  remains pending, not claimed complete.
+  startup case failed including its bounded retry. On 2026-11-01 at 18:04 the
+  owner confirmed the real app's upper-edge appearance is now good. Other native
+  PWA acceptance paths remain separately unverified.
 
 ## Evidence And Change
 
@@ -214,3 +215,70 @@ For a release regression, prior compatible deployment is `8856d0ab` after
 rechecking active production. Same data/auth/budget contracts, but old header
 may still be blurred. Use normal Pages rollback, preserve D1/local cards and
 handle SW updates normally; never clear storage or reinstall to recover.
+
+## Real-App Physical Result And Lessons
+
+Feedback received 2026-11-01T18:05:28+08:00, with a screenshot timestamped 18:04.
+Following the production-update handoff, the owner says the app is now good and
+asks for a lessons summary. In the real app's scrolled home view, the Logo,
+title and right control upper edges are sharp and safely below the status
+region. This accepts the originally reported upper-edge appearance issue on
+the owner's Safari-installed iPhone PWA, not just isolated F. This message does
+not display a build identifier or provide separate drawer, keyboard, native
+offline/restart or device-update recordings. Do not expand visual acceptance
+into a claim that all PWA paths or the prior failed Chromium case passed.
+No private screenshot, card text or authorization information is published.
+
+### What Worked
+
+The effective intervention was browser-managed viewport insetting: use
+`viewport-fit=auto` only for iPhone standalone, selected by a parser-blocking
+same-origin script immediately after the viewport meta, before app rendering.
+Keep cover for other devices/tabs and the no-script fallback. Preserve all four
+env safe areas, dynamic height, Logo geometry, shadows and data. Static F was
+physically clear before adoption, and the owner now accepts real-app appearance.
+This is evidence for the practical workaround on this tested device/context,
+not proof of a particular internal WebKit defect or a universal iOS fix.
+
+### Reusable Investigation Rules
+
+1. Reproduce in the original runtime. A Safari tab, desktop WebKit emulation,
+   separately installed preview and existing home-screen PWA are not equivalent
+   test contexts. Clear isolated A/B/C and full-shell D/E, including unchanged
+   baselines, did not demonstrate a fix because they did not reproduce blur.
+2. Keep a failing baseline in the same install and origin. The read-only static
+   page reproduced blur without cards, cloud sync or app scripts. Same-install
+   A/B/C remained blurred; changing viewport-fit in F distinguished an effective
+   mechanism. Do not promote an unreproduced baseline's variants to production.
+3. Compare actual computed values, not formulas alone. B reported env top 59px,
+   Logo top 69px and sampler 69px; clear D reported Logo top 10px/sampler 11px.
+   Both had screen height 852px and viewport height 793px. That shared 59px delta
+   was not a root-cause proof or permission to subtract safe-area padding.
+4. Verify delivered version, then stop blaming stale code without evidence.
+   Earlier sampling fixes were active yet failed physically. Repeated reinstall,
+   storage clearing or reauthorization would risk data while changing the test
+   context. Use visible version, exact deployed bytes and normal SW updates.
+5. Separate candidate efficacy from regression protection. Real-device F found
+   the effective candidate; unit/browser checks protected device gating, initial
+   rendering, geometry, responsive/drawer behavior, old SW updates and offline
+   data preservation. Simulated native blur absence was never proof of efficacy.
+6. Fix test timing and selectors without weakening gates. Wait for drawer
+   animations and responsive layout, use exact link names, and model an old SW
+   without the newly introduced file. Keep genuine overflow assertions and all
+   failures. Bound public retries; incomplete downloads and unresolved startup
+   failures remain failed/unverified even after physical visual acceptance.
+7. Ship the smallest proven change and close the loop. No Logo asset, shadow,
+   card/schema/cloud, install identity or origin changes were necessary. Commit,
+   push and deploy the exact validated bundle; ask for real-app feedback and
+   retain the distinction between visual acceptance and wider PWA acceptance.
+
+This acceptance/retrospective update touches documentation only: this record,
+the PWA contract and release index. Markdown links and diff checks are required;
+no app rebuild, new deployment, device mutation or memory-store edit is needed.
+Implementation remains `b5e79fd` / deployment `b15d48db` / version `1656`.
+
+2026-11-01T18:06:41+08:00: `node /tmp/recall-f-adoption-artifacts.mjs` passed
+Markdown links and reconfirmed the unchanged 202-file bundle;
+`git diff --check` passed. Only the three stated docs changed, and remote main
+still matched `0f5e8f3`. This docs-only follow-up will be committed/pushed normally
+without another deployment; its actual push result is reported at handoff.
