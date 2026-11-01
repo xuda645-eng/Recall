@@ -1,4 +1,5 @@
 import path from "node:path";
+import { readFileSync } from "node:fs";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig } from "vite";
@@ -14,7 +15,13 @@ export default defineConfig(({ mode }) => {
     define: { __RECALL_BUILD_INFO__: versionJSON },
     plugins: [{
       name: "recall-build-version",
-      generateBundle() { this.emitFile({ type: "asset", fileName: "version.json", source: versionJSON }); },
+      generateBundle() {
+        this.emitFile({ type: "asset", fileName: "version.json", source: versionJSON });
+        const diagnostic = readFileSync(new URL("./public/status-diagnostics/index.html", import.meta.url), "utf8")
+          .replace('<html lang="zh-CN">', '<html lang="zh-CN" data-case="f">')
+          .replace('viewport-fit=cover', 'viewport-fit=auto');
+        this.emitFile({ type: "asset", fileName: "status-diagnostics/system-frame.html", source: diagnostic });
+      },
       configureServer(server) {
         server.middlewares.use((request, response, next) => {
           if (request.url?.split('?')[0] !== `${base}version.json`) { next(); return; }

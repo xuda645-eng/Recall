@@ -264,3 +264,36 @@ diff, then normal commit/push; no app tests/build or production replacement.
 Completed: 35 local documentation links passed, diff whitespace passed and
 the application/public/config diff remained empty. External primary links
 were opened during research, not inferred from search snippets alone.
+
+## Clear D Report Paired With Blurred B
+
+2026-11-01T14:23+08:00: the owner supplied the previously clear installed
+full-shell D preview's expanded report. The new screenshots also show a sharp
+Logo upper edge while an expanded Dynamic Island and low battery are present.
+The report identifies `shell-20261101-r1`, variant d, all standalone flags
+true, viewport 393 x 793, screen 393 x 852, DPR 3 and visual viewport height
+793/offsetTop 0. These match B's screen/viewport shape, yet D is clear.
+
+The important observed differences are D's `logoTop: 10` and `edgeHeight: 11`,
+compared with B's Logo top 69 and sampler height 69. The source of preview
+`cb055bf` still uses `safe-inset-top + 10px` for the Logo and
+`env(safe-area-inset-top) + 11px` for its nonpainting portal sampler. The
+recorded values are consistent with a zero effective top inset in D. D's
+report does not directly sample `env()` or native frame origin, so this is a
+source-backed inference, not a direct native inset measurement. Its root is
+transparent, body RGB 249/250/251 and root overscroll none. Other differences
+remain; do not declare the top inset alone the cause.
+
+The 59px screen/viewport height delta exists on both a clear and a blurred
+page, so that delta alone does not establish a blur trigger. Do not force
+screen height or subtract 59px from the real app's safe area: the D screenshots
+place the visible Logo below the status region despite its DOM top of 10px,
+and DOM coordinates cannot reveal the native host's page origin.
+
+Next is a separate read-only **F 系统安全框** document inside the original
+diagnostic scope, using `viewport-fit=auto` while still honoring all four
+CSS safe-area insets. It tests browser-managed insetting instead of overriding
+the original app's safe-area variables. See [system safe-frame task](./20261101T142400+0800-system-safe-frame.md).
+The real app's `viewport-fit=cover` and topbar styles remain unchanged until
+a physically safe, clear candidate is demonstrated. Private images remain
+attachments only.

@@ -31,13 +31,14 @@ p { line-height: 1.8; font-size: 14px; }
 .cases { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 16px 0; }
 .cases a { display: flex; align-items: center; justify-content: center; min-height: 48px; border: 1px solid #cfcec1; border-radius: 12px; font-size: 14px; text-decoration: none; }
 .cases [aria-current="page"] { background: #353532; color: #fffef9; }
+.cases [data-case-link="f"] { grid-column: 1 / -1; }
 .return { display: flex; align-items: center; justify-content: center; min-height: 48px; background: #fffef9; border: 1px solid #e0dfd5; border-radius: 12px; text-decoration: none; }
 .sample { margin: 24px 0; padding: 24px; border-radius: 24px; background: #353532; color: #f6f5ef; }
 .sample strong { display: block; margin: 28px 0; font: 28px/1.5 "Iowan Old Style", "Songti SC", serif; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.7; padding: 14px; border-radius: 12px; background: #fffef9; }
 .status-edge { display: none; }
 @supports (-webkit-touch-callout: none) {
-  [data-standalone="true"][data-case="a"] .status-edge { display: block; position: fixed; inset: 0 0 auto; height: calc(var(--safe-top) + 11px); background-color: var(--paper); -webkit-background-clip: text; background-clip: text; z-index: 2147483647; pointer-events: none; }
+  [data-standalone="true"]:is([data-case="a"], [data-case="f"]) .status-edge { display: block; position: fixed; inset: 0 0 auto; height: calc(var(--safe-top) + 11px); background-color: var(--paper); -webkit-background-clip: text; background-clip: text; z-index: 2147483647; pointer-events: none; }
 }
 [data-case="b"] .status-edge { display: block; position: fixed; inset: 0 0 auto; height: calc(var(--safe-top) + 10px); background: var(--paper); z-index: 2147483647; pointer-events: none; }
 html[data-case="c"] { overflow-x: clip; }

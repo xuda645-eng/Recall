@@ -202,12 +202,17 @@ test('原安装静态诊断离线进入并返回，未访问过的页面已预�
   else await context.setOffline(true);
   await page.getByRole('link', { name: '打开原安装内对照页' }).click();
   await expect(page.getByRole('heading', { name: '静态页还模糊吗？' })).toBeVisible();
-  await expect(page.locator('#report')).toContainText('installed-context-20261101-r2');
+  await expect(page.locator('#report')).toContainText('installed-context-20261101-r3');
   for (const variant of ['b', 'c', 'a']) {
     await page.locator(`[data-case-link="${variant}"]`).click();
     await expect(page.locator('html')).toHaveAttribute('data-case', variant);
     await expect(page.locator('#report')).toContainText(`"variant": "${variant.toUpperCase()}"`);
   }
+  await page.locator('[data-case-link="f"]').click();
+  await expect(page.locator('html')).toHaveAttribute('data-case', 'f');
+  await expect(page.locator('#report')).toContainText('viewport-fit=auto');
+  await page.locator('[data-case-link="a"]').click();
+  await expect(page.locator('#report')).toContainText('viewport-fit=cover');
   await page.getByRole('link', { name: '返回 Recall', exact: true }).click();
   await waitForAppReady(page);
   expect(await snapshot(page)).toEqual(before);
@@ -223,18 +228,22 @@ test('原安装显示诊断公开只读入口、静态加载与返回', async ({
   await page.getByRole('link', { name: '打开原安装内对照页' }).click();
   await expect(page.getByRole('heading', { name: '静态页还模糊吗？' })).toBeVisible();
   expect(new URL(page.url()).origin).toBe(origin);
-  await expect(page.locator('#report')).toContainText('installed-context-20261101-r2');
+  await expect(page.locator('#report')).toContainText('installed-context-20261101-r3');
   for (const variant of ['b', 'c', 'a']) {
     await page.locator(`[data-case-link="${variant}"]`).click();
     await expect(page.locator('html')).toHaveAttribute('data-case', variant);
     await expect(page.locator('#report')).toContainText(`"variant": "${variant.toUpperCase()}"`);
     expect(new URL(page.url()).origin).toBe(origin);
   }
+  await page.locator('[data-case-link="f"]').click();
+  await expect(page.locator('html')).toHaveAttribute('data-case', 'f');
+  await expect(page.locator('#report')).toContainText('viewport-fit=auto');
+  expect(new URL(page.url()).origin).toBe(origin);
   await page.getByRole('link', { name: '返回 Recall', exact: true }).click();
   await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'settings');
 });
 
-test('原安装三方案保持控件几何、触摸和滚动，切换不读写存储或调用API', async ({ page }) => {
+test('原安装方案保持控件几何、触摸和滚动，切换不读写存储或调用API', async ({ page }) => {
   test.skip(!!process.env.RECALL_URL, 'Storage guards and inset stress use local isolated contexts');
   await seedPage(page);
   const before = await snapshot(page);
@@ -248,13 +257,15 @@ test('原安装三方案保持控件几何、触摸和滚动，切换不读写�
   });
   await page.goto('./status-diagnostics/?status-case=invalid');
   await expect(page.locator('html')).toHaveAttribute('data-case', 'a');
-  for (const variant of ['a', 'b', 'c']) {
+  for (const variant of ['a', 'b', 'c', 'f']) {
     await page.locator('html').evaluate(element => element.setAttribute('data-previous-document', 'true'));
     await page.locator(`[data-case-link="${variant}"]`).click();
     await expect(page.locator('html')).toHaveAttribute('data-case', variant);
     expect(await page.locator('html').getAttribute('data-previous-document')).toBeNull();
     await expect(page.locator(`[data-case-link="${variant}"]`)).toHaveAttribute('aria-current', 'page');
     await expect(page.locator('#mode')).toContainText(`PWA · ${variant.toUpperCase()}`);
+    const viewportMetadata = await page.locator('meta[name="viewport"]').getAttribute('content');
+    expect(viewportMetadata).toContain(variant === 'f' ? 'viewport-fit=auto' : 'viewport-fit=cover');
     for (const inset of [0, 20, 59, 96]) {
       await page.evaluate(value => {
         document.documentElement.style.setProperty('--safe-top', `${value}px`);
@@ -300,6 +311,19 @@ test('原安装三方案保持控件几何、触摸和滚动，切换不读写�
     expect(scrolledReport.scrollTop).toBeGreaterThan(0);
     expect((await page.locator('.brand').boundingBox())!.y).toBe(69);
     await saveShot(page, `installed-case-${variant}`);
+    await page.setViewportSize({ width: 393, height: 793 });
+    await page.evaluate(() => {
+      Object.defineProperty(screen, 'height', { configurable: true, value: 852 });
+    });
+    await page.getByRole('button', { name: '重新读取显示信息' }).click();
+    const shorterReport = JSON.parse((await page.locator('#report').textContent())!);
+    expect(shorterReport.screen).toEqual([393, 852]);
+    expect(shorterReport.viewport).toEqual([393, 793]);
+    expect(shorterReport.logoTop).toBe(69);
+    await page.evaluate(() => document.documentElement.style.setProperty('--safe-top', '0px'));
+    await page.getByRole('button', { name: '重新读取显示信息' }).click();
+    expect((await page.locator('.brand').boundingBox())!.y).toBe(10);
+    await noOverflow(page);
   }
   await page.getByRole('link', { name: '返回 Recall', exact: true }).click();
   await waitForAppReady(page);
