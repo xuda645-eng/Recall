@@ -8,7 +8,8 @@
 - Repository: `https://github.com/xuda645-eng/Recall`.
 - Scope: preserve six existing drafts, synchronize local main with already
   published source, and commit this documentation record and release index.
-- Status: original main synchronized and clean; record publication pending.
+- Status: original drafts preserved, local main synchronized and clean; record
+  committed and normally pushed, documentation evidence follow-up prepared.
 - No new application, dependency, schema, secret, infrastructure or data change.
 
 ## Inspection And Preservation
@@ -58,15 +59,27 @@ local handoffs, dependencies and build output were not staged or published.
 - Exact pending-path inventory and staged-empty checks: passed before stash.
 - Backup/stash byte equality: all six passed after synchronization.
 - Original main `git status --porcelain`: empty after synchronization.
-- Documentation link and diff checks are run before each record commit/push;
-  actual publication outcomes are appended below.
+- Documentation validation at `2026-11-01T19:00:33+08:00`:
+  `UV_CACHE_DIR=/tmp/recall-skill-uv-cache uv run --no-project --with PyYAML
+  python /tmp/recall-parallel-skill-check.py skills/recall-parallel-delivery
+  docs/RELEASES.md docs/releases/20261101T185732+0800-main-worktree-reconciliation.md`:
+  8 metadata/package checks, 34 release-index links and 1 task-record link passed.
+  `git diff --check` passed, and the application/public/server/dependency diff
+  was empty. Repeat documentation/diff checks before the evidence follow-up.
 - No app tests/build/browser or physical-device acceptance is run for this
   documentation-only reconciliation. Existing validation limits are unchanged.
 
 ## Publication And Recovery
 
-- Record commit SHA: Git commit containing this file, appended after normal push.
-- Push and final original-main synchronization outcomes: pending.
+- Record commit: `1ef1be842f9621ed694412b1404cce79f3980707`,
+  `2026-11-01T19:01:48+08:00`, containing this record and its index entry only.
+- `git fetch origin` still matched `e197e45` before commit. Normal
+  `git push origin HEAD:main` succeeded: `e197e45..1ef1be8 HEAD -> main`.
+  `git ls-remote origin refs/heads/main` independently returned the full record
+  SHA at `2026-11-01T19:01:52+08:00`. No force push or new app deployment.
+- Evidence follow-up: documentation-only Git commit updating this record/index;
+  its exact SHA, push result and final original-main synchronization are reported
+  at handoff without another self-describing commit or app release.
 - Production deployment: not applicable; no app code changed or bundle uploaded.
   Production origin stays `https://recall-memory.pages.dev/`.
 - Prior production evidence is in
