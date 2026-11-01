@@ -3,8 +3,9 @@
 - ID: `20261101T104013+0800-full-shell-device-probe`.
 - Start: 2026-11-01T10:40:13+08:00.
 - Scope: isolated prototype build, tests, evidence; production unchanged.
-- Status: isolated full-shell preview published and browser checks passed;
-  native D/E comparison pending. Production unchanged.
+- Status: user reports both D/E clear in the installed PWA. The isolated
+  full-source probe does not reproduce the production symptom; root cause
+  remains unresolved. Production unchanged by this task.
 - Source base: `4ca87a39f9b7721f84de70ab750ffa1418843142`,
   `xuda645-eng/Recall` main. Work performed in clean existing isolated
   worktree; unrelated CWD/primary-worktree changes preserved.
@@ -138,3 +139,30 @@ or vault content changed. This was already disclosed in the preceding work.
   script and reader CSS matched local bytes. All 12 selected public resources
   plus the HTML document are byte-verified. Full 203-file public hashing was
   not performed; Workbox-controlled offline shell checks passed separately.
+
+## Physical D/E Result
+
+2026-11-01T11:04:18+08:00: the owner reports D and E both look normal. Their
+private screenshots show D on Home and E on the folder directory, both with
+the home-screen PWA mode label, `shell-20261101-r1` and a sharp Logo top edge.
+The screenshots are evidence only and are not published in the repository.
+
+D uses the original app styles, so E's root-background override is not an
+established fix. Neither the simplified A/B/C nor this full-source isolated
+installation reproduced the reported production blur. This narrows the
+investigation but does not prove CSS irrelevant or blame an old installation:
+the preview still differs in installation identity/origin, synthetic data,
+network fence, diagnostic panel and loading timing.
+
+Next required evidence is the current appearance when returning to the
+original Recall home-screen icon, without reinstalling, clearing storage or
+changing settings. The latest original-app screenshot predates these probes;
+do not assume that symptom persists now or has resolved. If it persists,
+compare the original instance's runtime state before proposing another fix.
+No further experimental style change or new installed preview is warranted
+from the D/E result alone.
+
+This acceptance-evidence follow-up is documentation-only. Local Markdown link
+validation and `git diff --check` are required; app tests/build/deployment are
+not repeated because application/prototype code is unchanged. No production
+operation, data mutation or rollback is part of this update.

@@ -25,6 +25,14 @@ an existing snapshot. Production-origin execution is rejected by a guard.
 
 ## Interpretation And Phone Handoff
 
+Physical result received 2026-11-01T11:04+08:00: D and E both look normal.
+Screenshots show D on Home and E on the folder directory in standalone mode.
+This probe therefore does not reproduce the original app's symptom. E is not
+a proven fix. Do not ask the owner to keep installing speculative previews or
+reinstalling the real app; first check its current appearance through the
+original home-screen icon. Installation state is only a hypothesis, not a
+confirmed cause.
+
 Open the [full-shell HTTPS preview](https://898bd7f7.recall-memory.pages.dev/).
 Validation details are in the [task record](../../docs/releases/20261101T104013+0800-full-shell-device-probe.md).
 Install separately as **Recall 完整壳对照**, without removing or reinstalling
