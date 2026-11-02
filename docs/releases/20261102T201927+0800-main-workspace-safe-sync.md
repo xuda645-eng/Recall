@@ -9,8 +9,9 @@
 - Scope: local preservation commit, history-preserving reconciliation, latest
   source validation and sanitized source/documentation publication. No new
   application behavior, real-library mutation or production deployment intended.
-- Status: preservation committed; source reconciled and validated, publication
-  pending. Validation clock `2026-11-02T20:27:51+08:00`.
+- Status: preservation committed; source reconciled, validated and normally
+  pushed. Validation clock `2026-11-02T20:27:51+08:00`; publication clock
+  `2026-11-02T20:29:43+08:00`. This is the outcome-only follow-up.
 
 ## Audit And Preservation
 
@@ -110,7 +111,17 @@
   After matching their historical draft hash and verifying upstream's newer
   fixes, resolve these files to the incoming reviewed versions; retain the new
   task record and its single index row. No whole-repository ours/theirs strategy.
-- Merge SHA, final normal push and completion time: pending.
+- Merge SHA: `824cd9a33c29f2b6798a4291209472ca9fe5765f`.
+  `git push origin HEAD:main` succeeded (`d424e29..824cd9a`) at the publication
+  clock above; independent `git ls-remote origin refs/heads/main` matched.
+  The main workspace was clean, with both original checkpoint and current
+  remote history retained. No new branch or force-push was used.
+- The first explicit `git add -- <reviewed paths>` returned an ignored-directory
+  warning for the previously ignored Skill parent. The incoming files were
+  already tracked by the merge. Recovery: `git add -u`, which updates only
+  tracked files; no `-f`, ignore-policy change or private-data staging.
+- This evidence follow-up is documentation-only. Its final SHA/push result is
+  reported in chat without an endless self-describing commit chain.
 - Deployment ID/URL and post-deploy validation: not applicable if reconciled app
   source matches existing remote source. Keep `https://recall-memory.pages.dev/`
   unchanged; do not redeploy an old snapshot or documentation-only update.
