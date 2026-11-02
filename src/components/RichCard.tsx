@@ -10,6 +10,8 @@ import remarkGfm from "remark-gfm";
 import type { CardType, ImageOcclusionData } from "@/types";
 import { renderCloze } from "@/lib/cloze";
 import { getImageUrl } from "@/services/images";
+import { MediaImage } from '@/components/media-image';
+import { MEDIA_ID } from '../../shared/media';
 import { ImageOcclusionStudy } from "@/components/image-occlusion-study";
 import "katex/dist/katex.min.css";
 import "highlight.js/styles/github-dark.css";
@@ -83,12 +85,25 @@ function RecallImage({ filename, alt }: { filename: string; alt?: string }): JSX
   return <img src={src} alt={alt ?? ""} className="max-w-full rounded-lg" />;
 }
 
+function MarkdownImage({ src, alt }: React.ComponentPropsWithoutRef<'img'>): JSX.Element {
+  const { t } = useTranslation();
+  if (src?.startsWith('https://recall.local/')) {
+    const filename = src.slice('https://recall.local/'.length);
+    return MEDIA_ID.test(filename) ? <MediaImage id={filename} alt={alt ?? ''}/> : <RecallImage filename={filename} alt={alt ?? undefined}/>;
+  }
+  if (src && (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('//'))) {
+    return <span className="inline-flex items-center gap-2 rounded border border-dashed border-muted-foreground/30 bg-muted/50 px-3 py-2 text-sm text-muted-foreground" title={src}>{t('richCard.remoteImageBlocked', '已阻止远程图片加载')}</span>;
+  }
+  return <img src={src} alt={alt ?? ''} className="max-w-full rounded-lg"/>;
+}
+
 /**
  * Rewrite recall:// protocol to a sanitizer-friendly https://recall.local/
  * so rehype-sanitize doesn't strip the img src.
  */
 function preprocessContent(content: string): string {
-  return content.replace(
+  const hashed = content.replace(/recall:\/\/([a-f0-9]{64}\.(?:png|jpg|webp))(?=[\s)<>"']|$)/g, 'https://recall.local/$1');
+  return hashed.replace(
     /!\[([^\]]*)\]\(recall:\/\/([^)]+)\)/g,
     "![$1](https://recall.local/$2)",
   );
@@ -150,22 +165,7 @@ export function RichCard({ content, isBack = false, cardType = "basic", revealed
         // rehypeKatex emits raw HTML, but KaTeX's default trust:false prevents \href{javascript:...} attacks.
         // DO NOT enable trust:true on rehypeKatex without re-auditing the sanitizer schema.
         components={{
-          img({ src, alt }: React.ComponentPropsWithoutRef<"img">) {
-            if (src && src.startsWith("https://recall.local/")) {
-              const filename = src.replace("https://recall.local/", "");
-              return <RecallImage filename={filename} alt={alt ?? undefined} />;
-            }
-            // Block all remote/external images for privacy (offline-first app)
-            // Only allow local recall:// images via the RecallImage component
-            if (src && (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("//"))) {
-              return (
-                <span className="inline-flex items-center gap-2 rounded border border-dashed border-muted-foreground/30 bg-muted/50 px-3 py-2 text-sm text-muted-foreground" title={src}>
-                  {t("richCard.remoteImageBlocked", "已阻止远程图片加载")}
-                </span>
-              );
-            }
-            return <img src={src} alt={alt ?? ""} className="max-w-full rounded-lg" />;
-          },
+          img: MarkdownImage,
           code({ children, className, inline, ...props }: React.ComponentPropsWithoutRef<"code"> & { inline?: boolean }) {
             const match = /language-(\w+)/.exec(className || "");
             return !inline && match ? (

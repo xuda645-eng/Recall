@@ -12,6 +12,7 @@ import { dataState } from '@/stores/store-helpers';
 import { applyEntities, canonical, cloudSettingKeys, entityKey, snapshotEntities, type CloudEntity, type TrustedDevice } from '../../shared/cloud';
 import type { RecallStateSnapshot } from '@/types';
 import './memory-cloud.css';
+import { synchronizeMedia, useMediaSync } from '@/services/media-sync';
 
 type CloudStatus = ReturnType<typeof useCloudSync.getState>;
 type ConflictChoice = 'local' | 'remote';
@@ -67,6 +68,7 @@ function exportLocalBackup(): void {
 
 function CloudSummary({ onManage }: Pick<MemoryCloudProps, 'onManage'>) {
   const status = useCloudSync();
+  const media = useMediaSync();
   const action = useCloudAction();
   const hasConflicts = status.conflicts > 0 || status.phase === 'conflict';
   const label = hasConflicts && status.phase === 'synced' ? phaseLabels.conflict
@@ -83,6 +85,8 @@ function CloudSummary({ onManage }: Pick<MemoryCloudProps, 'onManage'>) {
       <span>待同步 {status.pending} 项</span><span>冲突 {status.conflicts} 项</span>
     </div>
     <p className="m-cloud-note">上次成功同步：{formatTime(status.lastSyncedAt)}</p>
+    {(media.pending > 0 || media.running || media.completed > 0) && <p className="m-cloud-note" role="status">来源图片：{media.running ? '正在单独同步' : media.pending ? '尚未完成' : '已同步'}，待传 {media.pending} 张。文字与复习记录优先同步。</p>}
+    {media.error && <p className="m-cloud-warning" role="status">{media.error}{authorized(status) && <button type="button" className="m-secondary" disabled={media.running} onClick={() => void synchronizeMedia(status.session!.spaceId)}>重试图片同步</button>}</p>}
     {hasConflicts && <p className="m-cloud-warning">冲突不会自动覆盖。请在云同步设置中预览双方、导出备份，再明确选择保留版本。</p>}
     {status.error && <p className="m-error" role="alert">{status.error}</p>}
     {action.error && <p className="m-error" role="alert">{action.error}</p>}

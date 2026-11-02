@@ -1,0 +1,26 @@
+<title>Recall 学习摘录模板 - 截图红框</title>
+<p>用途：记录自己选中的学习内容。把带红框的截图放进下方表格，后续提供这份学习文档的链接，生成 Recall 问答卡片；无需手抄原文。</p>
+<h1 seq="auto">来源与记录</h1>
+<p><b>学习主题：</b>填写本次主题</p>
+<p><b>原文链接：</b>粘贴来源文档链接；同一篇来源只需记录一次</p>
+<p><b>记录日期：</b>可选</p>
+<p><b>卡组与导入位置：</b>可选；未填写时，制卡前再确认</p>
+<h1 seq="auto">截图记录区</h1>
+<p>每格放一张带红框的截图。按行从左到右阅读，空格跳过；同行截图默认独立。跨屏同一知识点可在旁边写“续上图”，问题和备注均可选。插入图片后删除对应的占位文字，空间不够时继续添加行。</p>
+<table>
+  <colgroup><col width="270"/><col width="270"/><col width="270"/></colgroup>
+  <tbody>
+    <tr><td vertical-align="top"><p>在此放截图</p></td><td vertical-align="top"><p>在此放截图</p></td><td vertical-align="top"><p>在此放截图</p></td></tr>
+    <tr><td vertical-align="top"><p>在此放截图</p></td><td vertical-align="top"><p>在此放截图</p></td><td vertical-align="top"><p>在此放截图</p></td></tr>
+    <tr><td vertical-align="top"><p>在此放截图</p></td><td vertical-align="top"><p>在此放截图</p></td><td vertical-align="top"><p>在此放截图</p></td></tr>
+    <tr><td vertical-align="top"><p>在此放截图</p></td><td vertical-align="top"><p>在此放截图</p></td><td vertical-align="top"><p>在此放截图</p></td></tr>
+  </tbody>
+</table>
+<h1 seq="auto">标记约定</h1>
+<ul>
+  <li>截图尽量保留章节标题和完整句子。红框指定答案取材范围，框外内容只帮助理解；原文红色字体不等于选中。</li>
+  <li>一个红框可以形成多个 QA。图表、时间线需保留日期、条件和对应关系；看不清的文字留待确认，不猜。</li>
+  <li>按来源当时的表述制卡，保留“计划”“尚未”等状态，不把材料中的计划当作当前已实现。</li>
+  <li>不同来源可复制“来源与记录”和“截图记录区”到本文档下方；也可为新主题另建一份学习文档。</li>
+  <li>这是个人记录模板，不含真实学习材料。遵守来源的截图与保存要求，不公开分享私有截图；生成文件不等于已导入 APP。</li>
+</ul>
