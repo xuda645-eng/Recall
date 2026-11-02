@@ -6,10 +6,21 @@ const original = ['  原创划线一。\n\n说明观点与条件。  ', '原创�
 const questions = ['第一条原创材料提出了什么观点和条件？', '第二条原创材料需要回忆哪个条件？'];
 const seed = () => ({ ...createSeedSnapshot(), cards: [], decks: [], reviewLogs: [], studySessions: [], settings: { ...createSeedSnapshot().settings, onboardingComplete: true } });
 async function snapshot(page: Page) { return page.evaluate(() => JSON.parse(localStorage.getItem('recall.snapshot.v1') || 'null')); }
+async function savedJob(page: Page): Promise<WereadJob> {
+  return page.evaluate(() => new Promise<WereadJob>((resolve, reject) => {
+    const request = indexedDB.open('recall-weread-drafts', 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const read = request.result.transaction('jobs').objectStore('jobs').get('active');
+      read.onsuccess = () => { resolve(read.result); request.result.close(); };
+      read.onerror = () => { reject(read.error); request.result.close(); };
+    };
+  }));
+}
 async function setup(page: Page, count = 2, fail: boolean | number = false, budget = 300, delay = 200) {
   const calls: string[] = [];
   let failed = false;
-  const marks = Array.from({ length: count }, (_, index) => ({ bookmarkId: `mark-${index}`, markText: original[index] || `原创第 ${index} 条划线。`, chapterUid: '1', chapterTitle: '原创章节' }));
+  const marks = Array.from({ length: count }, (_, index) => ({ bookmarkId: `mark-${index}`, markText: original[index] || `原创第 ${index} 条划线。`, chapterUid: '1', chapterIdx: 1, range: `${index * 100}-80`, chapterTitle: '原创章节' }));
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url());
     const body = route.request().postDataJSON();
@@ -47,6 +58,56 @@ async function choose(page: Page) {
   await page.getByRole('button', { name: '下一步 · AI 问题与导入' }).click();
   await expect(page.getByRole('heading', { name: '让划线变成问题' })).toBeVisible();
 }
+test('确认页按步骤选择，默认逐条且只有一个主操作，说明展开不调用AI', async ({ page }) => {
+  const calls = await setup(page);
+  const before = await snapshot(page);
+  await choose(page);
+  await expect(page.getByRole('heading', { name: /1\s*选择划线/ })).toBeVisible();
+  await expect(page.getByRole('group', { name: /2\s*选择生成方式/ })).toBeVisible();
+  await expect(page.getByRole('radio', { name: /^逐条生成/ })).toBeChecked();
+  await expect(page.getByRole('button', { name: '智能合并划线', exact: true })).toHaveCount(0);
+  await expect(page.locator('.wr-workspace .m-primary')).toHaveCount(1);
+  const layouts = await page.locator('.wr-generation-mode').evaluateAll(elements => elements.map(element => getComputedStyle(element).flexDirection));
+  expect(layouts).toEqual(['row', 'row']);
+  await expect(page.locator('.wr-generation-details')).not.toHaveAttribute('open');
+  await expect(page.locator('.wr-privacy-note')).toContainText('仅所选原文发送至火山 AI');
+  await page.getByText('AI 与隐私说明', { exact: true }).click();
+  await expect(page.locator('.wr-generation-details')).toHaveAttribute('open');
+  await expect(page.locator('.wr-consent')).toContainText('每日最多 300');
+  await page.getByRole('button', { name: '调整划线', exact: true }).click();
+  await expect(page.locator('.wr-highlight-options')).toBeVisible();
+  expect(calls).toEqual([]);
+  expect(await snapshot(page)).toEqual(before);
+});
+test('确认页安全区、窄屏、断点、横屏、放大文字和深色保持可读可触达', async ({ page }, info) => {
+  const calls = await setup(page, 29);
+  const before = await snapshot(page);
+  await choose(page);
+  await page.screenshot({ path: `/tmp/recall-weread-flow-${info.project.name}.png` });
+  await page.locator('.memory-app').evaluate(element => { (element as HTMLElement).style.setProperty('--safe-inset-top', '59px'); (element as HTMLElement).style.setProperty('--safe-bottom', '34px'); });
+  for (const viewport of [{ width: 393, height: 852 }, { width: 320, height: 740 }, { width: 760, height: 900 }, { width: 761, height: 1000 }, { width: 852, height: 393 }, { width: 1280, height: 900 }]) {
+    await page.setViewportSize(viewport);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    expect(await page.locator('.memory-content').evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+    const targets = await page.locator('.wr-scope-control, .wr-generation-mode, .wr-generation-details summary, .wr-dock button').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().height));
+    expect(targets.every(height => height >= 44)).toBe(true);
+    await page.locator('.memory-content').evaluate(element => { element.scrollTop = element.scrollHeight; });
+    const button = await page.locator('.wr-dock .m-primary').boundingBox();
+    const content = await page.locator('.memory-content').boundingBox();
+    expect(button!.y).toBeGreaterThanOrEqual(content!.y);
+    expect(button!.y + button!.height).toBeLessThanOrEqual(content!.y + content!.height);
+  }
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.evaluate(() => document.documentElement.classList.add('dark'));
+  const enlarged = await page.addStyleTag({ content: '.wr-generation-mode strong, .wr-generation-mode small, .wr-privacy-note, .wr-action-note { font-size: 20px !important; }' });
+  expect(await page.locator('.memory-content').evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  await page.getByRole('button', { name: '调整划线', exact: true }).click();
+  await page.getByRole('checkbox', { name: /全选 \/ 全不选/ }).uncheck();
+  await expect(page.getByRole('button', { name: '生成并自动导入', exact: true })).toBeDisabled();
+  await enlarged.evaluate(element => element.remove());
+  expect(calls).toEqual([]);
+  expect(await snapshot(page)).toEqual(before);
+});
 test('正式连接入口、个人书卡字段与搜索，百分比1不误作100%', async ({ page }, testInfo) => {
   const calls = await setup(page);
   await expect(page.locator('.wr-workspace')).not.toContainText('5 MB');
@@ -116,7 +177,7 @@ test('展开划线支持全选全不选和半选，数量同步且仅导入确�
   const calls = await setup(page);
   const before = await snapshot(page);
   await choose(page);
-  await page.getByRole('button', { name: '选择划线 · 默认全选', exact: true }).click();
+  await page.getByRole('button', { name: '调整划线', exact: true }).click();
   const all = page.getByRole('checkbox', { name: /全选 \/ 全不选/ });
   const rows = page.locator('.wr-highlight-options > label:not(.wr-highlight-all) input');
   const generate = page.getByRole('button', { name: '生成并自动导入', exact: true });
@@ -135,8 +196,8 @@ test('展开划线支持全选全不选和半选，数量同步且仅导入确�
   await expect(all).toBeChecked();
   await expect(rows.nth(1)).toBeChecked();
   await rows.nth(1).uncheck();
-  await page.getByRole('button', { name: '选择划线 · 默认全选', exact: true }).click();
-  await page.getByRole('button', { name: '选择划线 · 默认全选', exact: true }).click();
+  await page.getByRole('button', { name: '调整划线', exact: true }).click();
+  await page.getByRole('button', { name: '调整划线', exact: true }).click();
   await expect(all).toBeChecked({ indeterminate: true });
   const box = await page.locator('.wr-highlight-all').boundingBox();
   expect(box!.height).toBeGreaterThanOrEqual(44);
@@ -191,12 +252,79 @@ test('失败全批不导入，刷新保留已成功问题且不续跑，重试�
   expect(calls.filter(value => value === original[1])).toHaveLength(2);
   expect((await snapshot(page)).cards.map((card: { back: string }) => card.back)).toEqual(original);
 });
+test('四并发生成乱序完成，保存不丢失且自动导入保持原文次序', async ({ page }) => {
+  await setup(page, 9);
+  const calls: string[] = [];
+  const releases: (() => void)[] = [];
+  let active = 0;
+  let maximum = 0;
+  await page.route('**/api/weread/question', async route => {
+    const { markText, summary } = route.request().postDataJSON();
+    expect(summary).toBe(false);
+    const index = calls.length;
+    calls.push(markText); active++; maximum = Math.max(maximum, active);
+    if (index < 4) await new Promise<void>(resolve => { releases[index] = resolve; });
+    else await new Promise(resolve => setTimeout(resolve, 100));
+    active--;
+    await route.fulfill({ json: { question: `第 ${index} 条原创材料需要回忆什么？`, summary: null, cached: false } });
+  });
+  await choose(page);
+  try {
+    await page.getByRole('button', { name: '生成并自动导入' }).click();
+    await expect.poll(() => calls.length).toBe(4);
+    expect(maximum).toBe(4);
+    expect((await snapshot(page)).cards).toHaveLength(0);
+    releases[3]();
+    await expect.poll(() => calls.length).toBeGreaterThan(4);
+    const partial = await savedJob(page);
+    expect(partial.generated[0]).toBe(partial.drafts[3].id);
+    for (const index of [2, 0, 1]) releases[index]();
+    await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+    const job = await savedJob(page);
+    expect(job.generated).toHaveLength(9);
+    expect(new Set(job.generated).size).toBe(9);
+    expect(maximum).toBe(4);
+    const data = await snapshot(page);
+    expect(data.cards.map((card: { back: string }) => card.back)).toEqual(calls);
+    expect(data.cards.map((card: { front: string }) => card.front)).toEqual(calls.map((_, index) => `第 ${index} 条原创材料需要回忆什么？`));
+  } finally { releases.forEach(release => release()); }
+});
+test('并发遇到429停止补位，保存其他在途成功问题且重试只处理剩余', async ({ page }) => {
+  await setup(page, 9);
+  const calls: string[] = [];
+  let limited = true;
+  await page.route('**/api/weread/question', async route => {
+    const { markText } = route.request().postDataJSON();
+    calls.push(markText);
+    if (limited && markText === original[0]) {
+      limited = false;
+      await route.fulfill({ status: 429, json: { error: 'synthetic-limit' } }); return;
+    }
+    await new Promise(resolve => setTimeout(resolve, 150));
+    await route.fulfill({ json: { question: '这个原创材料提出了什么具体条件？', summary: null, cached: false } });
+  });
+  await choose(page);
+  await page.getByRole('button', { name: '生成并自动导入' }).click();
+  await expect(page.getByRole('alert')).toContainText('在线调用上限');
+  expect(calls).toHaveLength(4);
+  const job = await savedJob(page);
+  expect(job.generated).toHaveLength(3);
+  expect((await snapshot(page)).cards).toHaveLength(0);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '进度已为你保留' })).toBeVisible();
+  await page.getByRole('button', { name: '重试并继续' }).click();
+  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  expect(calls).toHaveLength(10);
+  expect(calls.filter(text => text === original[0])).toHaveLength(2);
+  for (const draft of job.drafts.filter(item => job.generated.includes(item.id))) expect(calls.filter(text => text === draft.highlight.markText)).toHaveLength(1);
+  expect((await snapshot(page)).cards).toHaveLength(9);
+});
 test('单次101条默认全选并全部生成导入，重复导入不重做问题', async ({ page }) => {
   const calls = await setup(page, 101, false, 300, 0);
   await choose(page);
   await expect(page.locator('.wr-confirm-count')).toContainText('101');
   await expect(page.getByRole('button', { name: '生成并自动导入' })).toBeEnabled();
-  await page.getByRole('button', { name: '选择划线 · 默认全选' }).click();
+  await page.getByRole('button', { name: '调整划线' }).click();
   await expect(page.locator('.wr-highlight-options > label:not(.wr-highlight-all) input:checked')).toHaveCount(101);
   expect(calls).toEqual([]);
   expect((await snapshot(page)).cards).toHaveLength(0);
@@ -230,14 +358,18 @@ test('超过20个成功问题的任务失败后刷新可恢复，重试只处理
   await choose(page);
   await page.getByRole('button', { name: '生成并自动导入' }).click();
   await expect(page.getByRole('alert')).toBeVisible();
-  expect(calls).toHaveLength(26);
+  const failedCalls = calls.length;
+  expect(failedCalls).toBeGreaterThanOrEqual(26);
+  expect(failedCalls).toBeLessThanOrEqual(29);
   expect((await snapshot(page)).cards).toHaveLength(0);
-  const completed = calls.slice(0, 25);
+  const job = await savedJob(page);
+  const completed = job.drafts.filter(draft => job.generated.includes(draft.id)).map(draft => draft.highlight.markText);
+  expect(completed.length).toBe(failedCalls - 1);
   await page.reload();
   await expect(page.getByRole('heading', { name: '进度已为你保留' })).toBeVisible();
-  await expect(page.locator('.wr-job-summary strong')).toContainText('25');
+  await expect(page.locator('.wr-job-summary strong')).toContainText(String(completed.length));
   await page.waitForTimeout(300);
-  expect(calls).toHaveLength(26);
+  expect(calls).toHaveLength(failedCalls);
   await page.getByRole('button', { name: '重试并继续' }).click();
   await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
   expect(calls).toHaveLength(42);
@@ -255,7 +387,9 @@ test('大批量任务超过20条后可以主动暂停，刷新不续跑且已完
   expect(count).toBeGreaterThan(20);
   expect(count).toBeLessThan(41);
   expect((await snapshot(page)).cards).toHaveLength(0);
-  const completed = calls.slice(0, count);
+  const job = await savedJob(page);
+  const completed = job.drafts.filter(draft => job.generated.includes(draft.id)).map(draft => draft.highlight.markText);
+  expect(completed).toHaveLength(count);
   await page.reload();
   await expect(page.getByRole('heading', { name: '进度已为你保留' })).toBeVisible();
   const pausedCalls = calls.length;
@@ -346,7 +480,7 @@ test('生成后的草稿写入失败保留内存问题，重试不重做已成�
   });
   await page.getByRole('button', { name: '生成并自动导入' }).click();
   await expect(page.getByRole('button', { name: '重试并继续' })).toBeVisible();
-  expect(calls).toEqual([original[0]]); expect((await snapshot(page)).cards).toHaveLength(0);
+  expect(calls).toEqual(original); expect((await snapshot(page)).cards).toHaveLength(0);
   await page.evaluate(() => (window as unknown as { restoreDraftWrites: () => void }).restoreDraftWrites());
   await page.getByRole('button', { name: '重试并继续' }).click();
   await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();

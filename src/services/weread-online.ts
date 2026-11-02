@@ -1,5 +1,10 @@
 import { parseWereadExport, type WereadBook } from '@/lib/memory-weread';
 import { validateQuestion } from '../../shared/weread-ai';
+import { validateMergeBatch, validateMergeGroups, wereadRangeStart } from '../../shared/weread-merge';
+import type { MergeBatch, MergeGroup } from '../../shared/weread-merge';
+
+export type WereadOnlineHighlight = WereadBook['highlights'][number] & { chapterIdx?: number; range?: string };
+export type WereadOnlineLoadedBook = Omit<WereadBook, 'highlights'> & { highlights: WereadOnlineHighlight[] };
 
 export interface WereadOnlineBook {
   bookId: string;
@@ -38,7 +43,7 @@ function onlineDate(value: unknown): string | null {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? value : null;
 }
 
-async function request(path: 'books' | 'book' | 'progress' | 'question', input: unknown, signal: AbortSignal): Promise<unknown> {
+async function request(path: 'books' | 'book' | 'progress' | 'question' | 'merge', input: unknown, signal: AbortSignal): Promise<unknown> {
   const response = await fetch(`/api/weread/${path}`, {
     method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input), signal,
@@ -78,13 +83,34 @@ export async function loadOnlineProgress(bookId: string, signal: AbortSignal): P
   return progress !== null && progress <= 100 ? progress : null;
 }
 
-export async function loadOnlineBook(bookId: string, signal: AbortSignal): Promise<WereadBook> {
-  const result = parseWereadExport(JSON.stringify(await request('book', { bookId }, signal)));
+export async function loadOnlineBook(bookId: string, signal: AbortSignal): Promise<WereadOnlineLoadedBook> {
+  const value = await request('book', { bookId }, signal);
+  if (!onlineRecord(value) || !Array.isArray(value.books) || value.books.length !== 1
+    || !onlineRecord(value.books[0]) || !Array.isArray(value.books[0].highlights)) throw new Error('在线书籍来源不一致');
+  const metadata = value.books[0].highlights.map(highlight => {
+    if (!onlineRecord(highlight)) throw new Error('在线划线无效');
+    const { chapterIdx, range, ...original } = highlight;
+    return { original, chapterIdx: onlineCount(chapterIdx), range: wereadRangeStart(range) === null ? undefined : range as string };
+  });
+  const result = parseWereadExport(JSON.stringify({ ...value, books: [{ ...value.books[0], highlights: metadata.map(highlight => highlight.original) }] }));
   if (result.books.length !== 1 || result.books[0].bookId !== bookId) throw new Error('在线书籍来源不一致');
-  return result.books[0];
+  return { ...result.books[0], highlights: result.books[0].highlights.map((highlight, index) => {
+    const { chapterIdx: _chapterIdx, range: _range, ...original } = highlight as WereadOnlineHighlight;
+    return { ...original,
+      ...(metadata[index].chapterIdx === null ? {} : { chapterIdx: metadata[index].chapterIdx as number }),
+      ...(metadata[index].range === undefined ? {} : { range: metadata[index].range }),
+    };
+  }) };
 }
 
 export async function generateWereadQuestion(markText: string, summary: boolean, signal: AbortSignal): Promise<{ question: string; summary: string | null }> {
   const value = await request('question', { markText, summary }, signal) as Record<string, unknown>;
   return validateQuestion({ question: value.question, summary: value.summary }, summary);
+}
+
+export async function generateWereadMerge(batch: MergeBatch, signal: AbortSignal): Promise<MergeGroup[]> {
+  const input = validateMergeBatch(batch), value = await request('merge', input, signal);
+  if (!onlineRecord(value) || Object.keys(value).some(key => !['cards', 'cached'].includes(key))
+    || (Object.hasOwn(value, 'cached') && typeof value.cached !== 'boolean')) throw new Error('Invalid merge response');
+  return validateMergeGroups({ cards: value.cards }, input);
 }

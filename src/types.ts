@@ -20,6 +20,15 @@ export interface WeReadSource {
   bookId: string;
   bookmarkId: string;
   chapterUid?: string;
+  chapterIdx?: number;
+  range?: string;
+  highlights?: {
+    bookmarkId: string;
+    markText: string;
+    chapterUid: string;
+    chapterIdx: number;
+    range: string;
+  }[];
 }
 
 export interface OcclusionShape {

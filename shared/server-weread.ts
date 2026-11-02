@@ -2,6 +2,8 @@ import { ApiError, isRecord, json, readJson, sha256 } from './server';
 import type { ServerEnv } from './server';
 import type { AuthenticatedDevice } from './server-auth';
 import { AI_DAILY_MODEL_ATTEMPTS, AI_MAX_CHARS, QUESTION_VERSION, arkResponsesUrl, parseQuestionResponse, questionRequest, validateQuestion } from './weread-ai';
+import { MERGE_VERSION, mergeRequest, parseMergeResponse, validateMergeBatch, validateMergeGroups, wereadRangeStart } from './weread-merge';
+import type { MergeBatch, MergeGroup } from './weread-merge';
 
 async function limit(env: ServerEnv, space: string, bucket: string, maximum: number, duration: number): Promise<void> {
   const now = Date.now(), window = Math.floor(now / duration) * duration;
@@ -110,7 +112,13 @@ export async function wereadBook(request: Request, env: ServerEnv, auth: Authent
   await limit(env, auth.session.spaceId, 'weread', 120, 3600000);
   const value = await gateway(env, '/book/bookmarklist', { bookId: input.bookId });
   if (!Array.isArray(value.updated) || value.updated.length > 1000 || !Array.isArray(value.chapters) || !isRecord(value.book)) throw new ApiError(502, '划线超过限制或响应无效，请使用分批文件导入');
-  const chapters = new Map(value.chapters.filter(isRecord).map(chapter => [String(chapter.chapterUid), chapter.title]));
+  const chapters = new Map<string, Record<string, unknown>>(), ambiguousChapters = new Set<string>();
+  for (const chapter of value.chapters.filter(isRecord)) {
+    if (typeof chapter.chapterUid !== 'string' && notebookCount(chapter.chapterUid) === null) continue;
+    const uid = String(chapter.chapterUid);
+    if (chapters.has(uid)) ambiguousChapters.add(uid);
+    chapters.set(uid, chapter);
+  }
   const seen = new Set<string>();
   const highlights = value.updated.filter(item => isRecord(item) && item.type === 1).map(item => {
     if (!isRecord(item) || typeof item.markText !== 'string' || !item.markText.trim() || item.markText.length > 20000
@@ -119,9 +127,13 @@ export async function wereadBook(request: Request, env: ServerEnv, auth: Authent
     if (seen.has(bookmarkId)) throw new ApiError(502, '微信读书返回重复划线');
     seen.add(bookmarkId);
     const chapterUid = item.chapterUid === undefined ? undefined : String(item.chapterUid);
-    const chapterTitle = chapterUid === undefined ? undefined : chapters.get(chapterUid);
+    const chapter = chapterUid === undefined ? undefined : chapters.get(chapterUid);
+    const chapterTitle = chapter?.title;
+    const chapterIdx = chapterUid !== undefined && !ambiguousChapters.has(chapterUid) ? notebookCount(chapter?.chapterIdx) : null;
+    const range = wereadRangeStart(item.range) === null ? undefined : item.range as string;
     return { bookmarkId, markText: item.markText, ...(chapterUid === undefined ? {} : { chapterUid: text(chapterUid, 200) }),
-      ...(chapterTitle === undefined ? {} : { chapterTitle: text(chapterTitle, 200) }) };
+      ...(chapterTitle === undefined ? {} : { chapterTitle: text(chapterTitle, 200) }),
+      ...(chapterIdx === null ? {} : { chapterIdx }), ...(range === undefined ? {} : { range }) };
   });
   return json({ format: 'recall-weread-export-v1', books: [{ bookId: input.bookId, title: text(value.book.title, 80),
     author: typeof value.book.author === 'string' ? value.book.author.slice(0, 200) : '', highlights }] });
@@ -154,4 +166,32 @@ export async function wereadQuestion(request: Request, env: ServerEnv, auth: Aut
       .bind(space, hash, JSON.stringify(result), Date.now() + 7 * 86400000),
   ]);
   return json({ ...result, cached: false });
+}
+
+export async function wereadMerge(request: Request, env: ServerEnv, auth: AuthenticatedDevice): Promise<Response> {
+  const value = await readJson(request, 64000);
+  let input: MergeBatch;
+  try { input = validateMergeBatch(value); } catch { throw new ApiError(400, 'Invalid merge batch'); }
+  if (!env.ARK_API_KEY || !env.ARK_ENDPOINT_ID || !env.ARK_BASE_URL) throw new ApiError(503, 'AI 连接尚未配置');
+  let url: string;
+  try { url = arkResponsesUrl(env.ARK_BASE_URL); } catch { throw new ApiError(503, 'AI 连接配置无效'); }
+  const space = auth.session.spaceId;
+  await limit(env, space, 'ai-request', 120, 3600000);
+  const hash = await sha256(JSON.stringify(['/api/weread/merge', MERGE_VERSION, env.ARK_ENDPOINT_ID, input]));
+  const old = await env.DB.prepare('SELECT value_json FROM import_question_cache WHERE space_id = ? AND content_hash = ? AND expires_at > ?')
+    .bind(space, hash, Date.now()).first<{ value_json: string }>();
+  if (old) {
+    try { return json({ cards: validateMergeGroups(JSON.parse(old.value_json), input), cached: true }); } catch { /* Regenerate invalid cached output. */ }
+  }
+  await limit(env, space, 'ai-model', AI_DAILY_MODEL_ATTEMPTS, 86400000);
+  const response = await upstream(url, env.ARK_API_KEY, mergeRequest(env.ARK_ENDPOINT_ID, input));
+  let cards: MergeGroup[];
+  try { cards = parseMergeResponse(response, input); } catch { throw new ApiError(502, 'AI 输出未通过检查，请重试或手动出题'); }
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM import_question_cache WHERE space_id = ? AND expires_at <= ?').bind(space, Date.now()),
+    env.DB.prepare(`INSERT INTO import_question_cache (space_id, content_hash, value_json, expires_at) VALUES (?, ?, ?, ?)
+      ON CONFLICT (space_id, content_hash) DO UPDATE SET value_json = excluded.value_json, expires_at = excluded.expires_at`)
+      .bind(space, hash, JSON.stringify({ cards }), Date.now() + 7 * 86400000),
+  ]);
+  return json({ cards, cached: false });
 }

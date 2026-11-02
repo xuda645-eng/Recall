@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createSeedSnapshot } from '@/data/seed';
 import { applyWereadImport, buildWereadDrafts, planWereadImport, type WereadBook } from './memory-weread';
 import { createWereadJob, jobUpdates, pendingQuestions, safeJobPlan, validateWereadJob } from './weread-job';
+import { buildMergedWereadDraft } from './memory-weread-merge';
 
 function fixture(count = 2) {
   const snapshot = { ...createSeedSnapshot(), cards: [], decks: [], reviewLogs: [] };
@@ -9,6 +10,57 @@ function fixture(count = 2) {
   return { snapshot, books, drafts: buildWereadDrafts(snapshot, books, ['test-book']) };
 }
 describe('bounded persistent WeRead job', () => {
+  it('revalidates persisted groups, their exact originals and hash IDs without generating singleton questions', async () => {
+    const { snapshot, books } = fixture();
+    const members = books[0].highlights.map((highlight, index) => ({ ...highlight, chapterUid: 'chapter', chapterIdx: 0, range: `${index * 100}-${index * 100 + 50}` }));
+    const draft = await buildMergedWereadDraft(snapshot, books[0], members, 'Question about both originals?');
+    const job = createWereadJob(snapshot, [draft], new Set());
+    expect(validateWereadJob(JSON.parse(JSON.stringify(job)))).toEqual(job);
+    expect(pendingQuestions(job)).toEqual([]);
+    const imported = applyWereadImport(snapshot, safeJobPlan(snapshot, job), new Set());
+    expect(applyWereadImport(imported.snapshot, safeJobPlan(imported.snapshot, job), new Set())).toMatchObject({ added: 0, skipped: 1 });
+    for (const tamper of [
+      (value: typeof job) => { value.drafts[0].id = 'weread-group:forged'; },
+      (value: typeof job) => { value.drafts[0].members![0].markText = '<script>alert(1)</script>'; },
+      (value: typeof job) => { value.drafts[0].highlight.markText = 'Rewritten aggregate'; },
+      (value: typeof job) => { value.drafts[0].members!.reverse(); },
+      (value: typeof job) => { value.drafts[0].members![1].chapterUid = 'another'; },
+      (value: typeof job) => { Object.assign(value.drafts[0].members![1], { unknown: true }); },
+    ]) {
+      const altered = structuredClone(job); tamper(altered);
+      expect(() => validateWereadJob(altered)).toThrow();
+    }
+  });
+  it('blocks an old singleton job before generation when its sources now belong to a group', async () => {
+    const { snapshot, books, drafts } = fixture();
+    const oldJob = createWereadJob(snapshot, drafts, new Set());
+    const members = books[0].highlights.map((highlight, index) => ({ ...highlight, chapterUid: 'chapter', chapterIdx: 0, range: `${index * 100}-${index * 100 + 50}` }));
+    const group = await buildMergedWereadDraft(snapshot, books[0], members, 'Grouped question?');
+    const imported = applyWereadImport(snapshot, planWereadImport(snapshot, [group]), new Set()).snapshot;
+    expect(() => safeJobPlan(imported, oldJob)).toThrow('不会');
+    const reconfirmed = createWereadJob(imported, oldJob.drafts, new Set());
+    expect(validateWereadJob(JSON.parse(JSON.stringify(reconfirmed)))).toEqual(reconfirmed);
+    expect(pendingQuestions(reconfirmed)).toEqual([]);
+    expect(reconfirmed.drafts.every(draft => draft.protectedSource && draft.originalUnchanged)).toBe(true);
+    const result = applyWereadImport(imported, safeJobPlan(imported, reconfirmed), jobUpdates(safeJobPlan(imported, reconfirmed), reconfirmed));
+    expect(result).toMatchObject({ added: 0, updated: 0, skipped: 2 });
+    expect(result.snapshot.cards).toEqual(imported.cards);
+  });
+  it('rejects unknown task, draft, book and original fields and unsafe replacement questions', () => {
+    const { snapshot, drafts } = fixture();
+    const job = createWereadJob(snapshot, drafts, new Set());
+    for (const tamper of [
+      (value: typeof job) => { Object.assign(value, { unknown: true }); },
+      (value: typeof job) => { Object.assign(value.drafts[0], { unknown: true }); },
+      (value: typeof job) => { Object.assign(value.drafts[0].book, { unknown: true }); },
+      (value: typeof job) => { Object.assign(value.drafts[0].highlight, { unknown: true }); },
+      (value: typeof job) => { value.drafts[0].question = '<img src=x onerror=alert(1)>'; },
+      (value: typeof job) => { value.drafts[0].protectedSource = 'true' as unknown as boolean; },
+    ]) {
+      const altered = structuredClone(job); tamper(altered);
+      expect(() => validateWereadJob(altered)).toThrow();
+    }
+  });
   it('validates stored drafts and excludes successful questions from retry', () => {
     const { snapshot, drafts } = fixture();
     const job = createWereadJob(snapshot, drafts, new Set());

@@ -22,7 +22,22 @@ export function memoryArchiveFolderState(decks: Deck[], cards: Card[]): { ids: S
       }
     }
   }
-  return { ids: new Set(decks.filter(deck => times.has(deck.id) && !active.has(deck.id)).map(deck => deck.id)), times };
+  const ids = new Set(decks.filter(deck => times.has(deck.id) && !active.has(deck.id)).map(deck => deck.id));
+  for (const deck of decks) {
+    if (ids.has(deck.id) || active.has(deck.id)) continue;
+    let parentId = parents.get(deck.id);
+    const seen = new Set([deck.id]);
+    while (parentId && !seen.has(parentId)) {
+      if (ids.has(parentId)) {
+        ids.add(deck.id);
+        times.set(deck.id, times.get(parentId)!);
+        break;
+      }
+      seen.add(parentId);
+      parentId = parents.get(parentId);
+    }
+  }
+  return { ids, times };
 }
 
 export function archiveMemoryCard(snapshot: RecallStateSnapshot, id: string, archivedAt = new Date().toISOString()): RecallStateSnapshot {

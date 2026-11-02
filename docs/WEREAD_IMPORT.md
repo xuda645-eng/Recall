@@ -36,7 +36,7 @@ Agent Skill，不将 `WEREAD_API_KEY` 或火山引擎密钥放入前端。
 [划线契约](https://github.com/Tencent/WeChatReading/blob/main/skills/notes.md)、
 [书籍契约](https://github.com/Tencent/WeChatReading/blob/main/skills/book.md)。
 每日 300 次模型尝试与图片支持是独立事项。用户随后确认取消单次
-20 个问题的限制；在线和手动 AI 路径均依次处理全部选中划线，仍受
+20 个问题的限制；在线和手动 AI 路径均最多 4 并发处理全部选中划线，仍受
 下文的每日额度、请求频率、文件容量和单条长度保护。
 
 ## 在线选择交互
@@ -45,7 +45,58 @@ Agent Skill，不将 `WEREAD_API_KEY` 或火山引擎密钥放入前端。
 - 使用顶栏返回按钮：生成确认页返回选书并保留已选书籍，选书页返回导入入口；不再重复提供底部“再选一选”和“返回导入”。运行中的任务仍禁止离开，暂停或完成的草稿不会因为返回而删除。
 - 展开划线列表后，可用“全选 / 全不选”复选框切换全部划线。部分选中时显示半选状态，单条选择、已选数量与生成数量同步；全不选时禁止开始生成。选择操作不调用 AI、不写入卡片。
 
-## 文件契约
+## 智能合并划线 (2026-11-02)
+
+在线确认页按“1 选择划线 > 2 选择生成方式”操作。默认全选，可点
+“调整划线”展开列表；选择范围不会调用 AI 或写入卡片。生成方式为
+单选，默认“逐条生成”，底部只有一个继续按钮：逐条模式为“生成并
+自动导入”；选择“智能合并”后为“下一步 · 合并预览”，进入合并流程
+后再明确开始生成，检查预览并确认后才写入卡片。合并前不猜测卡片数。
+无法合并时说明原因，仍可主动选择逐条生成，不静默切换生成方式。
+AI 传输边界始终可见，详细额度与隐私说明默认收起。
+Skill 文件预览页仍提供“智能合并划线”。不要把智能合并的预览当作
+已导入或已通过人工语义审核。
+
+- 模型只返回编号组合与共同问题，不返回答案。服务端给模型的编号是
+  批次内 `H001` 等短编号，校验后才映射回稳定的 `bookmarkId`。
+- 划线保留 `chapterIdx`、`chapterUid` 与 `range`。按章节序号和位置
+  范围的第一个数值排序，不用划线时间或章节 UID 猜顺序；不假设范围
+  第二个数值是终点或长度。缺失或存在歧义时禁止智能合并，仍可逐条导入。
+- 只合并同书、同章、在所选划线序列中连续的条目，每组 1-4 条。每条
+  选中原文恰好归属一张卡。未知、遗漏、重复、重排编号均拒绝，不静默修复。
+- 每批最多 12 条、6000 字。长章节在边界保留末组供下一批重新理解；
+  已确认的前组不会重复保存，最终原文仍完整且不重复。保留全部原文，
+  只在段落之间增加界面分隔，答案文本使用两次换行分隔原始字符串。
+- 单批上限不是整本书或单次操作上限。分批依次进行，共享每天 300 次
+  模型尝试和每小时 120 次 AI 请求；失败计入尝试，缓存按设备空间、
+  EP、提示版本和完整输入隔离。合并请求输出上限为 4096 tokens，原有
+  单条请求仍为 384。没有免费调用或固定减卡比例的承诺。
+- 默认保护旧卡：智能合并只处理新来源，不自动合并已复习的单卡，不
+  改已有分组成员。重复读取已归入分组的划线不会产生新单卡。旧任务若
+  与新分组冲突会要求重新检查，不继续无效生成。
+- 预览可改共同问题、拆为单条或与下一张合并。拆分/合并后生成的是
+  明确标识的通用手动回忆任务，不冒充 AI 新问题，建议改成具体问题。
+  这些操作不调用 AI。跨书、跨章、超过 4 条的手动合并也被拒绝。
+- 合并原文以 `sourceRef.highlights` 有序保存，包含每条原始字符串与
+  定位信息。阅读面分段显示原文。问题编辑不会 trim 原文；合并答案
+  只读，Markdown 不能替换其答案。云同步校验答案与来源拼接完全一致。
+  `.recall` 导入/导出保留来源与卡片复习字段，不改变既有历史合并规则。
+- 独立本机 IndexedDB `recall-weread-merge-drafts` 保存 7 天。刷新后
+  不自动执行，需显式继续；成功批次保留，失败不导入残缺结果。Web Locks
+  与草稿修订号阻止跨页重复执行。保存失败不继续调用。取消只删草稿，
+  不删卡片。草稿不参与云同步或 `.recall` 备份。
+- 导入失败可能发生在卡片已经保存之后；重试按稳定来源检查，避免
+  重复写入，不重新生成。已有卡片内容发生变化时拒绝覆盖。
+- 入口“体验合并示例（合成数据 / 非 AI）”使用原创文本和预置分组，
+  不查询真实书架、不调用模型。安全预览环境仅此示例可用，真实连接仍
+  要设备鉴权和生产服务配置，预览不拥有生产 D1 或密钥。
+
+分组的结构、原文和顺序可由程序验证，语义合理性仍需检查。模型只理解
+所提供的划线，不代表读到了完整章节。图注和对象占位符不等于书内图片，
+不得推断未取得的图片内容。有关实书验证、失败与人工拆分结果见本任务
+[验证记录](./releases/20261102T010000+0800-weread-highlight-merge.md)。
+
+### 逐条文件格式
 
 ```json
 {
@@ -60,6 +111,8 @@ Agent Skill，不将 `WEREAD_API_KEY` 或火山引擎密钥放入前端。
           "bookmarkId": "sample-highlight",
           "markText": "这是示例原文，不是真实书籍摘录。",
           "chapterUid": "1",
+          "chapterIdx": 1,
+          "range": "10-80",
           "chapterTitle": "第一章",
           "question": "这一段的结论与条件是什么？",
           "recallKind": "qa",
@@ -120,7 +173,8 @@ under **其他导入方式**, with the legacy manual preview and generation work
 Select books, click **下一步 · AI 问题与导入**, inspect the scope and select
 individual highlights if needed. Click **生成并自动导入** to consent to the
 displayed originals and changed-card updates. All selected highlights are
-processed serially; there is no separate 20-question per-action ceiling. A book
+processed with at most four concurrent model requests; there is no separate
+20-question per-action ceiling. A book
 with more than 20 highlights does not require manually choosing batches of 20.
 New originals longer than 6000
 characters require manual handling. All required questions must succeed before
@@ -139,6 +193,21 @@ schema validation does not guarantee semantic correctness. Review and edit
 questions in the resulting card group. Pause, network failure or model failure
 retains successful questions without importing an incomplete batch. Retry only
 the remaining questions; import-stage failure retries the import, not AI.
+
+Requests refill the four-slot pool as results are saved. Results are associated
+with their original highlight IDs, not response order; job merges and IndexedDB
+writes remain serial. A model error or save failure stops new dispatch, then
+already-running successful responses are retained before reporting failure.
+Pause aborts browser requests, ignores late responses and stops new dispatch.
+Up to four upstream calls may already have started and may still be charged.
+Concurrency does not add a server-side background job: iOS can suspend a PWA
+in the background, and closing it still stops the browser-managed batch.
+
+On 2026-11-01 a four-request direct endpoint probe using synthetic originals,
+the same request/schema contract and no retries returned four valid HTTP 200
+responses in 1831ms total (1342-1761ms per request). This establishes small-batch
+feasibility, not sustained-load capacity or a guaranteed fourfold speedup. The
+probe did not access personal highlights, Recall cards, its cache or D1 quota.
 
 Automatic-job drafts are saved transactionally in a separate local IndexedDB
 `recall-weread-drafts`, with a seven-day validity window. Refresh or reopening
@@ -170,7 +239,8 @@ and a seven-day question cache, separate from cards/sync entities.
 
 - Each AI request accepts 1-6000 characters and caps output at 384 tokens.
 - Both online automatic and manual AI paths process all selected candidates
-  serially, with no 20-question truncation or consent ceiling. Stop prevents
+  with at most four concurrent requests, with no 20-question truncation or
+  consent ceiling. Stop prevents
   future calls but an already started upstream call may still finish and be
   charged. Successful questions are not regenerated on retry. Automatic jobs
   persist across refresh; manual drafts remain only in the current page.

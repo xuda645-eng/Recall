@@ -171,6 +171,38 @@ describe('authenticated online WeRead and AI', () => {
     expect(value.books[0].highlights).toEqual([{ bookmarkId: 'mark-1', markText: original, chapterUid: '1', chapterTitle: '第一章' }]);
     expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_entities').get()).toEqual({ count: 0 });
   });
+  it('projects reliable chapter indices and exact numeric ranges without guessing or timestamp sorting', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ book: { title: 'Synthetic book' }, chapters: [
+      { chapterUid: 1, chapterIdx: 0, title: 'First chapter' }, { chapterUid: 2, chapterIdx: '1', title: 'Second chapter' },
+      { chapterUid: 3, chapterIdx: 2, title: 'Duplicate chapter' }, { chapterUid: 3, chapterIdx: 3, title: 'Duplicate chapter' },
+    ], updated: [
+      { type: 1, bookmarkId: 'mark-1', markText: original, chapterUid: 1, range: '0020-4', createTime: 1 },
+      { type: 1, bookmarkId: 'mark-2', markText: original, chapterUid: 1, range: '2-100', createTime: 999 },
+      { type: 1, bookmarkId: 'mark-3', markText: original, chapterUid: 2, chapterIdx: 1, range: 'invalid' },
+      { type: 1, bookmarkId: 'mark-4', markText: original, chapterUid: 3, range: '1.5-2' },
+      { type: 1, bookmarkId: 'mark-5', markText: original, chapterUid: 99, chapterIdx: 4, range: '1-0' },
+    ] })));
+    const response = await api('weread/book', { bookId: 'book-1' });
+    expect(response.status).toBe(200);
+    expect((await response.json()).books[0].highlights).toEqual([
+      { bookmarkId: 'mark-1', markText: original, chapterUid: '1', chapterTitle: 'First chapter', chapterIdx: 0, range: '0020-4' },
+      { bookmarkId: 'mark-2', markText: original, chapterUid: '1', chapterTitle: 'First chapter', chapterIdx: 0, range: '2-100' },
+      { bookmarkId: 'mark-3', markText: original, chapterUid: '2', chapterTitle: 'Second chapter' },
+      { bookmarkId: 'mark-4', markText: original, chapterUid: '3', chapterTitle: 'Duplicate chapter' },
+      { bookmarkId: 'mark-5', markText: original, chapterUid: '99', range: '1-0' },
+    ]);
+  });
+  it.each([-1, 0.5, '0', null, true, Number.MAX_SAFE_INTEGER + 1])('omits invalid chapterIdx %j and unsafe ranges without losing the highlight', async chapterIdx => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ book: { title: 'Synthetic book' },
+      chapters: [{ chapterUid: 1, chapterIdx, title: 'Synthetic chapter' }], updated: [
+        { type: 1, bookmarkId: 'mark-1', markText: original, chapterUid: 1, range: '1-9007199254740992' },
+      ] })));
+    const response = await api('weread/book', { bookId: 'book-1' });
+    expect(response.status).toBe(200);
+    expect((await response.json()).books[0].highlights).toEqual([
+      { bookmarkId: 'mark-1', markText: original, chapterUid: '1', chapterTitle: 'Synthetic chapter' },
+    ]);
+  });
   it('generates the final allowed question, reuses its cache at the daily cap and never changes library', async () => {
     db.sqlite.prepare('INSERT INTO import_request_limits VALUES (?, ?, ?, ?)').run('personal', 'ai-model', Math.floor(Date.now() / 86400000) * 86400000, 299);
     const fetcher = vi.fn().mockImplementation(() => Promise.resolve(Response.json(ai))); vi.stubGlobal('fetch', fetcher);
@@ -183,6 +215,39 @@ describe('authenticated online WeRead and AI', () => {
     expect(request.store).toBe(false); expect(request.max_output_tokens).toBe(384);
     expect(JSON.parse(request.input).originalHighlight).toBe(original);
     expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_entities').get()).toEqual({ count: 0 });
+  });
+  it('allows four simultaneous independent questions and counts/cache-saves each without writing cards', async () => {
+    let active = 0;
+    let maximum = 0;
+    let release!: () => void;
+    const waiting = new Promise<void>(resolve => { release = resolve; });
+    const fetcher = vi.fn(async () => {
+      active++; maximum = Math.max(maximum, active);
+      await waiting;
+      active--;
+      return Response.json(ai);
+    });
+    vi.stubGlobal('fetch', fetcher);
+    const inputs = Array.from({ length: 4 }, (_, index) => ({ markText: `${original}\nSynthetic ${index}`, summary: false }));
+    const batch = Promise.all(inputs.map(input => api('weread/question', input)));
+    try {
+      await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(4));
+      expect(maximum).toBe(4);
+    } finally { release(); }
+    expect((await batch).map(response => response.status)).toEqual([200, 200, 200, 200]);
+    expect(db.sqlite.prepare("SELECT attempts FROM import_request_limits WHERE bucket = 'ai-model'").get()).toEqual({ attempts: 4 });
+    for (const input of inputs) expect((await api('weread/question', input)).status).toBe(200);
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_entities').get()).toEqual({ count: 0 });
+  });
+  it('four concurrent requests at the daily boundary never exceed the remaining model budget', async () => {
+    db.sqlite.prepare('INSERT INTO import_request_limits VALUES (?, ?, ?, ?)').run('personal', 'ai-model', Math.floor(Date.now() / 86400000) * 86400000, 298);
+    const fetcher = vi.fn(async () => Response.json(ai));
+    vi.stubGlobal('fetch', fetcher);
+    const replies = await Promise.all(Array.from({ length: 4 }, (_, index) => api('weread/question', { markText: `${original}\nSynthetic ${index}`, summary: false })));
+    expect(replies.map(response => response.status).sort()).toEqual([200, 200, 429, 429]);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(db.sqlite.prepare("SELECT attempts FROM import_request_limits WHERE bucket = 'ai-model'").get()).toEqual({ attempts: 300 });
   });
   it('fails closed on upgrade, HTTP error, invalid or incomplete AI, and hides upstream secrets', async () => {
     for (const value of [{ upgrade_info: { instructions: 'synthetic-weread' } }, { errcode: 401, errmsg: 'synthetic-weread' }]) {

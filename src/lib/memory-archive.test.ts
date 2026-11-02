@@ -90,6 +90,20 @@ describe('folder archive lifecycle', () => {
     const restored = restoreMemoryCard(archived, 'child');
     expect([...memoryArchiveFolderState(restored.decks, restored.cards).ids]).toEqual(['deep']);
   });
+  it('keeps empty descendants inside their archived subtree and returns them with restored ancestors', () => {
+    const before = fixture();
+    before.decks.push({ ...before.decks[0], id: 'empty-deep', parentId: 'empty-child' },
+                      { ...before.decks[0], id: 'empty-child', parentId: 'root' },
+                      { ...before.decks[0], id: 'empty-outside', parentId: 'outside' });
+    const archived = archiveMemoryFolder(before, 'root', archivedAt).snapshot;
+    const state = memoryArchiveFolderState(archived.decks, archived.cards);
+    expect([...state.ids].sort()).toEqual(['child', 'deep', 'empty-child', 'empty-deep', 'root']);
+    expect(state.times.get('empty-deep')).toBe(archivedAt);
+    expect(state.ids.has('empty-outside')).toBe(false);
+    const restored = restoreMemoryFolder(archived, 'root').snapshot;
+    expect(memoryArchiveFolderState(restored.decks, restored.cards).ids.size).toBe(0);
+    expect(restored.decks).toEqual(before.decks);
+  });
   it('uses most recent archive time rather than import or card modification time', () => {
     const before = fixture();
     const cards = before.cards.map(card => ({ ...card, archivedAt: card.id === 'deep' ? '2026-11-02T00:00:00.000Z' : archivedAt,

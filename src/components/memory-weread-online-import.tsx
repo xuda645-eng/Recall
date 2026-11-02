@@ -2,12 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, BookOpen, Check, ChevronRight, LoaderCircle, Pause, Search, SlidersHorizontal } from 'lucide-react';
 import { useRecallStore } from '@/stores/recall-store';
 import { commitMemory } from '@/services/memory-actions';
-import { generateWereadQuestion, loadOnlineBook, loadOnlineBooks, loadOnlineProgress, type WereadOnlineBook } from '@/services/weread-online';
+import { loadOnlineBook, loadOnlineBooks, loadOnlineProgress, type WereadOnlineBook } from '@/services/weread-online';
+import { generateWereadQuestions, WEREAD_AI_CONCURRENCY } from '@/services/weread-question-batch';
 import { applyWereadImport, buildWereadDrafts, parseWereadExport, planWereadImport, type WereadDraft } from '@/lib/memory-weread';
 import { createWereadJob, jobUpdates, needsQuestion, pendingQuestions, safeJobPlan, type WereadJob } from '@/lib/weread-job';
 import { checkWereadBudget, discardWereadJob, loadWereadJob, saveWereadJob, withWereadJobLock } from '@/services/weread-job-storage';
 import { AI_DAILY_MODEL_ATTEMPTS } from '../../shared/weread-ai';
 import type { MemoryWereadImportProps } from './memory-weread-import';
+import { MemoryWereadMergeImport } from './memory-weread-merge-import';
+import { loadMergeSession, saveMergeSession } from '@/services/weread-merge-storage';
+import { createMergeSession, createMergeDemo } from '@/lib/weread-merge-session';
 
 function Cover({ book }: { book: { title: string; cover?: string | null } }): JSX.Element {
   const [failed, setFailed] = useState(false);
@@ -42,6 +46,8 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal,
   const [onlyHighlights, setOnlyHighlights] = useState(false);
   const [onlyUnimported, setOnlyUnimported] = useState(false);
   const [drafts, setDrafts] = useState<WereadDraft[]>([]);
+  const [merging, setMerging] = useState(false);
+  const [generationMode, setGenerationMode] = useState<'individual' | 'merge'>('individual');
   const [updates, setUpdates] = useState<Set<string>>(new Set());
   const [job, setJob] = useState<WereadJob | null>(null);
   const [busy, setBusy] = useState(false);
@@ -69,15 +75,20 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal,
   useEffect(() => {
     onBackChange?.(() => {
       if (running.current || initializing) return;
+      if (merging) { setMerging(false); return; }
       if (stage === 'confirm') { setStage(renewed ? 'job' : 'books'); setError(''); }
       else onClose();
     });
     return () => onBackChange?.(null);
-  }, [stage, renewed, initializing, onBackChange, onClose]);
+  }, [stage, renewed, initializing, merging, onBackChange, onClose]);
 
   useEffect(() => {
     mounted.current = true;
-    void loadWereadJob().then(saved => { if (mounted.current && saved) { currentJob.current = saved; setJob(saved); setStage('job'); } })
+    void loadMergeSession().catch(value => { if (mounted.current) setMerging(true); throw value; }).then(async merged => {
+      if (mounted.current && merged) { setMerging(true); return; }
+      const saved = await loadWereadJob();
+      if (mounted.current && saved) { currentJob.current = saved; setJob(saved); setStage('job'); }
+    })
       .catch(value => { if (mounted.current) { setError(failure(value)); setDraftBlocked(true); } }).finally(() => { if (mounted.current) setInitializing(false); });
     return () => { mounted.current = false; abort.current?.abort(); progressControllers.current.forEach(controller => controller.abort()); callbacks.current.onBusy?.(false); };
   }, []);
@@ -119,8 +130,20 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal,
       if (!mounted.current) return;
       const next = buildWereadDrafts(useRecallStore.getState(), parsed.books, selected);
       if (!next.length) throw new Error('这些书暂时没有我的划线，请重新选择');
-      setDrafts(next); setRenewed(null); setUpdates(new Set()); setShowHighlights(false); setStage('confirm');
+      setDrafts(next); setRenewed(null); setUpdates(new Set()); setShowHighlights(false); setGenerationMode('individual'); setStage('confirm');
     } catch (value) { if (mounted.current) setError(failure(value)); }
+    finally { report(false); }
+  }
+  async function mergeDemo(): Promise<void> {
+    if (running.current) return;
+    report(true); setError('');
+    try {
+      await withWereadJobLock(async () => {
+        if (await loadMergeSession()) throw new Error('本机已有合并草稿，请先继续或取消');
+        await saveMergeSession(await createMergeDemo(useRecallStore.getState()));
+      });
+      setMerging(true);
+    } catch (value) { setError(failure(value)); }
     finally { report(false); }
   }
   async function execute(input: WereadJob, replacement = false): Promise<void> {
@@ -146,12 +169,10 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal,
         await checkWereadBudget(candidates.length, controller.signal);
         next = { ...next, status: 'generating', error: '' };
         await persist(next);
-        for (const draft of candidates) {
-          if (controller.signal.aborted) break;
-          const result = await generateWereadQuestion(draft.highlight.markText, false, controller.signal);
+        await generateWereadQuestions(candidates, false, controller.signal, async (draft, result) => {
           next = { ...next, generated: [...next.generated, draft.id], drafts: next.drafts.map(item => item.id === draft.id ? { ...item, kind: 'qa', question: result.question, aiSummary: undefined } : item) };
           await persist(next);
-        }
+        });
         if (controller.signal.aborted || !mounted.current) { await persist({ ...next, status: 'paused' }); return; }
         next = { ...next, status: 'importing' }; await persist(next);
         let receipt: WereadJob['receipt'];
@@ -218,6 +239,12 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal,
       setRenewed(job); setUpdates(new Set()); setSelected(new Set(job.drafts.map(draft => draft.book.bookId))); setStage('confirm'); setError('');
     } catch (value) { setError(failure(value)); }
   }
+  let mergeError = '';
+  if (stage === 'confirm') {
+    try { createMergeSession(useRecallStore.getState(), drafts); } catch (value) { mergeError = failure(value); }
+  }
+  const mergeSelected = !renewed && generationMode === 'merge';
+  if (merging) return <MemoryWereadMergeImport drafts={drafts} onClose={() => setMerging(false)} onComplete={onComplete} onBusy={report}/>;
   return <section className="wr-workspace" aria-label="微信读书导入" aria-busy={busy}>
     {error && <p role="alert" className="m-error">{error}</p>}
     {confirmationError && <p role="alert" className="m-error">{confirmationError}</p>}
@@ -226,6 +253,7 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal,
       <span className="wr-eyebrow">YOUR READING, RECALLED</span><h1>读过的，<br/>也能记得住。</h1><p>把微信读书里的划线，<br/>变成下一次温习的问题。</p>
       <div className="wr-art" aria-hidden="true"><div><span>阅读的回声</span></div><div><span>思考的尺度</span></div><div><Check size={30}/></div></div>
       <button className="m-primary" disabled={busy || draftBlocked} onClick={() => void connect()}>{busy ? <LoaderCircle className="wr-spin" size={18}/> : null}{busy ? '正在连接' : '连接微信读书'}<ArrowRight size={17}/></button><small>只导入我的划线，不包含其他人的热门划线。</small><button className="m-text" disabled={busy} onClick={onLocal}>其他导入方式</button>
+      <button className="m-secondary wr-more" disabled={busy || draftBlocked} onClick={() => void mergeDemo()}>体验合并示例（合成数据 / 非 AI）</button>
     </div> : stage === 'books' ? <>
       <header className="wr-heading"><span className="wr-eyebrow">YOUR NOTEBOOKS</span><h1>选择想记住的书</h1><p>我的笔记本 · 已载入 {books.length} 本{cursor !== null ? '，还有更多' : ''}</p></header>
       <div className="wr-search"><label><Search size={18}/><input type="search" aria-label="搜索书名或作者" placeholder="搜索书名或作者" value={query} onChange={event => setQuery(event.target.value)}/></label><button className="m-secondary" aria-label="更多筛选" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}><SlidersHorizontal size={18}/></button></div>
@@ -238,13 +266,17 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal,
       <div className="wr-dock"><div><strong>已选 {selected.size} 本</strong><span>{books.filter(book => selected.has(book.bookId)).reduce((total, book) => total + book.highlightCount, 0)} 条我的划线</span></div><button className="m-primary" disabled={busy || !selected.size} onClick={() => void prepare()}>{busy ? '正在读取划线' : '下一步 · AI 问题与导入'}<ArrowRight size={17}/></button></div>
     </> : stage === 'confirm' ? <>
       <header className="wr-heading"><span className="wr-eyebrow">READY TO RECALL</span><h1>让划线变成问题</h1><p>已选 {selected.size} 本书 · {included.length} 条我的划线</p></header>
+      <h2 className="wr-step-title"><span>1</span>选择划线</h2>
       <div className="wr-confirm-books">{confirmedBooks.map(book => <div key={book.bookId}><Cover book={book}/><span><strong>{book.title}</strong><small>{drafts.filter(draft => draft.book.bookId === book.bookId && draft.include).length} 条已选划线</small></span></div>)}</div>
-      <div className="wr-confirm-count"><span>本次生成</span><strong>{questionCount}<small> 个问题</small></strong></div>
-      {!!changes.length && <div className="wr-changes"><h2>{changes.length} 张已有卡片的原文发生变化</h2><p>默认保留已有内容；勾选后才更新，复习进度保留。</p>{changes.map(draft => <label key={draft.id}><input type="checkbox" checked={updates.has(draft.id)} onChange={event => setUpdates(old => { const next = new Set(old); if (event.target.checked) next.add(draft.id); else next.delete(draft.id); return next; })}/><span>{draft.book.title} · {draft.highlight.markText.slice(0, 60)}</span></label>)}</div>}
-      <p className="wr-consent">确认后，仅所选原文发送至火山 AI，依次生成全部问题。每日最多 {AI_DAILY_MODEL_ATTEMPTS} 次模型尝试，每小时最多 120 次请求；限流或失败保留进度。全部成功后自动导入，原文不改写；已有相同划线保留。AI 可能出错，导入后可查看和编辑。</p>
-      <button className="m-secondary wr-more" aria-expanded={showHighlights} onClick={() => setShowHighlights(!showHighlights)}>选择划线 · 默认全选</button>
-      {showHighlights && <div className="wr-highlight-options"><label className="wr-highlight-all"><input ref={selectAllHighlights} type="checkbox" checked={drafts.length > 0 && included.length === drafts.length} disabled={busy || !drafts.length} onChange={event => { const include = event.target.checked; setDrafts(old => old.map(draft => ({ ...draft, include }))); }}/><span>全选 / 全不选<small>已选 {included.length} / {drafts.length} 条划线</small></span></label>{drafts.map(draft => <label key={draft.id}><input type="checkbox" checked={draft.include} disabled={busy} onChange={event => setDrafts(old => old.map(item => item.id === draft.id ? { ...item, include: event.target.checked } : item))}/><span><small>{draft.book.title} · {draft.highlight.chapterTitle}</small>{draft.highlight.markText}</span></label>)}</div>}
-      <div className="wr-dock"><button className="m-primary" disabled={busy || !included.length || !!confirmationError} onClick={() => void confirm()}>生成并自动导入<ArrowRight size={17}/></button></div>
+      <button className="wr-scope-control" aria-label="调整划线" aria-expanded={showHighlights} aria-controls="wr-confirm-highlights" disabled={busy} onClick={() => setShowHighlights(!showHighlights)}><span>已选 {included.length} / {drafts.length} 条<small>{included.length === drafts.length ? '默认全选，可按需调整' : '只处理选中的划线'}</small></span><span>{showHighlights ? '收起' : '调整'}<ChevronRight size={16} aria-hidden="true"/></span></button>
+      {showHighlights && <div id="wr-confirm-highlights" className="wr-highlight-options"><label className="wr-highlight-all"><input ref={selectAllHighlights} type="checkbox" checked={drafts.length > 0 && included.length === drafts.length} disabled={busy || !drafts.length} onChange={event => { const include = event.target.checked; setDrafts(old => old.map(draft => ({ ...draft, include }))); }}/><span>全选 / 全不选<small>已选 {included.length} / {drafts.length} 条划线</small></span></label>{drafts.map(draft => <label key={draft.id}><input type="checkbox" checked={draft.include} disabled={busy} onChange={event => setDrafts(old => old.map(item => item.id === draft.id ? { ...item, include: event.target.checked } : item))}/><span><small>{draft.book.title} · {draft.highlight.chapterTitle}</small>{draft.highlight.markText}</span></label>)}</div>}
+      {!renewed && <fieldset className="wr-generation-modes" disabled={busy}><legend className="wr-step-title"><span>2</span>选择生成方式</legend><label className="wr-generation-mode"><input type="radio" name="weread-generation-mode" value="individual" checked={generationMode === 'individual'} onChange={() => setGenerationMode('individual')}/><span><strong>逐条生成</strong><small>一条划线，一个问题。生成后自动导入。</small></span></label><label className="wr-generation-mode"><input type="radio" name="weread-generation-mode" value="merge" checked={generationMode === 'merge'} disabled={!!mergeError} aria-describedby={mergeError ? 'wr-merge-unavailable' : undefined} onChange={() => setGenerationMode('merge')}/><span><strong>智能合并</strong><small>适合零碎划线。合并相邻内容，先预览再导入。</small></span></label>{mergeError && <p id="wr-merge-unavailable" className="wr-mode-error">{mergeError}。可选择逐条生成。</p>}</fieldset>}
+      {!mergeSelected && !!changes.length && <div className="wr-changes"><h2>{changes.length} 张已有卡片的原文发生变化</h2><p>默认保留已有内容；勾选后才更新，复习进度保留。</p>{changes.map(draft => <label key={draft.id}><input type="checkbox" checked={updates.has(draft.id)} onChange={event => setUpdates(old => { const next = new Set(old); if (event.target.checked) next.add(draft.id); else next.delete(draft.id); return next; })}/><span>{draft.book.title} · {draft.highlight.markText.slice(0, 60)}</span></label>)}</div>}
+      <div className={`wr-confirm-count${mergeSelected ? ' wr-confirm-count-merge' : ''}`} aria-live="polite"><span>{mergeSelected ? '合并后卡片数' : '本次生成'}</span><strong>{mergeSelected ? '预览时确定' : <>{questionCount}<small> 个问题</small></>}</strong></div>
+      <p className="wr-action-note">{mergeSelected ? '仅处理新划线，已有卡片不变。预览满意后，再确认导入。' : '全部生成成功后自动导入；已有相同划线跳过，复习进度保留。'}</p>
+      <p className="wr-privacy-note">点击生成后，仅所选原文发送至火山 AI；原文保留，AI 问题可编辑。</p>
+      <details className="wr-generation-details"><summary>AI 与隐私说明</summary><p className="wr-consent">确认后，仅所选原文发送至火山 AI。逐条生成最多 {WEREAD_AI_CONCURRENCY} 并发；智能合并仅处理同章相邻的新划线，先预览再确认导入。每日最多 {AI_DAILY_MODEL_ATTEMPTS} 次模型尝试，每小时最多 120 次请求；限流或失败保留进度。原文不改写，已有卡片与复习进度保留。AI 可能出错，导入后可查看和编辑。</p></details>
+      <div className="wr-dock"><button className="m-primary" disabled={busy || !included.length || !!confirmationError || (mergeSelected && !!mergeError)} onClick={() => mergeSelected ? setMerging(true) : void confirm()}>{mergeSelected ? '下一步 · 合并预览' : '生成并自动导入'}<ArrowRight size={17}/></button></div>
     </> : job ? <>
       {done ? <><div className="wr-done-symbol"><Check size={30}/></div><header className="wr-heading wr-done-heading"><h1>让读过的，留得住。</h1><p>导入完成 · 原文已保留</p></header><div className="wr-receipt">{[[job.receipt?.added || 0, '新增卡片'], [job.receipt?.updated || 0, '更新卡片'], [job.receipt?.skipped || 0, '跳过已有']].map(([value, title]) => <div key={title}><strong>{value}</strong><span>{title}</span></div>)}</div></>
         : <><header className="wr-heading"><span className="wr-eyebrow">READING INTO MEMORY</span><h1>{job.status === 'import-failed' ? '问题已好，导入未完成' : paused ? '进度已为你保留' : job.status === 'importing' ? '正在放进你的卡组' : '正在把划线变成问题'}</h1><p>{paused ? '已完成的问题保留，继续时不重做。' : '一条划线，一个问题。原文始终保留。'}</p></header><div className="wr-job-summary"><div><span>问题生成进度</span><strong>{job.generated.length}<small> / {totalJob}</small></strong></div><Meter value={totalJob ? job.generated.length / totalJob * 100 : 100}/><p>01 生成问题 <span>02 自动导入</span></p></div></>}

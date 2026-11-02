@@ -1,0 +1,4 @@
+interface:
+  display_name: "飞书标记转 Recall"
+  short_description: "将飞书标黄或表格截图红框整理为 Recall 卡片，每批独立归档并验证"
+  default_prompt: "使用 $lark-yellow-to-recall 将指定飞书文档的黄色高亮或个人摘录中的截图红框整理为 Recall 卡片，确认卡组后生成独立批次并归档。"
