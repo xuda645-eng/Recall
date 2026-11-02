@@ -49,7 +49,7 @@ test('公网合成书卡标记、顶栏返回和划线全选，不调用真实�
   await expect(page.getByRole('heading', { name: '让划线变成问题', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '再选一选', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '返回导入', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: '选择划线 · 默认全选', exact: true }).click();
+  await page.getByRole('button', { name: '调整划线', exact: true }).click();
   const all = page.getByRole('checkbox', { name: /全选 \/ 全不选/ });
   await expect(all).toBeChecked();
   await all.uncheck();

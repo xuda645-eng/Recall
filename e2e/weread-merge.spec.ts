@@ -52,9 +52,43 @@ async function setup(page: Page, fail = false, missing = false) {
 }
 const snapshot = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('recall.snapshot.v1') || 'null'));
 
+async function enterMerge(page: Page): Promise<void> {
+  await page.getByRole('radio', { name: /^智能合并/ }).check();
+  await page.getByRole('button', { name: '下一步 · 合并预览', exact: true }).click();
+}
+
+test('生成方式只是选择，合并数量不预猜，范围变更不会静默切换或自动导入', async ({ page }) => {
+  const calls = await setup(page);
+  const before = await snapshot(page);
+  const individual = page.getByRole('radio', { name: /^逐条生成/ });
+  const merge = page.getByRole('radio', { name: /^智能合并/ });
+  await expect(individual).toBeChecked();
+  await merge.check();
+  await expect(page.locator('.wr-confirm-count')).toHaveText('合并后卡片数预览时确定');
+  await expect(page.locator('.wr-action-note')).toContainText('已有卡片不变');
+  await expect(page.getByRole('button', { name: '生成并自动导入', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '调整划线', exact: true }).click();
+  const all = page.getByRole('checkbox', { name: /全选 \/ 全不选/ });
+  await all.uncheck();
+  await expect(merge).toBeChecked();
+  await expect(page.getByRole('button', { name: '下一步 · 合并预览', exact: true })).toBeDisabled();
+  await all.check();
+  await individual.check();
+  await expect(page.getByRole('button', { name: '生成并自动导入', exact: true })).toBeEnabled();
+  expect(calls).toEqual([]);
+  expect(await snapshot(page)).toEqual(before);
+  await enterMerge(page);
+  await expect(page.getByRole('button', { name: '生成分组与问题' })).toBeVisible();
+  expect(calls).toEqual([]);
+  expect(await snapshot(page)).toEqual(before);
+  await page.locator('.memory-bar').getByRole('button', { name: '返回', exact: true }).click();
+  await expect(merge).toBeChecked();
+  await expect(page.locator('.wr-scope-control')).toContainText('已选 4 / 4 条');
+});
+
 test('智能分组合并、原文顺序、改问题、确认后导入与刷新恢复', async ({ page }, info) => {
   const calls = await setup(page);
-  await page.getByRole('button', { name: '智能合并划线', exact: true }).click();
+  await enterMerge(page);
   await page.getByRole('button', { name: '生成分组与问题' }).click();
   await expect(page.getByRole('heading', { name: '检查你的知识单元' })).toBeVisible();
   expect((await snapshot(page)).cards).toEqual([]);
@@ -98,7 +132,7 @@ test('智能分组合并、原文顺序、改问题、确认后导入与刷新�
 
 test('手动拆分与相邻合并不调用AI、不改原文', async ({ page }) => {
   const calls = await setup(page);
-  await page.getByRole('button', { name: '智能合并划线', exact: true }).click();
+  await enterMerge(page);
   await page.getByRole('button', { name: '生成分组与问题' }).click();
   await expect(page.locator('.wr-merge-card')).toHaveCount(2);
   await page.getByRole('button', { name: '拆分为单条' }).first().click();
@@ -112,7 +146,7 @@ test('手动拆分与相邻合并不调用AI、不改原文', async ({ page }) =
 for (const fault of ['expired', 'invalid']) {
   test(`旧页面取消${fault}草稿不能删除另一页面的新草稿`, async ({ page, context }) => {
     await setup(page);
-    await page.getByRole('button', { name: '智能合并划线', exact: true }).click();
+    await enterMerge(page);
     await page.getByRole('button', { name: '生成分组与问题' }).click();
     await expect(page.locator('.wr-merge-card')).toHaveCount(2);
     const old = JSON.parse(await mergeDraft(page));
@@ -147,7 +181,7 @@ for (const fault of ['expired', 'invalid']) {
 
 test('失败不导入，刷新后显式继续；缺位置不能智能合并', async ({ page }) => {
   const calls = await setup(page, true);
-  await page.getByRole('button', { name: '智能合并划线', exact: true }).click();
+  await enterMerge(page);
   await page.getByRole('button', { name: '生成分组与问题' }).click();
   await expect(page.getByRole('alert')).toBeVisible();
   expect((await snapshot(page)).cards).toEqual([]);
@@ -161,7 +195,8 @@ test('失败不导入，刷新后显式继续；缺位置不能智能合并', as
 
 test('缺少原文位置时保留逐条入口而禁止智能合并', async ({ page }) => {
   await setup(page, false, true);
-  await expect(page.getByRole('button', { name: '智能合并划线', exact: true })).toBeDisabled();
+  await expect(page.getByRole('radio', { name: /^智能合并/ })).toBeDisabled();
+  await expect(page.locator('.wr-mode-error')).toContainText('可选择逐条生成');
   await expect(page.getByRole('button', { name: '生成并自动导入', exact: true })).toBeEnabled();
 });
 

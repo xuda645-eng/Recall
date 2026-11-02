@@ -78,6 +78,33 @@
 .wr-empty p { font-size: 12px; color: var(--muted); }
 .wr-more { width: 100%; margin-top: 15px; }
 .wr-confirm-books { display: grid; gap: 16px; margin: 24px 0; }
+.wr-workspace .wr-step-title { display: flex; align-items: center; gap: 9px; margin: 22px 0 12px; font-size: 14px; font-weight: 600; }
+.wr-step-title > span { display: grid; place-items: center; width: 23px; height: 23px; flex: none; border-radius: 50%; background: var(--wr-olive-soft); color: var(--wr-olive); font: 500 13px/1 var(--number); }
+.wr-step-title + .wr-confirm-books { margin: 12px 0; }
+.wr-confirm-books > div > span { min-width: 0; overflow-wrap: anywhere; }
+.wr-scope-control { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 56px; padding: 10px 0; border: 0; border-bottom: 1px solid var(--line); background: none; text-align: left; font-size: 13px; }
+.wr-scope-control > span:first-child { min-width: 0; }
+.wr-scope-control small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+.wr-scope-control > span:last-child { display: flex; align-items: center; gap: 5px; flex: none; color: var(--wr-olive); }
+.wr-scope-control[aria-expanded="true"] svg { transform: rotate(90deg); }
+.wr-generation-modes { min-width: 0; margin: 22px 0 0; padding: 0; border: 0; }
+.wr-generation-modes .wr-step-title { margin: 0 0 12px; padding: 0; }
+.memory-app .wr-generation-mode { display: flex; flex-direction: row; align-items: center; gap: 12px; min-height: 76px; padding: 13px 15px; margin-bottom: 9px; border: 1px solid var(--line); border-radius: 14px; background: var(--card-paper); cursor: pointer; }
+.wr-generation-mode:has(input:checked) { border-color: var(--wr-olive); background: var(--wr-olive-soft); }
+.wr-generation-mode:has(input:disabled) { cursor: not-allowed; }
+.wr-generation-mode input { width: 19px; height: 19px; min-height: 19px; flex: none; margin: 0; accent-color: var(--wr-olive); }
+.wr-generation-mode > span { min-width: 0; overflow-wrap: anywhere; }
+.wr-generation-mode strong { display: block; font-size: 14px; font-weight: 600; }
+.wr-generation-mode small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.wr-generation-mode:has(input:disabled) strong { color: var(--muted); }
+.wr-mode-error, .wr-action-note, .wr-privacy-note { color: var(--muted); font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.wr-action-note { margin: 0 0 8px; color: var(--ink); }
+.wr-generation-details summary { width: fit-content; min-height: 44px; display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; cursor: pointer; }
+.wr-generation-details summary::after { content: '+'; font-size: 16px; }
+.wr-generation-details[open] summary::after { content: '-'; }
+.wr-generation-details .wr-consent { margin: 0 0 12px; }
+.wr-scope-control:focus-visible, .wr-generation-details summary:focus-visible { outline: 2px solid var(--wr-olive); outline-offset: 3px; border-radius: 4px; }
+.wr-generation-mode:has(input:focus-visible) { outline: 2px solid var(--wr-olive); outline-offset: 3px; }
 .wr-confirm-books > div { display: flex; gap: 13px; align-items: center; }
 .wr-confirm-books .wr-cover { width: 40px; height: 58px; padding: 7px; }
 .wr-confirm-books .wr-cover > span { font-size: 9px; max-height: 42px; }
@@ -87,6 +114,7 @@
 .wr-confirm-count { border-top: 1px solid var(--line); padding: 19px 0; display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
 .wr-confirm-count > strong { font: 400 32px/1 var(--number); }
 .wr-confirm-count small { font: 400 12px/1 var(--sans); }
+.wr-confirm-count-merge > strong { font: 500 14px/1.5 var(--sans); color: var(--wr-olive); }
 .wr-consent { padding: 15px; border-radius: 14px; font-size: 12px; background: var(--wr-olive-soft); color: #505b40; }
 .wr-job-summary { background: var(--stone); color: var(--paper); padding: 23px; border-radius: 21px; margin: 25px 0; }
 .wr-job-summary > div:first-child { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; }

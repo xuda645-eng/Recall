@@ -20,7 +20,7 @@ async function savedJob(page: Page): Promise<WereadJob> {
 async function setup(page: Page, count = 2, fail: boolean | number = false, budget = 300, delay = 200) {
   const calls: string[] = [];
   let failed = false;
-  const marks = Array.from({ length: count }, (_, index) => ({ bookmarkId: `mark-${index}`, markText: original[index] || `原创第 ${index} 条划线。`, chapterUid: '1', chapterTitle: '原创章节' }));
+  const marks = Array.from({ length: count }, (_, index) => ({ bookmarkId: `mark-${index}`, markText: original[index] || `原创第 ${index} 条划线。`, chapterUid: '1', chapterIdx: 1, range: `${index * 100}-80`, chapterTitle: '原创章节' }));
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url());
     const body = route.request().postDataJSON();
@@ -58,6 +58,56 @@ async function choose(page: Page) {
   await page.getByRole('button', { name: '下一步 · AI 问题与导入' }).click();
   await expect(page.getByRole('heading', { name: '让划线变成问题' })).toBeVisible();
 }
+test('确认页按步骤选择，默认逐条且只有一个主操作，说明展开不调用AI', async ({ page }) => {
+  const calls = await setup(page);
+  const before = await snapshot(page);
+  await choose(page);
+  await expect(page.getByRole('heading', { name: /1\s*选择划线/ })).toBeVisible();
+  await expect(page.getByRole('group', { name: /2\s*选择生成方式/ })).toBeVisible();
+  await expect(page.getByRole('radio', { name: /^逐条生成/ })).toBeChecked();
+  await expect(page.getByRole('button', { name: '智能合并划线', exact: true })).toHaveCount(0);
+  await expect(page.locator('.wr-workspace .m-primary')).toHaveCount(1);
+  const layouts = await page.locator('.wr-generation-mode').evaluateAll(elements => elements.map(element => getComputedStyle(element).flexDirection));
+  expect(layouts).toEqual(['row', 'row']);
+  await expect(page.locator('.wr-generation-details')).not.toHaveAttribute('open');
+  await expect(page.locator('.wr-privacy-note')).toContainText('仅所选原文发送至火山 AI');
+  await page.getByText('AI 与隐私说明', { exact: true }).click();
+  await expect(page.locator('.wr-generation-details')).toHaveAttribute('open');
+  await expect(page.locator('.wr-consent')).toContainText('每日最多 300');
+  await page.getByRole('button', { name: '调整划线', exact: true }).click();
+  await expect(page.locator('.wr-highlight-options')).toBeVisible();
+  expect(calls).toEqual([]);
+  expect(await snapshot(page)).toEqual(before);
+});
+test('确认页安全区、窄屏、断点、横屏、放大文字和深色保持可读可触达', async ({ page }, info) => {
+  const calls = await setup(page, 29);
+  const before = await snapshot(page);
+  await choose(page);
+  await page.screenshot({ path: `/tmp/recall-weread-flow-${info.project.name}.png` });
+  await page.locator('.memory-app').evaluate(element => { (element as HTMLElement).style.setProperty('--safe-inset-top', '59px'); (element as HTMLElement).style.setProperty('--safe-bottom', '34px'); });
+  for (const viewport of [{ width: 393, height: 852 }, { width: 320, height: 740 }, { width: 760, height: 900 }, { width: 761, height: 1000 }, { width: 852, height: 393 }, { width: 1280, height: 900 }]) {
+    await page.setViewportSize(viewport);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    expect(await page.locator('.memory-content').evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+    const targets = await page.locator('.wr-scope-control, .wr-generation-mode, .wr-generation-details summary, .wr-dock button').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().height));
+    expect(targets.every(height => height >= 44)).toBe(true);
+    await page.locator('.memory-content').evaluate(element => { element.scrollTop = element.scrollHeight; });
+    const button = await page.locator('.wr-dock .m-primary').boundingBox();
+    const content = await page.locator('.memory-content').boundingBox();
+    expect(button!.y).toBeGreaterThanOrEqual(content!.y);
+    expect(button!.y + button!.height).toBeLessThanOrEqual(content!.y + content!.height);
+  }
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.evaluate(() => document.documentElement.classList.add('dark'));
+  const enlarged = await page.addStyleTag({ content: '.wr-generation-mode strong, .wr-generation-mode small, .wr-privacy-note, .wr-action-note { font-size: 20px !important; }' });
+  expect(await page.locator('.memory-content').evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  await page.getByRole('button', { name: '调整划线', exact: true }).click();
+  await page.getByRole('checkbox', { name: /全选 \/ 全不选/ }).uncheck();
+  await expect(page.getByRole('button', { name: '生成并自动导入', exact: true })).toBeDisabled();
+  await enlarged.evaluate(element => element.remove());
+  expect(calls).toEqual([]);
+  expect(await snapshot(page)).toEqual(before);
+});
 test('正式连接入口、个人书卡字段与搜索，百分比1不误作100%', async ({ page }, testInfo) => {
   const calls = await setup(page);
   await expect(page.locator('.wr-workspace')).not.toContainText('5 MB');
@@ -127,7 +177,7 @@ test('展开划线支持全选全不选和半选，数量同步且仅导入确�
   const calls = await setup(page);
   const before = await snapshot(page);
   await choose(page);
-  await page.getByRole('button', { name: '选择划线 · 默认全选', exact: true }).click();
+  await page.getByRole('button', { name: '调整划线', exact: true }).click();
   const all = page.getByRole('checkbox', { name: /全选 \/ 全不选/ });
   const rows = page.locator('.wr-highlight-options > label:not(.wr-highlight-all) input');
   const generate = page.getByRole('button', { name: '生成并自动导入', exact: true });
@@ -146,8 +196,8 @@ test('展开划线支持全选全不选和半选，数量同步且仅导入确�
   await expect(all).toBeChecked();
   await expect(rows.nth(1)).toBeChecked();
   await rows.nth(1).uncheck();
-  await page.getByRole('button', { name: '选择划线 · 默认全选', exact: true }).click();
-  await page.getByRole('button', { name: '选择划线 · 默认全选', exact: true }).click();
+  await page.getByRole('button', { name: '调整划线', exact: true }).click();
+  await page.getByRole('button', { name: '调整划线', exact: true }).click();
   await expect(all).toBeChecked({ indeterminate: true });
   const box = await page.locator('.wr-highlight-all').boundingBox();
   expect(box!.height).toBeGreaterThanOrEqual(44);
@@ -274,7 +324,7 @@ test('单次101条默认全选并全部生成导入，重复导入不重做问�
   await choose(page);
   await expect(page.locator('.wr-confirm-count')).toContainText('101');
   await expect(page.getByRole('button', { name: '生成并自动导入' })).toBeEnabled();
-  await page.getByRole('button', { name: '选择划线 · 默认全选' }).click();
+  await page.getByRole('button', { name: '调整划线' }).click();
   await expect(page.locator('.wr-highlight-options > label:not(.wr-highlight-all) input:checked')).toHaveCount(101);
   expect(calls).toEqual([]);
   expect((await snapshot(page)).cards).toHaveLength(0);
