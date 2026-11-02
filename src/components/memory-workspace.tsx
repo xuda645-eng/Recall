@@ -165,6 +165,11 @@ export function MemoryWorkspace(): JSX.Element {
       const secondDate = route === 'archived' && sort !== 'updated' ? 'name' in second ? archiveFolders.times.get(second.id) : second.archivedAt : second[field];
       const firstTime = Date.parse(firstDate || '') || 0;
       const secondTime = Date.parse(secondDate || '') || 0;
+      if (firstTime === secondTime && !('name' in first) && !('name' in second)
+        && first.sourceRef?.bookId === second.sourceRef?.bookId && first.sourceRef?.chapterIdx !== undefined && second.sourceRef?.chapterIdx !== undefined
+        && first.sourceRef.range && second.sourceRef.range) {
+        return first.sourceRef.chapterIdx - second.sourceRef.chapterIdx || Number(first.sourceRef.range.split('-')[0]) - Number(second.sourceRef.range.split('-')[0]) || first.id.localeCompare(second.id);
+      }
       return (firstTime - secondTime) * (sort === 'old' ? 1 : -1) || first.id.localeCompare(second.id);
     });
   }
@@ -369,7 +374,7 @@ export function MemoryWorkspace(): JSX.Element {
           if (sheet?.kind === 'move') return moveMemoryCard(snapshot, sheet.id!, String(values.get('parent')));
           const at = new Date().toISOString();
           const old = snapshot.cards.find(card => card.id === sheet?.id);
-          const fields = { front: String(values.get('front')).trim(), back: String(values.get('back')).trim(), deckId: String(values.get('parent')), contentKind: old?.contentKind === 'excerpt' ? 'excerpt' as const : 'qa' as const, bookTitle: String(values.get('bookTitle') || ''), chapter: String(values.get('chapter') || ''), source: String(values.get('source') || ''), updatedAt: at };
+          const fields = { front: String(values.get('front')).trim(), back: old?.sourceRef?.highlights ? old.back : String(values.get('back')).trim(), deckId: String(values.get('parent')), contentKind: old?.contentKind === 'excerpt' ? 'excerpt' as const : 'qa' as const, bookTitle: String(values.get('bookTitle') || ''), chapter: String(values.get('chapter') || ''), source: String(values.get('source') || ''), updatedAt: at };
           if (!fields.back || !snapshot.decks.some(deck => deck.id === fields.deckId)) throw new Error('请选择卡组并填写正文');
           if (fields.contentKind === 'qa' && !fields.front) throw new Error('问答卡需要问题');
           return { ...snapshot, cards: old ? snapshot.cards.map(card => card.id === old.id ? { ...old, ...fields } : card) : [...snapshot.cards, newMemoryCard(fields, at)] };
@@ -382,7 +387,7 @@ export function MemoryWorkspace(): JSX.Element {
       <label>{sheet?.kind === 'folder' ? '上级卡组' : '目标卡组'}<select name="parent" required={sheet?.kind !== 'folder'} defaultValue={sheet?.kind === 'folder' ? store.decks.find(deck => deck.id === sheet.id)?.parentId ?? folder ?? '' : editing?.deckId ?? folder ?? store.decks[0]?.id ?? ''}>
         {sheet?.kind === 'folder' && <option value="">根目录</option>}{store.decks.filter(deck => sheet?.kind !== 'folder' || !sheet.id || !subtreeIds(store.decks, sheet.id).has(deck.id)).map(deck => <option key={deck.id} value={deck.id}>{folderPath(store.decks, deck.id).map(item => item.name).join(' / ')}</option>)}
       </select></label>
-      {sheet?.kind === 'card' && <><p className="m-note">{editing?.contentKind === 'excerpt' ? '阅读摘录 · 保留原文与复习进度' : '问答卡 · 先回忆问题，再查看答案'}</p><label>{editing?.contentKind === 'excerpt' ? '段落标题（可选）' : '问题'}<textarea name="front" required={editing?.contentKind !== 'excerpt'} maxLength={10000} defaultValue={editing?.front || ''}/></label><label>{editing?.contentKind === 'excerpt' ? '划线原文' : '答案'}<textarea name="back" required maxLength={20000} defaultValue={editing?.back || ''}/></label><details className="m-card-source-fields"><summary>来源信息（可选）</summary><label>书名<input name="bookTitle" defaultValue={editing?.bookTitle || ''}/></label><label>章节<input name="chapter" defaultValue={editing?.chapter || ''}/></label><label>来源<input name="source" defaultValue={editing?.source || ''}/></label></details></>}
+      {sheet?.kind === 'card' && <><p className="m-note">{editing?.sourceRef?.highlights ? '合并划线原文只读，可修改问题；来源与复习进度保留。' : editing?.contentKind === 'excerpt' ? '阅读摘录 · 保留原文与复习进度' : '问答卡 · 先回忆问题，再查看答案'}</p><label>{editing?.contentKind === 'excerpt' ? '段落标题（可选）' : '问题'}<textarea name="front" required={editing?.contentKind !== 'excerpt'} maxLength={10000} defaultValue={editing?.front || ''}/></label><label>{editing?.contentKind === 'excerpt' ? '划线原文' : '答案'}<textarea name="back" required readOnly={!!editing?.sourceRef?.highlights} maxLength={20000} defaultValue={editing?.back || ''}/></label><details className="m-card-source-fields"><summary>来源信息（可选）</summary><label>书名<input name="bookTitle" defaultValue={editing?.bookTitle || ''}/></label><label>章节<input name="chapter" defaultValue={editing?.chapter || ''}/></label><label>来源<input name="source" defaultValue={editing?.source || ''}/></label></details></>}
       {sheet?.kind === 'folder' && sheet.id && <><button className="m-secondary" type="button" disabled={busy || !archiveCount} onClick={() => { if (sheetDirty.current && !window.confirm('归档前放弃未保存的修改？')) return; setSheet({ kind: 'folder-archive', id: sheet.id }); }}><Archive size={20}/>归档整个卡组</button><small>{archiveCount ? `包含所有子卡组，共 ${archiveCount} 张在学卡片。原文与进度保留。` : '本卡组及子卡组没有在学卡片。'}</small></>}
       {sheet?.kind === 'card' && <MediaEditor onBusy={setBusy} onDirty={() => { sheetDirty.current = true; }}/>}
       {sheet?.kind === 'folder' && sheet.id && <button className="m-secondary" type="button" disabled={busy} onClick={() => void run(async () => {
@@ -492,7 +497,7 @@ export function MemoryWorkspace(): JSX.Element {
           {route === 'settings' && <MediaBackupControls/>}
           {route === 'advanced' && <Settings/>}
           {route === 'compat' && <ImportHub onClose={() => navigate('import')}/>}
-          {route === 'weread' && <MemoryWereadImport onClose={() => navigate('import')} onComplete={deckIds => { setDrawer(false); setSheet(null); setFolder(deckIds[0] || null); setRoute('folders'); setQuery(''); setError(''); }} onBusy={setBusy} onBackChange={registerWereadBack}/>}
+          {route === 'weread' && <MemoryWereadImport onClose={() => navigate('import')} onComplete={deckIds => { setDrawer(false); setSheet(null); setFolder(deckIds[0] || null); setRoute('folders'); setQuery(''); setSort('old'); setError(''); }} onBusy={setBusy} onBackChange={registerWereadBack}/>}
           {route === 'import' && <>
             {(plan || receipt) && <div className="m-step">选择 / 校验 / 完成</div>}
             {plan && <MediaPackagePreview assets={importAssets}/>}

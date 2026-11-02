@@ -118,3 +118,25 @@
 .dark .wr-consent { color: #d5ddc7; }
 .dark .wr-job-books .wr-failed { border-color: #916344; background: #47342c; }
 @media(prefers-reduced-motion:reduce) { .wr-spin { animation: none; } .wr-meter i { transition: none; } }
+.wr-merge-choice { margin: 18px 0; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--card-paper); }
+.wr-merge-choice p, .wr-merge-choice small, .wr-merge-summary p { display: block; color: var(--muted); font-size: 12px; line-height: 1.7; margin: 8px 0; }
+.wr-merge-choice button { width: 100%; min-height: 44px; }
+.wr-merge-summary { margin: 20px 0; padding: 16px; border-radius: 14px; background: var(--wr-olive-soft); }
+.wr-merge-cards { display: grid; gap: 16px; }
+.wr-merge-card { min-width: 0; padding: 16px; overflow-wrap: anywhere; }
+.wr-merge-card > small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+.wr-merge-card label { display: grid; gap: 8px; font-size: 13px; }
+.wr-merge-card textarea { width: 100%; font-size: 16px; min-height: 96px; }
+.wr-merge-originals { margin-top: 16px; display: grid; gap: 14px; }
+.wr-merge-originals > div { padding-left: 12px; border-left: 2px solid var(--line); }
+.wr-merge-originals small, .wr-merge-sources small { color: var(--muted); font-size: 11px; }
+.wr-merge-originals p, .wr-merge-sources p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; font-size: 15px; margin-top: 6px; }
+.wr-merge-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.wr-merge-actions button { flex: 1; min-height: 44px; }
+.wr-merge-sources { margin: 16px 0; }
+.wr-merge-sources summary { min-height: 44px; padding: 12px 0; }
+.wr-merge-sources article { margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: 14px; }
+.m-weread-source-count { color: var(--muted); font-size: 12px; }
+.m-weread-source-count:empty { display: none; }
+.m-weread-source-segments section { padding: 8px 0 14px; border-bottom: 1px solid var(--line); }
+.m-weread-source-segments small { color: var(--muted); font-size: 12px; }
