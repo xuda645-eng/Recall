@@ -1,4 +1,11 @@
-# Source Image Attachments - Pending Integration
+# Source Image Attachments - Integrated
+
+Delivered by the integration owner in production source `70a98c4`, deployment
+`3da17d22-3d57-45b3-9058-3c1d6d9bdde4`, verified `2026-11-02T13:01:05+08:00`.
+The additive migration and matching installed Skill are complete. See the
+[combined outcome](20261102T122811+0800-all-pending-media-weread.md), including
+integration corrections and acceptance limits. Earlier sections retain the
+developer handoff/preview history, not the current production status.
 
 ## Identity And Ownership
 

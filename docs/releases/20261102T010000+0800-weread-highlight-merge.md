@@ -1,5 +1,12 @@
 # WeRead Highlight Grouping
 
+Delivered by the integration owner in production source `70a98c4`, deployment
+`3da17d22-3d57-45b3-9058-3c1d6d9bdde4`, verified `2026-11-02T13:01:05+08:00`.
+See the [combined outcome](20261102T122811+0800-all-pending-media-weread.md) for
+source-ownership, draft-cancellation and Markdown corrections and public checks.
+The developer's private real-book candidates were not imported or published.
+Earlier sections retain the pending handoff and independent preview history.
+
 ## Identity And Scope
 
 - Record time: `2026-11-02T01:00:00+08:00`, Asia/Shanghai.

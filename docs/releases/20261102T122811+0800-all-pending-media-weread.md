@@ -7,7 +7,7 @@
 - Worktree `/private/tmp/recall-integration-all-pending-20261102`, branch `codex/integration-all-pending-20261102`.
 - Starting remote main `ce276d0e9ead2d438136bd8744311d07d8e61b69`.
 - Fixed build marker `1.0-20261102-1240`. Desktop/package version unchanged; no tag or new infrastructure.
-- Current status: merged and undergoing final integration validation. Actual source SHA, push, migration, endpoint and deployment outcomes will be appended, not guessed.
+- Current status: delivered to main and production, verified `2026-11-02T13:01:05+08:00`. Actual source/migration/configuration/deployment results are recorded below.
 
 ## Inventory And History Preservation
 
@@ -69,7 +69,7 @@ isolated data, ports and grouping outputs.
 - Documentation check: 70 local links passed across 85 reviewed files; actual credential value excluded. Synthetic screenshot fixture and WebKit import layout visually inspected. Diff and temporary public-probe syntax checks passed.
 - Final production build passed. The first cross-directory hash comparison failed on `sw.js`: the reused external output directory retained 25 obsolete assets, giving 186 precache entries rather than the clean production 161. Both local servers were stopped before rebuilding with explicit `--emptyOutDir`. All 203 files then matched the clean production build, with no extra files. Manifest SHA-256 `2dbe74d0c690847c246cffd9f50ec6337b9c1ae7dc10b64660f6becffe0321b8`; `/tmp/recall-integration-bundle-sha256-20261102.txt`.
 - The final 82-case PWA run used the normal emptied `dist/` directory, not the stale external SW. Local D1 suites blocked SW and loaded the matching current entry/asset graph; their passing auth/data results are not claimed as acceptance of the stale SW. Build mismatch was recovered before any source push/deployment.
-- Publication/public acceptance remain pending until actual outcomes are appended.
+- Publication/public acceptance outcomes are recorded below, including the failed aggregate HTTP attempt and bounded recovery.
 
 Browser commands use build marker `1.0-20261102-1240`, cached Chromium-1223 /
 WebKit-2272 executables and `scripts/run-playwright.mjs`. iPhone baseline is
@@ -103,3 +103,41 @@ Credentials/data rollback needs separate authorization. No rollback claimed.
 
 See [media](../MEDIA.md), [WeRead](../WEREAD_IMPORT.md), [PWA](../PWA.md),
 [hosting](../DEPLOYMENT.md) and [cloud safety](../CLOUD_SYNC.md).
+
+## Published Outcomes
+
+- Source commit `70a98c4b6fe0dcfe454eeb7c7bcdc1be6a5da799`, created `2026-11-02T12:54:54+08:00`.
+- Normal `git push origin HEAD:main` succeeded, advancing `ce276d0` to `70a98c4`. Remote SHA recheck matched before deployment and after public validation. Both fixed task tips are reachable; no remaining unmerged task branch was found.
+- Production migration command `CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2 npx --yes wrangler@4.156.0 d1 migrations apply DB --env production --remote` applied only `20261101_recall_media.sql`, five commands / 0.90ms reported. No card seed/reset/update; post-publication listing reports no migrations to apply.
+- Existing encrypted production `ARK_ENDPOINT_ID` updated via stdin to requested `ep-20261102000025-wt6tl`; Wrangler reported success. No other credential changed. This confirms configuration publication, not a new live production inference request; runtime compatibility uses developer evidence plus synthetic integrated workerd tests.
+- Clean-source deployment command used `pages deploy dist --project-name recall-memory --branch main --commit-hash 70a98c4b6fe0dcfe454eeb7c7bcdc1be6a5da799`, with explicit existing account. All 203 predeployment file hashes passed; no dirty flag. Wrangler uploaded 28 assets, reused 173, and compiled/uploaded the Functions bundle, headers and routes.
+- Production deployment ID `3da17d22-3d57-45b3-9058-3c1d6d9bdde4`. Fixed URL `https://3da17d22.recall-memory.pages.dev`; stable origin `https://recall-memory.pages.dev/`. Listing confirmed Production / main / source `70a98c4`. Visible version `1.0-20261102-1240`.
+- Read-only HTTP probe checked 38 resources/interfaces: 32 static hashes plus six anonymous API gates. Initial aggregate passed 37/38; `cloze-DpTIrGLd.js` hit two SSL connection timeouts. Individual bounded curl without forced HTTP/1.1 then returned 200 and exact expected SHA-256 `7b10c3a09bc5d51884df052593261e1da7b487998fccca6903fed7a223fba32f`. All 38 verified across attempts, not one aggregate pass. Evidence `/tmp/recall-integration-public-http-20261102.json` and `/tmp/recall-integration-public-http-combined-20261102.json`. Includes root, module/CSS graph, manifest/icons, SW/Workbox, no-store version and anonymous auth/sync/devices/books/merge/media rejection.
+- Public grouping suite `RECALL_MERGE_URL=https://recall-memory.pages.dev/ RECALL_MERGE_OUTPUT=/tmp/recall-integration-public-grouping-20261102 ... node scripts/run-playwright.mjs --config e2e/weread-merge.config.ts --workers=2 --timeout=120000`: 14/14 Chromium/WebKit cases passed, including ordered originals, preview/edit/split/combine/import, protected answers and true two-tab draft replacement. All upstream/API test responses intercepted; no live model calls or owner-library mutation. `/tmp/recall-integration-public-grouping-20261102.log`.
+- Selected primary suite `RECALL_URL=https://recall-memory.pages.dev/ ... node scripts/run-playwright.mjs --grep '抽屉显示固定构建版本|归档目录兼容|Markdown预览|PWA部署路径' --workers=2 --output=/tmp/recall-integration-public-pwa-20261102`: 8/8 passed. Seven cases exercised the public origin, including Chromium SW/offline reopen, version, archive restore and Markdown progress. The shipped WebKit offline case deliberately serves an isolated local copy, so its pass is local recovery evidence, not public WebKit offline proof. `/tmp/recall-integration-public-pwa-20261102.log`.
+- All 203 deployed-bundle files passed an actual-credential exclusion scan. Screenshot/card fixtures are synthetic. No private batch, real-book candidate or source screenshot published.
+- Matching `lark-yellow-to-recall` Skill synced to `/Users/bytedance/.codex/skills/lark-yellow-to-recall` after production publication, with previous installation preserved under the restricted private backup directory. Source/install comparison and quick validation passed; Python caches excluded. The new Skill is available on the next turn, not silently activated in unrelated chats.
+- Original shared-main archive diff remains the same captured SHA-256; no old worktree was cleaned, staged or rewritten. Preserved dirty copies are already-delivered drafts, not pending new tasks. Both local D1 servers were stopped after validation.
+
+No observed product regression or rollback. Public WebKit offline reopening,
+physical iPhone Safari home-screen installation/update/offline acceptance and
+authenticated live-production model/media mutation flows are not claimed.
+Local D1 and synthetic browser evidence are distinct from those checks.
+
+If recovery becomes necessary, first confirm current production has not moved
+past this deployment. Check grouped-provenance/media compatibility before using
+the prior deployment. Dashboard route: Workers and Pages > recall-memory >
+Deployments > the compatible previous Production deployment > Rollback. Verify
+root/version/assets/auth afterward and append the incident. If the old worker
+cannot preserve new grouped data, retain a compatible worker and publish a
+validated forward fix instead. Never drop media tables, restore the private SQL
+over a live library, change credentials or clear device storage as asset rollback.
+
+This final evidence is a documentation-only commit/push after publication. It
+does not rebuild/redeploy the unchanged source bundle or create another release.
+Final follow-up checks cover exactly six documentation files: 59 local Markdown
+links resolve, actual credentials are excluded, added prose uses permitted
+characters, and `git diff --check` passes. The initial `python3 -` exclusion
+check stopped because this integration/original worktree had no local credential
+file; a bounded retry used the known developer environment files without
+printing values and passed. No app validation or deployment was repeated.

@@ -1,5 +1,12 @@
 # WeRead Ark Endpoint Check
 
+The integration owner published the requested production EP configuration with
+source `70a98c4`, deployment `3da17d22-3d57-45b3-9058-3c1d6d9bdde4`, verified
+`2026-11-02T13:01:05+08:00`. See the
+[combined outcome](20261102T122811+0800-all-pending-media-weread.md).
+Earlier prerequisite-only/pending statements retain the original task history;
+integration did not repeat the real upstream model check or change other credentials.
+
 ## Scope And Delivery Status
 
 - Role: parallel developer task, explicitly enabled by the user.
