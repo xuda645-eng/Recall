@@ -24,8 +24,8 @@ export function synchronizeMedia(space: string): Promise<void> {
           let asset = await localMedia(id);
           if (!asset) {
             asset = await downloadMedia(id);
-            if (spaceId === currentSpace) await saveMedia([asset], currentSpace);
-          } else if (asset.uploadedSpace !== currentSpace) {
+          }
+          if (asset.uploadedSpace !== currentSpace) {
             const options = { credentials: 'same-origin' as const, cache: 'no-store' as const, signal: AbortSignal.timeout(20000) };
             let response = await fetch(`/api/media/${id}`, { ...options, method: 'HEAD' });
             if (response.status === 404 && spaceId === currentSpace) response = await fetch(`/api/media/${id}`, { ...options, signal: AbortSignal.timeout(20000), method: 'PUT', headers: { 'Content-Type': asset.mime }, body: asset.bytes });

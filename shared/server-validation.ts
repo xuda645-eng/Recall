@@ -258,6 +258,7 @@ export function assembleState(current: CloudEntity[], mutation: CloudMutation): 
     for (const visited of visiting) complete.add(visited);
   }
   const cards = new Set(assembled.filter(entity => entity.kind === 'card' && entity.value !== null).map(entity => entity.id));
+  const wereadOwners = new Map<string, { cardId: string; grouped: boolean }>();
   for (const entity of assembled) {
     if (entity.value === null) continue;
     const value = entity.value as Record<string, unknown>;
@@ -265,6 +266,17 @@ export function assembleState(current: CloudEntity[], mutation: CloudMutation): 
       if (value.deckId !== null && !decks.has(value.deckId as string)) invalid();
     }
     if (entity.kind === 'reviewLog' && !cards.has(value.cardId as string)) invalid();
+    if (entity.kind === 'card' && value.sourceRef) {
+      const source = value.sourceRef as Record<string, unknown>;
+      const grouped = Object.hasOwn(source, 'highlights');
+      const members = grouped ? source.highlights as Record<string, unknown>[] : [source];
+      for (const member of members) {
+        const identity = JSON.stringify([source.bookId, member.bookmarkId]);
+        const owner = wereadOwners.get(identity);
+        if (owner && owner.cardId !== entity.id && (owner.grouped || grouped)) invalid();
+        wereadOwners.set(identity, { cardId: entity.id, grouped });
+      }
+    }
   }
   return assembled;
 }

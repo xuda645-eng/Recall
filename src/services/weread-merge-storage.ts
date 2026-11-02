@@ -28,14 +28,33 @@ async function transact<Value>(mode: IDBTransactionMode, work: (store: IDBObject
 export async function loadMergeSession(): Promise<WereadMergeSession | null> {
   const value = await transact('readonly', store => store.get('active'));
   if (!value) return null;
-  const session = await validateMergeSession(value);
-  if (session.expiresAt <= Date.now()) throw new Error('合并草稿已超过 7 天，请取消后重新选择；不会自动执行');
-  return { ...session, status: ['generating', 'importing'].includes(session.status) ? 'paused' : session.status };
+  try {
+    const session = await validateMergeSession(value);
+    if (session.expiresAt <= Date.now()) throw new Error('合并草稿已超过 7 天，请取消后重新选择；不会自动执行');
+    return { ...session, status: ['generating', 'importing'].includes(session.status) ? 'paused' : session.status };
+  } catch (error) {
+    throw Object.assign(error instanceof Error ? error : new Error('合并草稿无效'), { draftToken: JSON.stringify(value) });
+  }
 }
 export async function saveMergeSession(session: WereadMergeSession): Promise<void> {
   const validated = await validateMergeSession(session);
   await transact('readwrite', store => store.put(validated));
 }
-export async function discardMergeSession(): Promise<void> {
-  await transact('readwrite', store => store.delete('active'));
+export async function discardMergeSession(expected: Pick<WereadMergeSession, 'createdAt' | 'revision'> | string | null): Promise<void> {
+  const db = await database();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction('sessions', 'readwrite');
+    const store = transaction.objectStore('sessions');
+    const request = store.get('active');
+    let changed = false;
+    request.onsuccess = () => {
+      const value = request.result;
+      const matches = expected === null ? !value : typeof expected === 'string' ? JSON.stringify(value) === expected
+        : value?.createdAt === expected.createdAt && value?.revision === expected.revision;
+      if (!matches) { changed = true; transaction.abort(); return; }
+      if (value) store.delete('active');
+    };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = transaction.onabort = () => reject(new Error(changed ? '另一个页面的合并草稿已变化或取消，请刷新后继续' : '合并草稿取消失败，请保持页面并重试'));
+  });
 }

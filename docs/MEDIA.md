@@ -2,7 +2,8 @@
 
 ## Task Scope
 
-This feature is developed on a separate task branch and is pending integration.
+This feature is included in the November 2 combined integration. Publication
+outcomes are recorded in the [integration record](releases/20261102T122811+0800-all-pending-media-weread.md).
 It covers user-provided screenshots and authorized Lark red-frame excerpts, not
 WeRead book-image acquisition. It does not invoke a model for image display,
 compression, upload, download or synchronization.
@@ -62,6 +63,10 @@ it cannot delete images used by another card. Archival retains references.
   checks retry the attachment queue; iOS background execution is not promised.
   Requests during an active run schedule a follow-up rescan, so newly attached
   images are not silently omitted when the earlier queue reaches zero.
+- A download helper can return an image saved locally by another tab. The queue
+  therefore verifies server presence before recording any space-specific upload
+  receipt, including after a missing-local-image read. Failed verification keeps
+  the image pending instead of falsely reporting synchronization complete.
 - An authorized device HEAD-checks unconfirmed images, PUTs missing binaries
   once, and caches successful space-specific receipt metadata. Missing local
   images are downloaded and verified. Scores/text edits do not resend image
@@ -89,6 +94,11 @@ Settings exposes explicit complete image backup and merge restore. Missing
 images stop export rather than producing a falsely complete backup. Group
 management supports scoped backup with ancestors retained. Normal `.recall`
 remains text/reference-only. Credentials and journals are excluded from backup.
+Legacy desktop filename images and image-occlusion cards are not supported by
+this portable format. Export and restore reject them explicitly before creating
+or accepting a misleading complete backup. Preserve and back up their original
+desktop image directory separately. Grouped WeRead original answers remain
+read-only and do not expose the screenshot attachment editor.
 
 The prepared HTTPS task preview uses a dedicated `_worker.js` denying every
 `/api` request. Synthetic image/package files are the only demo assets. No

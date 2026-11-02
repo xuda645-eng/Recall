@@ -3,6 +3,20 @@ import { createSeedSnapshot } from '../src/data/seed';
 
 const originals = ['  概念定义。\r\n\t 保持空白。  ', '具体条件与说明。', '方法的第一步。', '方法的第二步。'];
 const seed = () => ({ ...createSeedSnapshot(), cards: [], decks: [], reviewLogs: [], studySessions: [], settings: { ...createSeedSnapshot().settings, onboardingComplete: true } });
+async function mergeDraft(page: Page, replacement?: string): Promise<string> {
+  return page.evaluate(value => new Promise<string>((resolve, reject) => {
+    const open = indexedDB.open('recall-weread-merge-drafts', 1);
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const transaction = db.transaction('sessions', value === undefined ? 'readonly' : 'readwrite');
+      const store = transaction.objectStore('sessions');
+      const request = value === undefined ? store.get('active') : store.put(JSON.parse(value));
+      transaction.oncomplete = () => { resolve(value ?? JSON.stringify(request.result)); db.close(); };
+      transaction.onabort = () => { reject(transaction.error); db.close(); };
+    };
+  }), replacement);
+}
 async function setup(page: Page, fail = false, missing = false) {
   const calls: string[][] = [];
   let failed = false;
@@ -57,7 +71,7 @@ test('智能分组合并、原文顺序、改问题、确认后导入与刷新�
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   }
   await page.setViewportSize({ width: 393, height: 852 });
-  await page.screenshot({ path: `/tmp/recall-merge-${info.project.name}.png`, fullPage: true });
+  await page.screenshot({ path: info.outputPath('grouped-originals-iphone15.png'), fullPage: true });
   await page.getByRole('button', { name: '确认导入 2 张卡片' }).click();
   await expect(page.getByRole('heading', { name: '合并卡片已收好' })).toBeVisible();
   const saved = await snapshot(page);
@@ -70,6 +84,7 @@ test('智能分组合并、原文顺序、改问题、确认后导入与刷新�
   await page.getByRole('button', { name: '管理卡片：这个概念的定义和适用条件分别是什么？', exact: true }).click();
   await page.getByRole('button', { name: '编辑卡片', exact: true }).click();
   await expect(page.locator('textarea[name="back"]')).toHaveAttribute('readonly', '');
+  await expect(page.getByLabel('附加来源截图')).toHaveCount(0);
   await page.locator('textarea[name="front"]').fill('定义和条件怎样共同限定这个概念？');
   await page.getByRole('button', { name: '保存修改', exact: true }).click();
   await expect(page.locator('textarea[name="front"]')).toHaveCount(0);
@@ -93,6 +108,42 @@ test('手动拆分与相邻合并不调用AI、不改原文', async ({ page }) =
   expect(calls).toHaveLength(1);
   expect((await snapshot(page)).cards).toEqual([]);
 });
+
+for (const fault of ['expired', 'invalid']) {
+  test(`旧页面取消${fault}草稿不能删除另一页面的新草稿`, async ({ page, context }) => {
+    await setup(page);
+    await page.getByRole('button', { name: '智能合并划线', exact: true }).click();
+    await page.getByRole('button', { name: '生成分组与问题' }).click();
+    await expect(page.locator('.wr-merge-card')).toHaveCount(2);
+    const old = JSON.parse(await mergeDraft(page));
+    if (fault === 'expired') {
+      old.createdAt = new Date(Date.now() - 8 * 86400000).toISOString();
+      old.expiresAt = Date.parse(old.createdAt) + 7 * 86400000;
+    } else old.version = 2;
+    await mergeDraft(page, JSON.stringify(old));
+    await page.reload();
+    await expect(page.getByRole('button', { name: '取消无法恢复的合并草稿' })).toBeVisible();
+    const other = await context.newPage();
+    try {
+      await other.route('**/api/**', route => route.fulfill({ status: 503, json: { error: 'synthetic-no-cloud' } }));
+      await other.goto('/#weread');
+      await expect(other.getByRole('button', { name: '取消无法恢复的合并草稿' })).toBeVisible();
+      other.once('dialog', dialog => dialog.accept());
+      await other.getByRole('button', { name: '取消无法恢复的合并草稿' }).click();
+      await expect(other.getByRole('button', { name: '取消无法恢复的合并草稿' })).toHaveCount(0);
+      await other.goto('/#weread');
+      await other.reload();
+      await other.getByRole('button', { name: '体验合并示例（合成数据 / 非 AI）' }).click();
+      await expect(other.locator('.wr-merge-card')).toHaveCount(2);
+      const replacement = await mergeDraft(other);
+      page.once('dialog', dialog => dialog.accept());
+      await page.getByRole('button', { name: '取消无法恢复的合并草稿' }).click();
+      await expect(page.getByRole('alert')).toContainText('另一个页面的合并草稿已变化');
+      expect(await mergeDraft(other)).toBe(replacement);
+      expect((await snapshot(page)).cards).toEqual([]);
+    } finally { await other.close(); }
+  });
+}
 
 test('失败不导入，刷新后显式继续；缺位置不能智能合并', async ({ page }) => {
   const calls = await setup(page, true);

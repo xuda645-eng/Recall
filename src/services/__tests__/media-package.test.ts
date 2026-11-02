@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { mediaRefs, validateMedia, imageInfo, MAX_IMAGE_BYTES, boundedImageBody } from '../../../shared/media';
-import { encodeMedia, parseMediaPackage } from '../media-package';
+import { encodeMedia, parseMediaPackage, mediaBackup } from '../media-package';
 import { createSeedSnapshot } from '@/data/seed';
 import { parseMemoryMarkdown, planMemoryImport, applyMemoryImport } from '@/lib/memory-markdown';
 import { buildExportPayload } from '@/services/import-export';
@@ -10,6 +10,15 @@ import { buildExportPayload } from '@/services/import-export';
 const original = readFileSync(new URL('../../../e2e/fixtures/source-screenshot.png', import.meta.url));
 const bytes = Uint8Array.from(original).buffer;
 describe('portable screenshot attachments', () => {
+  it('rejects unsupported legacy attachments before exporting or restoring a complete backup', async () => {
+    for (const kind of ['markdown', 'image-occlusion']) {
+      const snapshot = createSeedSnapshot();
+      snapshot.cards[0].back = kind === 'markdown' ? '![Legacy](recall://old-image.png)' : JSON.stringify({ imageUrl: 'old-image.png', occlusions: [] });
+      if (kind === 'image-occlusion') snapshot.cards[0].cardType = 'image-occlusion';
+      await expect(mediaBackup(snapshot)).rejects.toThrow('旧版');
+      await expect(parseMediaPackage(JSON.stringify({ format: 'recall-media', version: 1, backup: buildExportPayload(snapshot), images: [] }))).rejects.toThrow('旧版');
+    }
+  });
   it('validates complete backup structure before saving and omits sync key material', async () => {
     const snapshot = { ...createSeedSnapshot(), cards: [], decks: [], reviewLogs: [], studySessions: [] };
     snapshot.settings.syncCode = 'synthetic-key-that-must-not-be-exported';

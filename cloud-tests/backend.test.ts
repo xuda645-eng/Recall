@@ -23,12 +23,17 @@ function card(id = 'card-1', deckId = 'deck-1') {
   };
 }
 
-function mergedCard(count = 2) {
-  const id = `weread-group:${'a'.repeat(64)}`;
-  const highlights = Array.from({ length: count }, (_, index) => ({ bookmarkId: `mark-${index + 1}`,
-    markText: `  Original observation ${index + 1}.\nKeep whitespace.  `, chapterUid: 'chapter-1', chapterIdx: 0, range: `${index * 10}-100` }));
+function mergedCard(count = 2, options: { id?: string; bookId?: string; offset?: number } = {}) {
+  const id = options.id ?? `weread-group:${'a'.repeat(64)}`;
+  const offset = options.offset ?? 0;
+  const highlights = Array.from({ length: count }, (_, index) => ({ bookmarkId: `mark-${index + offset + 1}`,
+    markText: `  Original observation ${index + offset + 1}.\nKeep whitespace.  `, chapterUid: 'chapter-1', chapterIdx: 0, range: `${(index + offset) * 10}-100` }));
   return { ...card(id), contentKind: 'qa', recallKind: 'question', back: highlights.map(highlight => highlight.markText).join('\n\n'),
-    sourceRef: { provider: 'weread', bookId: 'book-1', bookmarkId: 'mark-1', chapterUid: 'chapter-1', highlights } };
+    sourceRef: { provider: 'weread', bookId: options.bookId ?? 'book-1', bookmarkId: highlights[0].bookmarkId, chapterUid: 'chapter-1', highlights } };
+}
+
+function wereadSingle(id: string, bookmarkId = 'mark-2', bookId = 'book-1') {
+  return { ...card(id), sourceRef: { provider: 'weread', bookId, bookmarkId } };
 }
 
 function change(kind: CloudChange['kind'], id: string, value: unknown, expectedRevision = 0): CloudChange {
@@ -645,6 +650,123 @@ describe('Recall Pages auth and D1 sync', () => {
     const saved = await (await api('/api/sync', { cookie: owner.cookie })).json() as CloudState;
     expect(saved.entities.find(entity => entity.kind === 'card')?.value).toEqual(value);
     expect(saved.revision).toBe(1);
+  });
+
+  it.each([
+    ['groups', false], ['groups', true], ['singleton', false], ['singleton', true],
+  ] as const)('rejects overlapping WeRead ownership in one mutation (%s, reversed: %s) atomically', async (kind, reversed) => {
+    const owner = await paired();
+    const group = mergedCard();
+    const overlapping = kind === 'groups' ? mergedCard(2, { id: 'group-2', offset: 1 }) : wereadSingle('single-1');
+    const changes = [change('card', group.id, group), change('card', overlapping.id, overlapping)];
+    if (reversed) changes.reverse();
+    const response = await sync(owner.cookie, mutation([change('deck', 'deck-1', deck()), ...changes, change('setting', 'xp', 1)]));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Invalid request' });
+    expect(await (await api('/api/sync', { cookie: owner.cookie })).json()).toEqual({ revision: 0, entities: [] });
+    expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_entities').get()).toEqual({ count: 0 });
+    expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM mutation_receipts').get()).toEqual({ count: 0 });
+    expect(db.sqlite.prepare('SELECT revision FROM spaces').get()).toMatchObject({ revision: 0 });
+  });
+
+  it.each(['groups', 'group-first', 'single-first'] as const)('rejects incremental overlapping WeRead ownership (%s) without changing prior data', async kind => {
+    const owner = await paired();
+    const group = mergedCard();
+    const overlapping = kind === 'groups' ? mergedCard(2, { id: 'group-2', offset: 1 }) : wereadSingle('single-1');
+    const [first, second] = kind === 'single-first' ? [overlapping, group] : [group, overlapping];
+    expect((await sync(owner.cookie, mutation([change('deck', 'deck-1', deck()), change('card', first.id, first)]))).status).toBe(200);
+    const before = await (await api('/api/sync', { cookie: owner.cookie })).json() as CloudState;
+    expect((await sync(owner.cookie, mutation([change('card', second.id, second), change('setting', 'xp', 1)], 1))).status).toBe(400);
+    expect(await (await api('/api/sync', { cookie: owner.cookie })).json()).toEqual(before);
+    expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_entities').get()).toEqual({ count: 2 });
+    expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM mutation_receipts').get()).toEqual({ count: 1 });
+    expect(db.sqlite.prepare('SELECT revision FROM spaces').get()).toMatchObject({ revision: 1 });
+  });
+
+  it.each(['group', 'singleton'] as const)('retains WeRead ownership for archived %s cards', async kind => {
+    const owner = await paired();
+    const group = mergedCard();
+    const single = wereadSingle('single-1');
+    const archived = { ...(kind === 'group' ? group : single), archivedAt: at };
+    const overlapping = kind === 'group' ? single : group;
+    expect((await sync(owner.cookie, mutation([change('deck', 'deck-1', deck()), change('card', archived.id, archived)]))).status).toBe(200);
+    const before = await (await api('/api/sync', { cookie: owner.cookie })).json() as CloudState;
+    expect((await sync(owner.cookie, mutation([change('card', overlapping.id, overlapping)], 1))).status).toBe(400);
+    expect(await (await api('/api/sync', { cookie: owner.cookie })).json()).toEqual(before);
+    expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM mutation_receipts').get()).toEqual({ count: 1 });
+    expect(db.sqlite.prepare('SELECT revision FROM spaces').get()).toMatchObject({ revision: 1 });
+  });
+
+  it.each(['disjoint', 'different-book'] as const)('accepts %s WeRead groups without treating a head source as a second owner', async kind => {
+    const owner = await paired();
+    const first = mergedCard();
+    const second = mergedCard(2, { id: 'group-2', offset: kind === 'disjoint' ? 2 : 0, bookId: kind === 'different-book' ? 'book-2' : 'book-1' });
+    expect((await sync(owner.cookie, mutation([change('deck', 'deck-1', deck()), change('card', first.id, first), change('card', second.id, second)]))).status).toBe(200);
+    const saved = await (await api('/api/sync', { cookie: owner.cookie })).json() as CloudState;
+    expect(saved.revision).toBe(1);
+    expect(saved.entities.filter(entity => entity.kind === 'card')).toHaveLength(2);
+    expect(saved.entities.find(entity => entity.id === first.id)?.value).toEqual(first);
+    expect(saved.entities.find(entity => entity.id === second.id)?.value).toEqual(second);
+  });
+
+  it('allows a grouped WeRead card to retain its own sources while updating question and review progress', async () => {
+    const owner = await paired();
+    const value = mergedCard();
+    expect((await sync(owner.cookie, mutation([change('deck', 'deck-1', deck()), change('card', value.id, value)]))).status).toBe(200);
+    const updated = { ...value, front: 'What supports these observations?', reps: 8, archivedAt: at };
+    expect((await sync(owner.cookie, mutation([change('card', value.id, updated, 1)], 1))).status).toBe(200);
+    const saved = await (await api('/api/sync', { cookie: owner.cookie })).json() as CloudState;
+    expect(saved.revision).toBe(2);
+    expect(saved.entities.find(entity => entity.id === value.id)?.value).toEqual(updated);
+  });
+
+  it.each([
+    ['group', 'group', false], ['group', 'group', true],
+    ['group', 'singleton', false], ['group', 'singleton', true],
+    ['singleton', 'group', false], ['singleton', 'group', true],
+  ] as const)('transfers deleted WeRead ownership from %s to %s in one mutation (reversed: %s)', async (originalKind, kind, reversed) => {
+    const owner = await paired();
+    const original = originalKind === 'group' ? mergedCard() : wereadSingle('original-single');
+    expect((await sync(owner.cookie, mutation([change('deck', 'deck-1', deck()), change('card', original.id, original)]))).status).toBe(200);
+    const replacement = kind === 'group' ? mergedCard(2, { id: 'group-2', offset: 1 }) : wereadSingle('single-1');
+    const changes = [change('card', original.id, null, 1), change('card', replacement.id, replacement)];
+    if (reversed) changes.reverse();
+    expect((await sync(owner.cookie, mutation(changes, 1))).status).toBe(200);
+    const saved = await (await api('/api/sync', { cookie: owner.cookie })).json() as CloudState;
+    expect(saved.revision).toBe(2);
+    expect(saved.entities.find(entity => entity.id === original.id)).toEqual({ kind: 'card', id: original.id, value: null, revision: 2 });
+    expect(saved.entities.find(entity => entity.id === replacement.id)?.value).toEqual(replacement);
+  });
+
+  it.each([
+    ['group', 'group'], ['group', 'singleton'], ['singleton', 'group'],
+  ] as const)('allows a %s tombstone to release WeRead sources to a later %s', async (originalKind, kind) => {
+    const owner = await paired();
+    const original = originalKind === 'group' ? mergedCard() : wereadSingle('original-single');
+    expect((await sync(owner.cookie, mutation([change('deck', 'deck-1', deck()), change('card', original.id, original)]))).status).toBe(200);
+    expect((await sync(owner.cookie, mutation([change('card', original.id, null, 1)], 1))).status).toBe(200);
+    const replacement = kind === 'group' ? mergedCard(2, { id: 'group-2', offset: 1 }) : wereadSingle('single-1');
+    expect((await sync(owner.cookie, mutation([change('card', replacement.id, replacement)], 2))).status).toBe(200);
+    const saved = await (await api('/api/sync', { cookie: owner.cookie })).json() as CloudState;
+    expect(saved.revision).toBe(3);
+    expect(saved.entities.find(entity => entity.id === original.id)?.value).toBeNull();
+    expect(saved.entities.find(entity => entity.id === replacement.id)?.value).toEqual(replacement);
+  });
+
+  it('preserves legacy single-single WeRead duplicates but rejects a group claiming their sources', async () => {
+    const owner = await paired();
+    const first = wereadSingle('single-1');
+    const second = wereadSingle('single-2');
+    expect((await sync(owner.cookie, mutation([change('deck', 'deck-1', deck()), change('card', first.id, first), change('card', second.id, second)]))).status).toBe(200);
+    expect((await sync(owner.cookie, mutation([change('setting', 'xp', 1)], 1))).status).toBe(200);
+    const disjoint = mergedCard(2, { offset: 2 });
+    expect((await sync(owner.cookie, mutation([change('card', disjoint.id, disjoint)], 2))).status).toBe(200);
+    const before = await (await api('/api/sync', { cookie: owner.cookie })).json() as CloudState;
+    const overlapping = mergedCard(2, { id: 'group-2' });
+    expect((await sync(owner.cookie, mutation([change('card', overlapping.id, overlapping)], 3))).status).toBe(400);
+    expect(await (await api('/api/sync', { cookie: owner.cookie })).json()).toEqual(before);
+    expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM mutation_receipts').get()).toEqual({ count: 3 });
+    expect(db.sqlite.prepare('SELECT revision FROM spaces').get()).toMatchObject({ revision: 3 });
   });
 
   it.each([

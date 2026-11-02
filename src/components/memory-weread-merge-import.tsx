@@ -25,6 +25,7 @@ export function MemoryWereadMergeImport({ drafts, onClose, onComplete, onBusy }:
   const [blocked, setBlocked] = useState(false);
   const current = useRef<WereadMergeSession | null>(null);
   const storedRevision = useRef<number | null>(null);
+  const blockedDraftToken = useRef<string | undefined>(undefined);
   const running = useRef(false);
   const mounted = useRef(true);
   const controller = useRef<AbortController | null>(null);
@@ -40,7 +41,7 @@ export function MemoryWereadMergeImport({ drafts, onClose, onComplete, onBusy }:
       if (!mounted.current) return;
       if (saved) { storedRevision.current = saved.revision; publish(saved); }
       else publish(createMergeSession(useRecallStore.getState(), drafts));
-    }).catch(value => { if (mounted.current) { setError(message(value)); setBlocked(true); } })
+    }).catch(value => { if (mounted.current) { blockedDraftToken.current = value && typeof value.draftToken === 'string' ? value.draftToken : undefined; setError(message(value)); setBlocked(true); } })
       .finally(() => { if (mounted.current) setInitializing(false); });
     return () => { mounted.current = false; controller.current?.abort(); callback.current?.(false); };
   }, [drafts]);
@@ -153,7 +154,11 @@ export function MemoryWereadMergeImport({ drafts, onClose, onComplete, onBusy }:
     if (!window.confirm('取消这份本机合并草稿？已导入卡片不会删除。')) return;
     report(true);
     try {
-      await withWereadJobLock(async () => { if (!blocked) await checkDisk(); await discardMergeSession(); });
+      await withWereadJobLock(async () => {
+        if (blocked && blockedDraftToken.current === undefined) throw new Error('无法确认草稿版本，请刷新后再取消');
+        if (!blocked) await checkDisk();
+        await discardMergeSession(blocked ? blockedDraftToken.current! : storedRevision.current === null ? null : { createdAt: current.current!.createdAt, revision: storedRevision.current });
+      });
       onClose();
     } catch (value) { setError(message(value)); }
     finally { report(false); }

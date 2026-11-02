@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { createSeedSnapshot } from '@/data/seed';
 import type { RecallStateSnapshot } from '@/types';
-import { newMemoryCard } from './memory-folders';
+import { newMemoryCard, folderPath } from './memory-folders';
 import { applyWereadImport, buildWereadDrafts, isWereadHighlightImported, orderedWereadDrafts, parseWereadExport, planWereadImport, wereadSourceId, type WereadHighlight } from './memory-weread';
 import { buildMergedWereadDraft, validateMergedWereadDraft } from './memory-weread-merge';
 import { applyMemoryImport, parseMemoryMarkdown, planMemoryImport } from './memory-markdown';
@@ -24,6 +24,26 @@ function importDrafts(snapshot: ReturnType<typeof emptySnapshot>, drafts: Return
 }
 
 describe('position-aware WeRead source import', () => {
+  it('allows question-only Markdown updates without normalizing grouped original bytes', async () => {
+    const draft = await buildMergedWereadDraft(emptySnapshot(), book, highlights(), 'What supports this conclusion?');
+    const snapshot = importDrafts(emptySnapshot(), [draft]).snapshot;
+    const original = snapshot.cards[0];
+    const metadata = { id: original.id, bookTitle: original.bookTitle || '', chapter: original.chapter || '' };
+    const heading = folderPath(snapshot.decks, original.deckId).map((deck, index) => `${'#'.repeat(index + 1)} ${deck.name}`).join('\n');
+    const markdown = `${heading}\n\n<!-- recall:card ${JSON.stringify(metadata)} -->\n问题：A new question?\n\n${original.back}\n<!-- recall:end -->`;
+    const plan = planMemoryImport(snapshot, parseMemoryMarkdown(markdown), null);
+    const result = applyMemoryImport(snapshot, plan, new Set([original.id]));
+    expect(result.updated).toBe(1);
+    expect(result.snapshot.cards[0].front).toBe('A new question?');
+    expect(result.snapshot.cards[0].back).toBe(original.back);
+    expect(result.snapshot.cards[0].sourceRef).toEqual(original.sourceRef);
+    expect(result.snapshot.cards[0].deckId).toBe(original.deckId);
+    expect(result.snapshot.reviewLogs).toBe(snapshot.reviewLogs);
+    const repeated = planMemoryImport(result.snapshot, parseMemoryMarkdown(markdown), null);
+    expect(repeated.rows[0].status).toBe('duplicate');
+    const tampered = planMemoryImport(result.snapshot, parseMemoryMarkdown(markdown.replace('Original 0.', 'Changed original.')), null);
+    expect(() => applyMemoryImport(result.snapshot, tampered, new Set([original.id]))).toThrow('合并划线原文');
+  });
   it('blocks Markdown answer replacement on grouped cards instead of corrupting provenance', async () => {
     const draft = await buildMergedWereadDraft(emptySnapshot(), book, highlights(), 'What supports this conclusion?');
     const snapshot = importDrafts(emptySnapshot(), [draft]).snapshot;

@@ -3,6 +3,7 @@ import { createSeedSnapshot } from '@/data/seed';
 import { useRecallStore } from '@/stores/recall-store';
 import { useMediaSync, synchronizeMedia, pauseMediaSync } from '../media-sync';
 import type { MediaAsset } from '../../../shared/media';
+import { localMedia, downloadMedia } from '../media-storage';
 
 const storage = vi.hoisted(() => ({ records: new Map<string, MediaAsset & { uploadedSpace?: string }>() }));
 vi.mock('../media-storage', () => ({
@@ -80,9 +81,32 @@ describe('media background queue', () => {
     expect(useMediaSync.getState().pending).toBe(0);
   });
   it('downloads missing images independently on a fresh device', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })));
     await synchronizeMedia('personal');
     expect(storage.records.get(id)?.uploadedSpace).toBe('personal');
     expect(useMediaSync.getState().completed).toBe(1);
+  });
+  it('verifies remote presence when a local save races the missing-image read', async () => {
+    const asset = { id, bytes: new ArrayBuffer(8), mime: 'image/png', width: 1, height: 1 };
+    vi.mocked(localMedia).mockResolvedValueOnce(undefined);
+    vi.mocked(downloadMedia).mockImplementationOnce(async () => {
+      storage.records.set(id, asset);
+      return asset;
+    });
+    const fetcher = vi.fn(async (_url: string, options: RequestInit) => new Response(null, { status: options.method === 'HEAD' ? 404 : 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    await synchronizeMedia('personal');
+    expect(fetcher.mock.calls.map(call => call[1].method)).toEqual(['HEAD', 'PUT']);
+    expect(storage.records.get(id)?.uploadedSpace).toBe('personal');
+    await synchronizeMedia('personal');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+  it('keeps unconfirmed downloads pending when the remote presence check fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 503 })));
+    await synchronizeMedia('personal');
+    expect(storage.records.get(id)?.uploadedSpace).toBeUndefined();
+    expect(useMediaSync.getState().pending).toBe(1);
+    expect(useMediaSync.getState().error).toContain('503');
   });
   it('stops scheduling new requests after authorization fails and keeps local images for retry', async () => {
     const identities = ['a', 'b', 'c'].map(character => character.repeat(64) + '.png');
