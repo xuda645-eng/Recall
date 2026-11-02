@@ -9,7 +9,7 @@
   document identified in the learning note's source field.
 - Scope: three private-local Skill instruction/template files, installation,
   validation, and this sanitized record/index. Status: validated and installed;
-  documentation publication pending.
+  sanitized documentation published, with this outcome-only follow-up.
 - No product code, database, real cards, credentials, cloud resources, existing
   Lark document or production deployment is changed by this task.
 
@@ -108,7 +108,20 @@
 
 ## Publication And Recovery
 
-- Documentation source SHA and normal push result: pending.
+- Documentation source: `2c28bbb18caa7534e7dcd1096f4a3afed28df3e4`.
+  Normal `git push origin HEAD:main` from the isolated publication checkout
+  succeeded (`c267c5d..2c28bbb`), captured at
+  `2026-11-02T20:05:12+08:00`. Independent
+  `git ls-remote origin refs/heads/main` matched the complete SHA.
+- The initial sandboxed `git push origin HEAD:main` failed with keychain
+  status `-67674` and `could not read Username ... Device not configured`.
+  Recovery: rerun the same push with tool-approved escalated execution to use
+  existing system Git credentials. No credential export or auth changes.
+- This record/index outcome update is a documentation-only follow-up. Its
+  final SHA and observed push result are reported in chat without a recursive
+  self-describing commit. The original dirty worktree remains on its initial
+  main SHA; local task documentation mirrors the published record. Its unrelated
+  app/test changes and all newer remote releases remain intact.
 - Deployment ID/URL, public verification and physical acceptance: not applicable;
   keep `https://recall-memory.pages.dev/` and its existing bundle unchanged.
 - Previous production deployment was not queried or revalidated because no app
