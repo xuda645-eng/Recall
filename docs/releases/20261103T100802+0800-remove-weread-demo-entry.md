@@ -169,3 +169,10 @@
 - Evidence follow-up is included with the next task's reviewed changes after
   the user allowed continuation. Its Git locator is the commit updating this
   section; this does not cause a second deployment of the unchanged old app.
+- Final documentation-only evidence completion is recorded alongside the next
+  routing release's publication outcomes. The two implementation deployments
+  are recorded separately; no Skill edits or repeat old-app deployment are part
+  of that documentation follow-up.
+- Superseded by the [completed-session routing release](./20261103T102235+0800-weread-completed-session-routing.md),
+  app source `9953836`, deployment `0325b1a9`, version `1033`. The removed public
+  demo entry stays absent; the later release addresses the phone routing report.

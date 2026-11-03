@@ -7,8 +7,10 @@
 - Publication preparation resumed: `2026-11-03T10:32:39+08:00` after the user
   confirmed unrelated disappearing Skill changes should be ignored and only
   this chat's completed work should ship.
-- Status: applicable local checks passed; ready for source commit/push and
-  production publication. Validation checked at `2026-11-03T10:36:45+08:00`.
+- Status: published and publicly verified. Local validation checked at
+  `2026-11-03T10:36:45+08:00`; public checks completed
+  `2026-11-03T10:45:47+08:00`, final package/evidence check
+  `2026-11-03T10:47:11+08:00`.
 - Repository: `xuda645-eng/Recall`, branch `main`, starting source
   `460aa03c2d4fa29001b01de3035be110c9941f05`.
 - Request: fix a physical-phone report where entering WeRead or starting a new
@@ -117,7 +119,80 @@
 
 ## Publication
 
-- Commit/push source SHA, immutable-package verification, deployment ID/URL,
-  public test outcomes and timezone-qualified completion timestamp pending.
-- Append actual outcomes in one documentation-only follow-up commit/push;
-  no second app deployment for that evidence update.
+- Source: `9953836750e0ff856c02afc57c4470d395bca307`. Normal HTTPS push advanced
+  main `460aa03..9953836`, confirmed `2026-11-03T10:37:36+08:00`. Reviewed commit
+  contains only this chat's eight app/test/documentation/evidence files, no Skill
+  changes. All 310 committed input hashes and 203 immutable package hashes passed
+  before publication. Production was rechecked immediately before deployment.
+- Command: `CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2 npx --yes
+  wrangler@4.156.0 pages deploy /private/tmp/recall-weread-completed-routing-20261103/dist
+  --project-name recall-memory --branch main
+  --commit-hash 9953836750e0ff856c02afc57c4470d395bca307
+  --commit-message 'fix: prevent completed WeRead merges from hijacking new imports'`.
+  No dirty flag. Compiled unchanged Worker, uploaded 27 files, reused 174,
+  uploaded headers/Functions/routes. CLI completion timestamp:
+  `2026-11-03T10:39:04+08:00`.
+- Deployment: `0325b1a9-edc0-42d2-a179-095dc38ec6b1`, Production/main/source
+  `9953836`, URL `https://0325b1a9.recall-memory.pages.dev`.
+  Stable origin remains `https://recall-memory.pages.dev/`, version
+  `1.0-20261103-1033`.
+- Read-only `verify-public.mjs` from the isolated task directory checked 25
+  exact live file digests, root manifest/icons, entry/preload/WeRead assets,
+  Service Worker/Workbox and version JSON. Version matches the package and is
+  served no-store. Six same-origin anonymous WeRead POST `{}` endpoints, including
+  merge, returned 401/no-store, without credentials or real model input.
+  Private-local evidence: `public-http-evidence.json`.
+- `RECALL_VERIFY_DIST=/private/tmp/recall-weread-completed-routing-20261103/dist
+  node scripts/run-playwright.mjs --config e2e/weread-public.config.ts --workers=1
+  --output=/private/tmp/recall-weread-completed-routing-20261103/public-results`:
+  3/3 passed, 17.2 seconds. Synthetic public selection, concurrent generation,
+  preserved example-entry removal, resource hashes and anonymous gates passed.
+- First public merge command: `RECALL_MERGE_URL=https://recall-memory.pages.dev/
+  RECALL_MERGE_OUTPUT=/private/tmp/recall-weread-completed-routing-20261103/public-merge
+  node scripts/run-playwright.mjs --config e2e/weread-merge.config.ts --workers=2
+  --timeout=120000`: 22 passed / 2 failed, 3.3 minutes. All six new completed-
+  record / consecutive-book regressions passed in both engines on this attempt.
+  Do not report this initial suite as fully passing.
+- Chromium mode-selection case timed out at the initial public `page.goto('/')`
+  while waiting for load, before performing the feature assertions. WebKit's
+  internal synthetic-demo case failed to find the connection button; its trace
+  shows the test's injected `#weread` becoming `#home` during initial hydration.
+  This is consistent with the fixture changing the hash before the existing
+  route-initialization effect settles. Owning `memory-workspace.tsx` route
+  initializer/effect is unchanged by this release. This observed synthetic-
+  startup timing issue is not claimed fixed.
+- Targeted recovery retained production code, tests and assertions, but reduced
+  workers to one: `RECALL_MERGE_URL=https://recall-memory.pages.dev/
+  RECALL_MERGE_OUTPUT=/private/tmp/recall-weread-completed-routing-20261103/public-merge-recovery
+  node scripts/run-playwright.mjs --config e2e/weread-merge.config.ts
+  --grep '生成方式只是选择|内部合成草稿' --workers=1 --timeout=120000`:
+  4/4 passed, 33.6 seconds, completed `2026-11-03T10:44:43+08:00`.
+  All 24 distinct merge cases have passing public evidence across the initial
+  and recovery runs; this is not a single clean 24-case aggregate run.
+- The initial shell chain stopped before public PWA checks after merge failed.
+  A separate protected public PWA run used one worker and the same six cases:
+  `RECALL_URL=https://recall-memory.pages.dev/ node
+  /Users/bytedance/Documents/CodexProject/Recall/Recall-next/scripts/run-playwright.mjs
+  --config /Users/bytedance/Documents/CodexProject/Recall/Recall-next/playwright.config.ts
+  --grep '抽屉显示固定构建版本|版本刷新检查后|PWA部署路径' --workers=1
+  --output=/private/tmp/recall-weread-completed-routing-20261103/public-pwa-results`,
+  from the isolated task directory. 6/6 passed, 1.6 minutes, completed
+  `2026-11-03T10:45:47+08:00`. Version and refresh checks use the public origin
+  in both engines; Chromium proves public SW/offline reopening and synthetic
+  local review persistence. The shipped WebKit offline test deliberately uses
+  an isolated local copy, not public WebKit offline proof. Across suites, 32
+  distinct public-origin cases plus one local fallback have passing evidence
+  across the initial/recovery runs. Physical-phone retesting remains outstanding.
+  Logs are
+  `/private/tmp/recall-weread-routing-public{,-merge,-merge-recovery,-pwa}.log`.
+- No product-code or test-assertion change, repeat app deployment, migration,
+  owner-library mutation or rollback occurred during public recovery. Skill
+  edits appearing concurrently are explicitly outside this task and retained.
+- Final source/package integrity recheck passed at
+  `2026-11-03T10:47:11+08:00`: the same 310 committed inputs / 203 immutable
+  files still match source `9953836` and version `1033`. No runtime-code changes
+  were made during publication or recovery.
+- Final evidence follow-up is documentation-only, updating this record, the
+  prior button-removal record and the release index. Its Git locator is the
+  commit updating this publication section. Commit/push outcome is reported in
+  the final delivery status; no second app deployment is triggered.
