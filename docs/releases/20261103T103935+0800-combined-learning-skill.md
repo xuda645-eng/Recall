@@ -9,7 +9,7 @@
   screenshot learning notes into one learning-oriented QA set, with illustrated
   and text-only cards in a single import file.
 - Status: implemented privately, validated and installed. Sanitized record
-  publication pending; no application deployment is part of this task.
+  published; no application deployment is part of this task.
 - Installed at `2026-11-03T10:50:30+08:00`.
 - No product UI, database, cloud resource, credential, real card or remote
   learning document was modified. The user confirmed that concurrent WeRead
@@ -120,9 +120,19 @@
   `9953836750e0ff856c02afc57c4470d395bca307`, `xuda645-eng/Recall`, `main`.
   This SHA is the inspected repository baseline, not the private Skill's source
   commit. The private implementation is identified by the artifact hash above.
-- Only this record and `docs/RELEASES.md` will be committed and pushed normally
-  from an isolated temporary main checkout. Publication source SHA and actual
-  push result will be appended after the push.
+- Documentation source: `6d0ab0598de14ced381942cf404f66e9830f17b8`.
+  Normal `git push origin HEAD:main` succeeded (`89f2243..6d0ab05`), and
+  independent `git ls-remote origin refs/heads/main` matched the full SHA at
+  `2026-11-03T11:00:34+08:00`. Only this record and `docs/RELEASES.md` were
+  committed from the isolated checkout; private Skill resources were not pushed.
+- Initial sandboxed push failed with keychain status `-67674` and
+  `could not read Username ... Device not configured`. The first escalated
+  permission review timed out before execution; one permitted identical retry
+  used existing system Git credentials and succeeded. No credential/auth changes.
+- This outcome/index update is a documentation-only follow-up. Its final SHA
+  and observed push result are reported in chat rather than recursively committed.
+  Installed full-suite validation was 68 passed, no skips; the installed package
+  still exactly matches the private local mirror at the publication check.
 - Before publication the isolated checkout fast-forwarded to
   `89f2243eb6c8cb8db5d154d0ffadc09b1439bbd9`. Reapplying this task's saved
   index insertion conflicted with another chat's completed-release row;
