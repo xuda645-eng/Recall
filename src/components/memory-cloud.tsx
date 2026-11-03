@@ -16,7 +16,7 @@ import { synchronizeMedia, useMediaSync } from '@/services/media-sync';
 
 type CloudStatus = ReturnType<typeof useCloudSync.getState>;
 type ConflictChoice = 'local' | 'remote';
-interface MemoryCloudProps { className?: string; onManage?: () => void }
+interface MemoryCloudProps { className?: string; onManage?: () => void; compact?: boolean }
 
 const phaseLabels: Record<CloudStatus['phase'], string> = {
   checking: '正在检查授权', local: '仅保存在本机', unauthorized: '需要设备授权',
@@ -138,7 +138,7 @@ function PairingForm() {
     {action.error && <p className="m-error" role="alert">{action.error}</p>}
     <div className="m-cloud-actions">
       <button type="submit" className="m-primary" disabled={action.busy || !code.trim() || !label.trim() || status.phase === 'checking' || status.phase === 'syncing'}>{action.busy ? '正在授权' : '授权并合并'}</button>
-      {(cardCount > 0 || deckCount > 0) && <button type="button" className="m-secondary" disabled={action.busy} onClick={() => void action.run(async () => exportLocalBackup())}>备份本机数据</button>}
+      {(cardCount > 0 || deckCount > 0) && <><p className="m-cloud-note">此备份不含图片文件，需要完整带图备份请使用“数据备份与恢复”。</p><button type="button" className="m-secondary" disabled={action.busy} onClick={() => void action.run(async () => exportLocalBackup())}>仅文字与进度备份</button></>}
     </div>
   </form>;
 }
@@ -341,7 +341,7 @@ function DeviceManagement() {
     {action.error && <p className="m-error" role="alert">{action.error}</p>}
     {(status.pending > 0 || status.conflicts > 0) && <p className="m-cloud-warning">本机仍有待同步或冲突数据。退出 / 撤销本机授权前，请先同步或导出备份；未上传的内容不会自动送达其他设备。</p>}
     <div className="m-cloud-actions">
-      <button type="button" className="m-secondary" disabled={action.busy} onClick={() => void action.run(async () => exportLocalBackup())}>备份本机数据</button>
+      <button type="button" className="m-secondary" disabled={action.busy} onClick={() => void action.run(async () => exportLocalBackup())}>仅文字与进度备份</button>
       <button type="button" className="m-secondary" disabled={disabled} onClick={() => {
         if (confirmDisconnect(status.session?.device.label ?? '本机', true, true)) void action.run(logoutDevice);
       }}>退出本机授权</button>
@@ -349,9 +349,12 @@ function DeviceManagement() {
   </section>;
 }
 
-export function MemoryCloudStatus({ className = '', onManage }: MemoryCloudProps = {}) {
+export function MemoryCloudStatus({ className = '', onManage, compact = false }: MemoryCloudProps = {}) {
+  const status = useCloudSync();
+  const media = useMediaSync();
+  const quiet = compact && status.phase === 'synced' && !status.pending && !status.conflicts && !status.error && !media.pending && !media.running && !media.error;
   return <section className={`m-cloud m-panel m-cloud-status ${className}`} aria-label="云同步状态">
-    <CloudSummary onManage={onManage} />
+    {quiet ? <details><summary>云同步 · 已同步</summary><CloudSummary onManage={onManage}/></details> : <CloudSummary onManage={onManage} />}
     {!onManage && <PairingForm />}
   </section>;
 }

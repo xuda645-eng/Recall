@@ -129,6 +129,7 @@ test('手动附图自动压缩、带图备份与合并恢复，窄屏安全区�
   await page.getByRole('button', { name: '保存修改', exact: true }).click();
   await page.goto('/#settings');
   await page.reload();
+  await page.getByRole('button', { name: '备份', exact: true }).click();
   const downloaded = page.waitForEvent('download');
   await page.getByRole('button', { name: '备份（含来源图片）', exact: true }).click();
   const download = await downloaded;
@@ -136,6 +137,7 @@ test('手动附图自动压缩、带图备份与合并恢复，窄屏安全区�
   const restored = await browser.newContext({ baseURL: new URL(page.url()).origin, viewport: { width: 393, height: 852 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
   const second = await restored.newPage();
   await second.goto('/#settings');
+  await second.getByRole('button', { name: '备份', exact: true }).click();
   second.on('dialog', dialog => dialog.accept());
   await second.locator('input[type=file]').setInputFiles(path!);
   await expect.poll(async () => second.evaluate(() => JSON.parse(localStorage.getItem('recall.snapshot.v1')!)?.cards.length)).toBe(2);

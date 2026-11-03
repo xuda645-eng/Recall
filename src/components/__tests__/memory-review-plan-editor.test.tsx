@@ -20,7 +20,9 @@ const at = new Date('2026-11-01T04:00:00.000Z');
 const DAY = 86_400_000;
 
 function openEditor(onClose = vi.fn(), onBusy = vi.fn()) {
-  return { ...render(createElement(MemoryReviewPlanEditor, { onClose, onBusy })), onClose, onBusy };
+  const view = render(createElement(MemoryReviewPlanEditor, { onClose, onBusy }));
+  view.container.querySelectorAll('details').forEach(details => { details.open = true; });
+  return { ...view, onClose, onBusy };
 }
 
 function changeNumber(label: string, value: string): void {
@@ -57,6 +59,13 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe('MemoryReviewPlanEditor mobile study preferences', () => {
+  it('places study controls first and collapses advanced scheduling by default', () => {
+    const view = render(createElement(MemoryReviewPlanEditor, { onClose: vi.fn() }));
+    const advanced = screen.getByText('高级排期设置').closest('details')!;
+    expect(advanced.open).toBe(false);
+    expect(screen.getByLabelText('每轮卡片数').compareDocumentPosition(advanced) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(view.container.querySelector('.m-study-preferences')).toBeDefined();
+  });
   it('defaults legacy settings to smart, 30% new cards, 10 cards and 30 minutes without a second title', () => {
     openEditor();
     expect(screen.queryByRole('heading', { name: '复习计划' })).not.toBeInTheDocument();

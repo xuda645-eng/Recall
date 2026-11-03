@@ -30,3 +30,36 @@
 .m-study-warning { color: var(--muted); font-size: 13px; }
 .m-review-plan .m-actions { flex-wrap: nowrap; }
 .m-review-plan .m-actions button { white-space: normal; }
+.m-home-deck { position: relative; margin-bottom: 14px; font-size: 14px; }
+.m-home-deck select { width: 100%; height: 48px; appearance: none; padding-right: 40px; }
+.m-home-deck::after { content: ''; position: absolute; right: 18px; bottom: 22px; width: 8px; height: 8px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); pointer-events: none; }
+.m-hero { padding: 22px; }
+.m-hero .m-big { font-size: 76px; margin: 14px 0 10px; }
+.m-hero .m-primary { margin-top: 18px; }
+.m-hero .m-card-stack { width: 94px; height: 114px; top: 52px; }
+.m-hero[data-illustration="1"] .m-card-stack { transform: rotate(-7deg); }
+.m-hero[data-illustration="1"] .m-card-stack > div:first-child { background: #a7b2a1; transform: rotate(19deg) translate(10px, 3px); }
+.m-hero[data-illustration="2"] .m-card-stack { transform: rotate(4deg); }
+.m-hero[data-illustration="2"] .m-card-stack > div:nth-child(2) { background: #d5c5a3; transform: rotate(-19deg) translate(-12px, 4px); }
+.m-home-summary { padding: 18px 8px; }
+.m-progress-counts { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 14px; }
+.m-forecast-bars small { font-size: 11px; white-space: normal; text-align: center; line-height: 1.25; height: 30px; }
+.m-study-tools > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-study-tools > div { flex-shrink: 0; }
+.m-reading-mode { display: block; font-size: 11px !important; line-height: 1.25; }
+.m-browse-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.m-browse-actions button { white-space: normal; }
+.m-browse-actions .m-primary { display: flex; justify-content: center; align-items: center; gap: 4px; }
+.m-editor-tabs { display: flex; gap: 8px; }
+.m-editor-tabs [aria-pressed="true"] { background: var(--soft); border-radius: 10px; }
+.m-editor-fields { display: grid; gap: 14px; }
+.m-editor-fields[hidden] { display: none; }
+.m-editor-fields textarea.is-expanded { min-height: 38dvh; }
+.m-editor-preview { padding: 14px; border: 1px solid var(--line); border-radius: 12px; overflow-wrap: anywhere; }
+.m-cloud-status summary, .memory-app .m-panel > summary, .m-review-plan summary { min-height: 44px; cursor: pointer; padding: 10px 0; }
+.m-import-package-note { font-size: 13px; color: var(--muted); margin: 6px 0 18px; }
+@media (max-width: 350px) {
+  .m-hero .m-card-stack { width: 75px; right: 15px; opacity: .65; }
+  .m-study-backlog { align-items: flex-start; }
+  .m-study-backlog small { max-width: 65%; }
+}

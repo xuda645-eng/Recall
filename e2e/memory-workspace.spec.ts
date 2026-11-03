@@ -127,6 +127,10 @@ async function startReading(page: Page) {
   await page.getByRole('button', { name: '开始复习', exact: true }).click();
   await expect(page.getByRole('button', { name: '显示答案', exact: true })).toBeVisible();
 }
+async function openDiagnostics(page: Page) {
+  await page.getByRole('button', { name: '更多设置', exact: true }).click();
+  await page.getByText('显示诊断（高级）', { exact: true }).click();
+}
 async function saveShot(page: Page, name: string) {
   await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))));
   await page.screenshot({ path: test.info().outputPath(`${name}.png`), scale: 'css' });
@@ -233,6 +237,7 @@ test('iPhone系统安全框首帧、抽屉、缩短视口和原版更新离线�
       await noOverflow(page);
     }
     await navigate(page, '设置与数据');
+    await openDiagnostics(page);
     await page.getByRole('button', { name: '显示运行信息' }).click();
     await expect(page.getByLabel('显示诊断结果')).toContainText('viewport-fit=auto');
     if (browserName === 'webkit') await oldServer.stop();
@@ -255,6 +260,7 @@ test('系统安全框引导脚本公开可用，原应用和诊断往返保留�
   const content = await page.locator('meta[name="viewport"]').getAttribute('content');
   const expected = await page.evaluate(() => /iPhone/.test(navigator.userAgent) && ((navigator as Navigator & { standalone?: boolean }).standalone === true || matchMedia('(display-mode: standalone)').matches) ? 'auto' : 'cover');
   expect(content).toContain(`viewport-fit=${expected}`);
+  await openDiagnostics(page);
   await page.getByRole('button', { name: '显示运行信息' }).click();
   await expect(page.getByLabel('显示诊断结果')).toContainText(`viewport-fit=${expected}`);
   await page.getByRole('link', { name: '打开原安装内对照页' }).click();
@@ -270,6 +276,7 @@ test('原安装显示诊断往返不改变合成卡片，静态页不加载应�
   await seedPage(page);
   const before = await snapshot(page);
   await navigate(page, '设置与数据');
+  await openDiagnostics(page);
   await page.getByRole('button', { name: '显示运行信息' }).click();
   const report = await page.getByLabel('显示诊断结果').textContent();
   expect(report).toContain('"navigator": true');
@@ -309,6 +316,7 @@ test('原安装静态诊断离线进入并返回，未访问过的页面已预�
   await seedPage(page, fixture(), 'home', isolated?.url || './');
   const before = await snapshot(page);
   await navigate(page, '设置与数据');
+  await openDiagnostics(page);
   if (isolated) await isolated.stop();
   else await context.setOffline(true);
   await page.getByRole('link', { name: '打开原安装内对照页' }).click();
@@ -333,6 +341,7 @@ test('原安装静态诊断离线进入并返回，未访问过的页面已预�
 test('原安装显示诊断公开只读入口、静态加载与返回', async ({ page }) => {
   await page.goto('./#settings', { waitUntil: 'domcontentloaded' });
   await waitForAppReady(page);
+  await openDiagnostics(page);
   await page.getByRole('button', { name: '显示运行信息' }).click();
   await expect(page.getByLabel('显示诊断结果')).toContainText('safeArea');
   const origin = new URL(page.url()).origin;
@@ -964,8 +973,9 @@ test('本机备份和迁移副本不携带同步密钥，保留卡片与复习�
   data.settings.syncRelayUrl = 'https://example.invalid/test-relay';
   data.cards[2].sourceRef = { provider: 'weread', bookId: 'test-book', bookmarkId: 'test-mark' };
   await seedPage(page, data, 'settings');
-  const pendingDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: '备份', exact: true }).click();
+  const pendingDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: '仅文字与进度备份', exact: true }).click();
   const download = await pendingDownload;
   const file = await download.path();
   expect(file).not.toBeNull();
@@ -978,6 +988,7 @@ test('本机备份和迁移副本不携带同步密钥，保留卡片与复习�
   expect(exported.settings.reviewPlan).toEqual(data.settings.reviewPlan);
   expect(exported.cards[2].archivedAt).toBe(at);
   expect(exported.cards[2].sourceRef).toEqual(data.cards[2].sourceRef);
+  await page.getByRole('button', { name: '关闭面板', exact: true }).click();
   await navigate(page, '今日复习');
   await startReading(page);
   await page.getByRole('button', { name: '归档当前卡片', exact: true }).click();
@@ -1200,7 +1211,7 @@ test('归档复习状态筛选使用保留进度和排期，不恢复或评分�
   data.cards[2] = { ...data.cards[2], state: 'review', nextReviewDate: '2100-01-01T00:00:00.000Z' };
   await seedPage(page, data, 'archived');
   const before = await snapshot(page);
-  for (const [status, expected] of [['待学习', 'first'], ['待复习', 'second'], ['已熟悉', 'archived']]) {
+  for (const [status, expected] of [['待学习', 'first'], ['待复习', 'second'], ['长期复习', 'archived']]) {
     await page.getByRole('button', { name: '筛选与排序', exact: true }).click();
     await page.getByLabel('内容', { exact: true }).selectOption('仅卡片');
     await page.getByLabel('复习状态', { exact: true }).selectOption(status);

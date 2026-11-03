@@ -149,8 +149,40 @@ export function MemoryReviewPlanEditor({ onClose, onBusy }: MemoryReviewPlanEdit
   }
 
   return <form className="m-review-plan m-panel" noValidate onFocusCapture={keepControlVisible} onSubmit={event => void save(event)} aria-busy={saving}>
-    <p>{t('memory.reviewPlan.description', { defaultValue: '选卡配比保存后立即调整本轮未练部分，保留当前卡和已完成记录。记忆排期只影响之后的评分，不会重排已有卡片的到期时间，也不会清空复习记录。' })}</p>
+    <p className="m-note">先调整本轮张数与新旧卡配比。算法与记忆率在高级排期设置中。</p>
     <fieldset disabled={saving} className="grid gap-4" style={groupStyle}>
+      <fieldset className="m-study-preferences grid gap-3" style={{ minWidth: 0 }}>
+        <legend>{t('memory.reviewPlan.selection', { defaultValue: '本轮选卡' })}</legend>
+        <label htmlFor={`${id}-batch-size`}>{t('memory.reviewPlan.batchSize', { defaultValue: '每轮卡片数' })}</label>
+        <input id={`${id}-batch-size`} type="number" inputMode="numeric" min="1" max="100" step="1"
+          value={studyInputs.batchSize} disabled={saving} style={controlStyle}
+          aria-invalid={!batchSizeValid} aria-describedby={`${id}-batch-hint ${id}-validation`}
+          onChange={event => { setStudyInputs(current => ({ ...current, batchSize: event.target.value })); setSaveError(''); }} />
+        <small id={`${id}-batch-hint`}>{t('memory.reviewPlan.batchHint', { defaultValue: '每轮 1 到 100 张；这是卡片数量目标，不是每天必须完成的任务。' })}</small>
+        <label htmlFor={`${id}-new-ratio`}>{t('memory.reviewPlan.newCardRatio', { defaultValue: '新卡占比' })}</label>
+        <input id={`${id}-new-ratio`} className="m-study-ratio" type="range" min="0" max="1" step="0.05"
+          aria-label={t('memory.reviewPlan.newCardRatio', { defaultValue: '新卡占比' })}
+          aria-valuetext={t('memory.reviewPlan.ratioValue', { defaultValue: '旧卡 {{oldPercent}}%，新卡 {{newPercent}}%', oldPercent, newPercent })}
+          aria-describedby={`${id}-ratio-hint ${id}-validation`} aria-invalid={!ratioValid}
+          value={studyInputs.newCardRatio} disabled={saving} style={{ ...controlStyle, width: '100%', padding: 0 }}
+          onChange={event => { setStudyInputs(current => ({ ...current, newCardRatio: Number(event.target.value) })); setSaveError(''); }} />
+        <output className="m-study-ratio-output" htmlFor={`${id}-new-ratio`} aria-live="polite" aria-atomic="true">
+          {t('memory.reviewPlan.ratioValue', { defaultValue: '旧卡 {{oldPercent}}%，新卡 {{newPercent}}%', oldPercent, newPercent })}
+        </output>
+        <details><summary>选卡配比说明</summary><small id={`${id}-ratio-hint`}>{t('memory.reviewPlan.ratioHint', { defaultValue: '占比按卡片张数分配，不是用时比例。0% 是全旧卡目标，100% 是全新卡目标；旧卡只选当前范围内已到期的已学卡，不提前复习未到期卡。某类不足时由另一类补足，两类都不足时按实际可用卡数开始。' })}</small></details>
+        {studyInputs.newCardRatio > 0.5 && <p className="m-study-warning" role="status">
+          {t('memory.reviewPlan.ratioWarning', { defaultValue: '新卡占比较高，可能增加之后的复习负担；可以按自己的节奏调整，这不影响保存。' })}
+        </p>}
+        <label htmlFor={`${id}-session-minutes`}>{t('memory.reviewPlan.sessionMinutes', { defaultValue: '每次时长目标（分钟）' })}</label>
+        <input id={`${id}-session-minutes`} type="number" inputMode="numeric" min="5" max="120" step="1"
+          value={studyInputs.sessionMinutes} disabled={saving} style={controlStyle}
+          aria-invalid={!sessionMinutesValid} aria-describedby={`${id}-session-hint ${id}-validation`}
+          onChange={event => { setStudyInputs(current => ({ ...current, sessionMinutes: event.target.value })); setSaveError(''); }} />
+        <details><summary>时长目标说明</summary><small id={`${id}-session-hint`}>{t('memory.reviewPlan.sessionHint', { defaultValue: '范围 5 到 120 分钟，只用于规划一次学习，不是严格截止时间，也不保证能在目标时间内完成；可随时暂停或继续，不要求每天打卡。' })}</small></details>
+      </fieldset>
+      <details className="m-plan-advanced" open={mode === 'fixed' || !retentionValid || !intervalsValid ? true : undefined}>
+      <summary>高级排期设置</summary>
+      <p className="m-note">{t('memory.reviewPlan.description', { defaultValue: '选卡配比保存后立即调整本轮未练部分，保留当前卡和已完成记录。记忆排期只影响之后的评分，不会重排已有卡片的到期时间，也不会清空复习记录。' })}</p>
       <fieldset className="m-review-modes grid gap-2" style={groupStyle}>
         <legend>{t('memory.reviewPlan.modeLabel', { defaultValue: '调度方式' })}</legend>
         <label style={{ display: 'flex', alignItems: 'center', minHeight: 44 }}>
@@ -201,39 +233,7 @@ export function MemoryReviewPlanEditor({ onClose, onBusy }: MemoryReviewPlanEdit
           onChange={event => { setRetention(event.target.value); setSaveError(''); }} />
       </label>
       <small id={`${id}-retention-hint`}>{t('memory.reviewPlan.retentionHint', { defaultValue: '范围 70% 到 99%。保留率越高，智能计划通常安排越频繁。' })}</small>
-      <fieldset className="m-study-preferences grid gap-3" style={{ minWidth: 0 }}>
-        <legend>{t('memory.reviewPlan.selection', { defaultValue: '本轮选卡' })}</legend>
-        <label htmlFor={`${id}-new-ratio`}>{t('memory.reviewPlan.newCardRatio', { defaultValue: '新卡占比' })}</label>
-        <input id={`${id}-new-ratio`} className="m-study-ratio" type="range" min="0" max="1" step="0.05"
-          aria-label={t('memory.reviewPlan.newCardRatio', { defaultValue: '新卡占比' })}
-          aria-valuetext={t('memory.reviewPlan.ratioValue', { defaultValue: '旧卡 {{oldPercent}}%，新卡 {{newPercent}}%', oldPercent, newPercent })}
-          aria-describedby={`${id}-ratio-hint ${id}-validation`} aria-invalid={!ratioValid}
-          value={studyInputs.newCardRatio} disabled={saving} style={{ ...controlStyle, width: '100%', padding: 0 }}
-          onChange={event => { setStudyInputs(current => ({ ...current, newCardRatio: Number(event.target.value) })); setSaveError(''); }} />
-        <div className="m-study-ratio-endpoints m-spread" aria-hidden="true">
-          <small>{t('memory.reviewPlan.oldEndpoint', { defaultValue: '0% 新卡' })}</small>
-          <small>{t('memory.reviewPlan.newEndpoint', { defaultValue: '100% 新卡' })}</small>
-        </div>
-        <output className="m-study-ratio-output" htmlFor={`${id}-new-ratio`} aria-live="polite" aria-atomic="true">
-          {t('memory.reviewPlan.ratioValue', { defaultValue: '旧卡 {{oldPercent}}%，新卡 {{newPercent}}%', oldPercent, newPercent })}
-        </output>
-        <small id={`${id}-ratio-hint`}>{t('memory.reviewPlan.ratioHint', { defaultValue: '占比按卡片张数分配，不是用时比例。0% 是全旧卡目标，100% 是全新卡目标；旧卡只选当前范围内已到期的已学卡，不提前复习未到期卡。某类不足时由另一类补足，两类都不足时按实际可用卡数开始。' })}</small>
-        {studyInputs.newCardRatio > 0.5 && <p className="m-study-warning" role="status">
-          {t('memory.reviewPlan.ratioWarning', { defaultValue: '新卡占比较高，可能增加之后的复习负担；可以按自己的节奏调整，这不影响保存。' })}
-        </p>}
-        <label htmlFor={`${id}-batch-size`}>{t('memory.reviewPlan.batchSize', { defaultValue: '每轮卡片数' })}</label>
-        <input id={`${id}-batch-size`} type="number" inputMode="numeric" min="1" max="100" step="1"
-          value={studyInputs.batchSize} disabled={saving} style={controlStyle}
-          aria-invalid={!batchSizeValid} aria-describedby={`${id}-batch-hint ${id}-validation`}
-          onChange={event => { setStudyInputs(current => ({ ...current, batchSize: event.target.value })); setSaveError(''); }} />
-        <small id={`${id}-batch-hint`}>{t('memory.reviewPlan.batchHint', { defaultValue: '每轮 1 到 100 张；这是卡片数量目标，不是每天必须完成的任务。' })}</small>
-        <label htmlFor={`${id}-session-minutes`}>{t('memory.reviewPlan.sessionMinutes', { defaultValue: '每次时长目标（分钟）' })}</label>
-        <input id={`${id}-session-minutes`} type="number" inputMode="numeric" min="5" max="120" step="1"
-          value={studyInputs.sessionMinutes} disabled={saving} style={controlStyle}
-          aria-invalid={!sessionMinutesValid} aria-describedby={`${id}-session-hint ${id}-validation`}
-          onChange={event => { setStudyInputs(current => ({ ...current, sessionMinutes: event.target.value })); setSaveError(''); }} />
-        <small id={`${id}-session-hint`}>{t('memory.reviewPlan.sessionHint', { defaultValue: '范围 5 到 120 分钟，只用于规划一次学习，不是严格截止时间，也不保证能在目标时间内完成；可随时暂停或继续，不要求每天打卡。' })}</small>
-      </fieldset>
+      </details>
       <p id={`${id}-validation`} role={validationError ? 'alert' : undefined} className="m-error" hidden={!validationError}>{validationError}</p>
       {saveError && <p role="alert" className="m-error">{saveError}</p>}
       <div className="m-actions">

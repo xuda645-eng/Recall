@@ -81,6 +81,15 @@ async function backupAndChoose(choice: 'local' | 'remote'): Promise<void> {
 }
 
 describe('mobile cloud components', () => {
+  it('collapses healthy sync details but never hides pending work or errors', () => {
+    authorize();
+    const view = render(<MemoryCloudStatus compact onManage={vi.fn()}/>);
+    expect(view.container.querySelector('details')?.open).toBe(false);
+    act(() => useCloudSync.setState({ pending: 2, error: '同步失败，请重试' }));
+    expect(view.container.querySelector('details')).toBeNull();
+    expect(screen.getByText('待同步 2 项')).toBeVisible();
+    expect(screen.getByText('同步失败，请重试')).toBeVisible();
+  });
   beforeEach(() => {
     vi.resetAllMocks();
     useCloudSync.setState({ phase: 'local', session: null, pending: 0, conflicts: 0, lastSyncedAt: null, error: '' });
@@ -124,7 +133,7 @@ describe('mobile cloud components', () => {
     expect(screen.getByText(/保留原有编号和复习记录/)).toBeTruthy();
     expect(screen.getByRole('button', { name: '授权并合并' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: '立即同步' })).toBeNull();
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '备份本机数据' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '仅文字与进度备份' })); });
     const payload = JSON.parse(api.download.mock.calls[0][0]);
     expect(payload.cards[0].id).toBe('card-1');
     expect(payload.cards[0].reps).toBe(8);

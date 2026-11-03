@@ -41,13 +41,14 @@ export function MemoryImportChoices({ busy, onFile, onWeread, onManual, onOther,
         <ChevronRight size={18} aria-hidden="true"/>
       </button>
     </div>
+    <div className="m-import-help"><button type="button" disabled={busy} onClick={onHelp}>格式说明</button><button type="button" disabled={busy} onClick={onExample}>下载 Markdown 示例</button></div>
+    <p className="m-import-package-note">带图包将卡片与来源图片放在一个文件里，可由制卡工具生成；不是单张图片，也不是完整数据备份。</p>
     <input ref={files} type="file" accept=".md,.markdown,.json" hidden aria-label="导入文件" onChange={event => { onFile(event.currentTarget.files?.[0]); event.currentTarget.value = ''; }}/>
     <details className="m-import-more">
       <summary>其他方式<ChevronDown size={18} aria-hidden="true"/></summary>
       <div className="m-import-secondary">
         <button type="button" disabled={busy} onClick={onManual}><Plus size={18} aria-hidden="true"/><span><strong>手动添加卡片</strong><small>自己填写问题与答案</small></span><ChevronRight size={16} aria-hidden="true"/></button>
         <button type="button" disabled={busy} aria-label="其他导入：CSV / Anki / Recall" onClick={onOther}><Upload size={18} aria-hidden="true"/><span><strong>CSV / Anki / Recall</strong><small>迁移资料或恢复普通备份</small></span><ChevronRight size={16} aria-hidden="true"/></button>
-        <div className="m-import-help"><button type="button" disabled={busy} onClick={onHelp}>格式说明</button><button type="button" disabled={busy} onClick={onExample}>下载 Markdown 示例</button></div>
       </div>
     </details>
   </section>;

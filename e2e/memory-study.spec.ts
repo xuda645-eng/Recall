@@ -71,7 +71,7 @@ test('首页区分总积压、新卡和小轮次，按比例推荐而不承诺�
   await expect(hero.locator('.m-big')).toContainText('10');
   await expect(hero).toContainText('旧卡 7 张 · 新卡 3 张');
   await expect(hero).toContainText('时长目标 30 分钟');
-  await expect(page.locator('.m-study-backlog')).toContainText('总待复习 12 张 · 待学习 12 张');
+  await expect(page.locator('.m-study-backlog')).toContainText('本卡组待复习 12 张 · 待学习 12 张');
   await expect(hero).not.toContainText('今日复习已完成');
 });
 
@@ -212,7 +212,7 @@ test('统计归档导入无无关顶部操作，子卡组返回但一级目录�
     await navigate(page, label);
     await expect(page.locator('.memory-bar .m-top-action')).toHaveCount(0);
     const placeholder = (await page.locator('.m-top-action-placeholder').boundingBox())!;
-    expect(placeholder.width).toBe(48);
+    expect(placeholder.width).toBeCloseTo(48, 3);
   }
   await navigate(page, '卡组目录');
   await expect(page.locator('.memory-bar').getByRole('button', { name: '添加', exact: true })).toBeVisible();

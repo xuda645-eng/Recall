@@ -15,6 +15,8 @@ it('presents exactly three equal primary sources and collapses infrequent action
   expect(screen.getByRole('button', { name: '导入划线' })).toBeDefined();
   expect(screen.getByText('手动添加卡片').closest('details')?.open).toBe(false);
   expect(screen.getByText('CSV / Anki / Recall').closest('details')?.open).toBe(false);
+  expect(screen.getByRole('button', { name: '格式说明' }).closest('details')).toBeNull();
+  expect(screen.getByRole('button', { name: '下载 Markdown 示例' }).closest('details')).toBeNull();
 });
 
 it('uses the correct file filter and passes a selected file without importing automatically', () => {
