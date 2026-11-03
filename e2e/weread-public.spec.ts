@@ -33,6 +33,8 @@ test('公网合成书卡标记、顶栏返回和划线全选，不调用真实�
   await page.addInitScript(({ initial, base }) => { if (location.origin === base) localStorage.setItem('recall.snapshot.v1', JSON.stringify(initial)); }, { initial, base });
   await page.goto('/#weread', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await expect(page.getByRole('button', { name: '连接微信读书', exact: true })).toBeVisible({ timeout: 120000 });
+  await expect(page.getByRole('button', { name: /体验合并示例/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '其他导入方式', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: '连接微信读书', exact: true }).click();
   for (const [index, book] of books.entries()) {
     const card = page.getByRole('button', { name: `${book.title}，2 条我的划线` });

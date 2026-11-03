@@ -10,8 +10,8 @@ import { checkWereadBudget, discardWereadJob, loadWereadJob, saveWereadJob, with
 import { AI_DAILY_MODEL_ATTEMPTS } from '../../shared/weread-ai';
 import type { MemoryWereadImportProps } from './memory-weread-import';
 import { MemoryWereadMergeImport } from './memory-weread-merge-import';
-import { loadMergeSession, saveMergeSession } from '@/services/weread-merge-storage';
-import { createMergeSession, createMergeDemo } from '@/lib/weread-merge-session';
+import { loadMergeSession } from '@/services/weread-merge-storage';
+import { createMergeSession } from '@/lib/weread-merge-session';
 
 function Cover({ book }: { book: { title: string; cover?: string | null } }): JSX.Element {
   const [failed, setFailed] = useState(false);
@@ -134,18 +134,6 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal,
     } catch (value) { if (mounted.current) setError(failure(value)); }
     finally { report(false); }
   }
-  async function mergeDemo(): Promise<void> {
-    if (running.current) return;
-    report(true); setError('');
-    try {
-      await withWereadJobLock(async () => {
-        if (await loadMergeSession()) throw new Error('本机已有合并草稿，请先继续或取消');
-        await saveMergeSession(await createMergeDemo(useRecallStore.getState()));
-      });
-      setMerging(true);
-    } catch (value) { setError(failure(value)); }
-    finally { report(false); }
-  }
   async function execute(input: WereadJob, replacement = false): Promise<void> {
     if (running.current) return;
     report(true); setError('');
@@ -253,7 +241,6 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal,
       <span className="wr-eyebrow">YOUR READING, RECALLED</span><h1>读过的，<br/>也能记得住。</h1><p>把微信读书里的划线，<br/>变成下一次温习的问题。</p>
       <div className="wr-art" aria-hidden="true"><div><span>阅读的回声</span></div><div><span>思考的尺度</span></div><div><Check size={30}/></div></div>
       <button className="m-primary" disabled={busy || draftBlocked} onClick={() => void connect()}>{busy ? <LoaderCircle className="wr-spin" size={18}/> : null}{busy ? '正在连接' : '连接微信读书'}<ArrowRight size={17}/></button><small>只导入我的划线，不包含其他人的热门划线。</small><button className="m-text" disabled={busy} onClick={onLocal}>其他导入方式</button>
-      <button className="m-secondary wr-more" disabled={busy || draftBlocked} onClick={() => void mergeDemo()}>体验合并示例（合成数据 / 非 AI）</button>
     </div> : stage === 'books' ? <>
       <header className="wr-heading"><span className="wr-eyebrow">YOUR NOTEBOOKS</span><h1>选择想记住的书</h1><p>我的笔记本 · 已载入 {books.length} 本{cursor !== null ? '，还有更多' : ''}</p></header>
       <div className="wr-search"><label><Search size={18}/><input type="search" aria-label="搜索书名或作者" placeholder="搜索书名或作者" value={query} onChange={event => setQuery(event.target.value)}/></label><button className="m-secondary" aria-label="更多筛选" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}><SlidersHorizontal size={18}/></button></div>

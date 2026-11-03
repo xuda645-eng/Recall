@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { createSeedSnapshot } from '../src/data/seed';
+import { createMergeDemo } from '../src/lib/weread-merge-session';
 
 const originals = ['  概念定义。\r\n\t 保持空白。  ', '具体条件与说明。', '方法的第一步。', '方法的第二步。'];
 const seed = () => ({ ...createSeedSnapshot(), cards: [], decks: [], reviewLogs: [], studySessions: [], settings: { ...createSeedSnapshot().settings, onboardingComplete: true } });
@@ -16,6 +17,11 @@ async function mergeDraft(page: Page, replacement?: string): Promise<string> {
       transaction.onabort = () => { reject(transaction.error); db.close(); };
     };
   }), replacement);
+}
+async function seedMergeDemo(page: Page): Promise<void> {
+  await mergeDraft(page, JSON.stringify(await createMergeDemo(seed())));
+  await page.reload();
+  await expect(page.locator('.wr-merge-card')).toHaveCount(2);
 }
 async function setup(page: Page, fail = false, missing = false) {
   const calls: string[][] = [];
@@ -167,8 +173,8 @@ for (const fault of ['expired', 'invalid']) {
       await expect(other.getByRole('button', { name: '取消无法恢复的合并草稿' })).toHaveCount(0);
       await other.goto('/#weread');
       await other.reload();
-      await other.getByRole('button', { name: '体验合并示例（合成数据 / 非 AI）' }).click();
-      await expect(other.locator('.wr-merge-card')).toHaveCount(2);
+      await expect(other.getByRole('button', { name: '连接微信读书', exact: true })).toBeVisible();
+      await seedMergeDemo(other);
       const replacement = await mergeDraft(other);
       page.once('dialog', dialog => dialog.accept());
       await page.getByRole('button', { name: '取消无法恢复的合并草稿' }).click();
@@ -200,7 +206,41 @@ test('缺少原文位置时保留逐条入口而禁止智能合并', async ({ pa
   await expect(page.getByRole('button', { name: '生成并自动导入', exact: true })).toBeEnabled();
 });
 
-test('公开合成示例无AI调用，可拆分预览且安全区按钮至少44px', async ({ page }) => {
+test('连接页无公开合成示例，保留真实连接与其他导入入口', async ({ page }, info) => {
+  const calls: string[] = [];
+  await page.route('**/api/**', async route => {
+    calls.push(new URL(route.request().url()).pathname);
+    await route.fulfill({ status: 503, json: { error: 'synthetic-no-cloud' } });
+  });
+  await page.goto('/');
+  await page.evaluate(data => { localStorage.setItem('recall.snapshot.v1', JSON.stringify(data)); location.hash = 'weread'; }, seed());
+  await page.reload();
+  const connect = page.getByRole('button', { name: '连接微信读书', exact: true });
+  await expect(connect).toBeEnabled();
+  await expect(page.getByRole('button', { name: /体验合并示例/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '其他导入方式', exact: true })).toBeEnabled();
+  await page.evaluate(() => {
+    document.querySelector<HTMLElement>('.memory-app')?.style.setProperty('--safe-top', '59px');
+    document.querySelector<HTMLElement>('.memory-app')?.style.setProperty('--safe-bottom', '34px');
+  });
+  for (const viewport of [{ width: 393, height: 852 }, { width: 320, height: 740 }, { width: 760, height: 852 }, { width: 761, height: 852 }, { width: 852, height: 393 }]) {
+    await page.setViewportSize(viewport);
+    for (const button of [connect, page.getByRole('button', { name: '其他导入方式', exact: true })]) {
+      await button.scrollIntoViewIfNeeded();
+      const box = (await button.boundingBox())!;
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      expect(box.width).toBeGreaterThanOrEqual(44);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  }
+  expect(calls.every(path => path === '/api/auth/session')).toBe(true);
+  expect((await snapshot(page)).cards).toEqual([]);
+  expect(await mergeDraft(page)).toBeUndefined();
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.screenshot({ path: info.outputPath('weread-landing.png'), fullPage: true });
+});
+
+test('内部合成草稿无AI调用，可拆分预览且安全区按钮至少44px', async ({ page }) => {
   let aiCalls = 0;
   await page.route('**/api/**', async route => {
     if (/weread\/(merge|question)/.test(route.request().url())) aiCalls++;
@@ -209,8 +249,8 @@ test('公开合成示例无AI调用，可拆分预览且安全区按钮至少44p
   await page.goto('/');
   await page.evaluate(data => { localStorage.setItem('recall.snapshot.v1', JSON.stringify(data)); location.hash = 'weread'; }, seed());
   await page.reload();
-  await page.getByRole('button', { name: '体验合并示例（合成数据 / 非 AI）' }).click();
-  await expect(page.locator('.wr-merge-card')).toHaveCount(2);
+  await expect(page.getByRole('button', { name: '连接微信读书', exact: true })).toBeVisible();
+  await seedMergeDemo(page);
   await expect(page.locator('.wr-consent')).toContainText('不是现场 AI 输出');
   await page.evaluate(() => {
     document.querySelector<HTMLElement>('.memory-app')?.style.setProperty('--safe-top', '59px');
