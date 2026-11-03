@@ -232,7 +232,7 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal,
     try { createMergeSession(useRecallStore.getState(), drafts); } catch (value) { mergeError = failure(value); }
   }
   const mergeSelected = !renewed && generationMode === 'merge';
-  if (merging) return <MemoryWereadMergeImport drafts={drafts} onClose={() => setMerging(false)} onComplete={onComplete} onBusy={report}/>;
+  if (merging) return <MemoryWereadMergeImport drafts={drafts} onClose={() => setMerging(false)} onComplete={onComplete} onImported={() => { setSelected(new Set()); setStage(books.length ? 'books' : 'connect'); }} onBusy={report}/>;
   return <section className="wr-workspace" aria-label="微信读书导入" aria-busy={busy}>
     {error && <p role="alert" className="m-error">{error}</p>}
     {confirmationError && <p role="alert" className="m-error">{confirmationError}</p>}

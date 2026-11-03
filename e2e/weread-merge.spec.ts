@@ -23,6 +23,16 @@ async function seedMergeDemo(page: Page): Promise<void> {
   await page.reload();
   await expect(page.locator('.wr-merge-card')).toHaveCount(2);
 }
+async function completedMergeDraft(page: Page, days = 0): Promise<string> {
+  const completed = await createMergeDemo(seed());
+  completed.status = 'done';
+  completed.receipt = { added: 2, updated: 0, skipped: 0, deckIds: ['synthetic-finished'] };
+  completed.createdAt = new Date(Date.now() - days * 86400000).toISOString();
+  completed.expiresAt = Date.parse(completed.createdAt) + 7 * 86400000;
+  const value = JSON.stringify(completed);
+  await mergeDraft(page, value);
+  return value;
+}
 async function setup(page: Page, fail = false, missing = false) {
   const calls: string[][] = [];
   let failed = false;
@@ -30,10 +40,10 @@ async function setup(page: Page, fail = false, missing = false) {
     const path = new URL(route.request().url()).pathname;
     if (path === '/api/auth/session') { await route.fulfill({ status: 503, json: { error: 'synthetic' } }); return; }
     const body = route.request().postDataJSON();
-    if (path.endsWith('/books')) await route.fulfill({ json: { books: [{ bookId: 'synthetic', title: '合成关联书', highlightCount: 4 }], cursor: null } });
+    if (path.endsWith('/books')) await route.fulfill({ json: { books: [{ bookId: 'synthetic', title: '合成关联书', highlightCount: 4 }, { bookId: 'synthetic-next', title: '合成下一本书', highlightCount: 4 }], cursor: null } });
     else if (path.endsWith('/progress')) await route.fulfill({ json: { bookId: body.bookId, readingProgress: null } });
     else if (path.endsWith('/budget')) await route.fulfill({ json: { remaining: 300 } });
-    else if (path.endsWith('/book')) await route.fulfill({ json: { format: 'recall-weread-export-v1', books: [{ bookId: 'synthetic', title: '合成关联书', highlights: [3, 1, 0, 2].map(index => ({
+    else if (path.endsWith('/book')) await route.fulfill({ json: { format: 'recall-weread-export-v1', books: [{ bookId: body.bookId, title: body.bookId === 'synthetic' ? '合成关联书' : '合成下一本书', highlights: [3, 1, 0, 2].map(index => ({
       bookmarkId: `m${index}`, markText: originals[index], chapterUid: '1', chapterTitle: '合成章节',
       ...(missing ? {} : { chapterIdx: 1, range: `${index * 100}-20` }),
     })) }] } });
@@ -62,6 +72,64 @@ async function enterMerge(page: Page): Promise<void> {
   await page.getByRole('radio', { name: /^智能合并/ }).check();
   await page.getByRole('button', { name: '下一步 · 合并预览', exact: true }).click();
 }
+
+for (const days of [0, 8]) {
+  test(`已完成${days}天的旧合并记录不劫持微信读书入口且不删除卡片`, async ({ page }) => {
+    const calls = await setup(page);
+    const before = await snapshot(page);
+    const completed = await completedMergeDraft(page, days);
+    await page.reload();
+    await expect(page.getByRole('button', { name: '连接微信读书', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '合并卡片已收好' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '取消无法恢复的合并草稿' })).toHaveCount(0);
+    expect(await mergeDraft(page)).toBe(completed);
+    expect(await snapshot(page)).toEqual(before);
+    expect(calls).toEqual([]);
+  });
+}
+
+test('选书后出现旧完成记录也从当前选择生成，完成返回书架并可再导入下一本书', async ({ page }) => {
+  const calls = await setup(page);
+  const requestedBooks: string[] = [];
+  page.on('request', request => {
+    if (new URL(request.url()).pathname === '/api/weread/merge') requestedBooks.push(request.postDataJSON().bookId);
+  });
+  await completedMergeDraft(page);
+  await enterMerge(page);
+  await expect(page.getByRole('heading', { name: '把相关划线放在一起' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '合并卡片已收好' })).toHaveCount(0);
+  await expect(page.locator('.wr-merge-sources')).toContainText('合成关联书');
+  await expect(page.locator('.wr-merge-sources')).not.toContainText('原创合并示例');
+  expect((await snapshot(page)).cards).toEqual([]);
+  await page.getByRole('button', { name: '生成分组与问题', exact: true }).click();
+  await page.getByRole('button', { name: '确认导入 2 张卡片', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '合并卡片已收好' })).toBeVisible();
+  await expect(page.locator('.wr-merge-summary')).toContainText('新增 2');
+  await expect(page.locator('.wr-merge-summary')).not.toContainText('尚未确认');
+  const firstImport = await snapshot(page);
+  expect(firstImport.cards).toHaveLength(2);
+  await page.locator('.memory-bar').getByRole('button', { name: '返回', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '选择想记住的书' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '合成关联书，4 条我的划线' })).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('button', { name: '合成下一本书，4 条我的划线' }).click();
+  await page.getByRole('button', { name: '下一步 · AI 问题与导入' }).click();
+  await enterMerge(page);
+  await expect(page.locator('.wr-merge-sources')).toContainText('合成下一本书');
+  expect(await snapshot(page)).toEqual(firstImport);
+  await page.getByRole('button', { name: '生成分组与问题', exact: true }).click();
+  await page.getByRole('button', { name: '确认导入 2 张卡片', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '合并卡片已收好' })).toBeVisible();
+  const secondImport = await snapshot(page);
+  expect(secondImport.cards).toHaveLength(4);
+  for (const card of firstImport.cards) expect(secondImport.cards.find((item: { id: string }) => item.id === card.id)).toEqual(card);
+  expect(requestedBooks).toEqual(['synthetic', 'synthetic-next']);
+  expect(calls).toHaveLength(2);
+  await page.getByRole('button', { name: '继续选择其他书', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '选择想记住的书' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: '连接微信读书', exact: true })).toBeVisible();
+  expect(await snapshot(page)).toEqual(secondImport);
+});
 
 test('生成方式只是选择，合并数量不预猜，范围变更不会静默切换或自动导入', async ({ page }) => {
   const calls = await setup(page);

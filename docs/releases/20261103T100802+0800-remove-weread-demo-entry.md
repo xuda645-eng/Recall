@@ -4,8 +4,9 @@
 
 - Release: `20261103T100802+0800-remove-weread-demo-entry`.
 - Started: `2026-11-03T10:08:02+08:00`, Asia/Shanghai.
-- Status: applicable local validation passed, ready for commit/push/publication;
-  production unchanged before publication.
+- Status: published and publicly verified. Publication evidence was appended
+  during the next WeRead task after the user confirmed unrelated Skill changes
+  should be ignored. No separate repeat deployment of this release is needed.
 - Repository: `xuda645-eng/Recall`, branch `main`. Starting HEAD and remote
   main: `3725e29ac30a92e8f1a44dcb6a5a818ac296c9e1`.
 - Request: remove the public synthetic merge example button from the WeRead
@@ -121,7 +122,50 @@
 
 ## Publication
 
-- App source SHA, normal push result, deployment ID/URL and post-publication
-  outcomes: pending after all applicable checks pass.
-- Append publication evidence in a documentation-only follow-up commit/push,
-  without rebuilding or publishing the unchanged app again.
+- App source: `460aa03c2d4fa29001b01de3035be110c9941f05`. Normal HTTPS push
+  advanced main from `3725e29` to `460aa03`, confirmed at
+  `2026-11-03T10:16:58+08:00`. Worktree was clean and all 310 committed input
+  hashes / 203 package-file hashes matched before publication.
+- Command: `CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2 npx --yes
+  wrangler@4.156.0 pages deploy /private/tmp/recall-remove-merge-demo-20261103/dist
+  --project-name recall-memory --branch main
+  --commit-hash 460aa03c2d4fa29001b01de3035be110c9941f05
+  --commit-message 'fix: remove public WeRead merge demo entry'`.
+  No dirty flag. Uploaded 27 files, reused 174, compiled the unchanged Worker
+  and uploaded headers/Functions/routes. Completed
+  `2026-11-03T10:18:01+08:00`.
+- Deployment: `1abcd1e9-9798-44ea-b400-a8764e60d3dd`, Production/main/source
+  `460aa03`, URL `https://1abcd1e9.recall-memory.pages.dev`.
+  Stable version `1.0-20261103-1015` verified HTTP 200 / `Cache-Control: no-store`.
+- `RECALL_VERIFY_DIST=/private/tmp/recall-remove-merge-demo-20261103/dist node
+  scripts/run-playwright.mjs --config e2e/weread-public.config.ts --workers=1
+  --output=/private/tmp/recall-remove-merge-demo-20261103/public-results`:
+  3/3 passed, 12.7 seconds. Live entry is absent; retained connection controls,
+  synthetic selection/generation and 11 resource hashes / five anonymous API
+  401/no-store gates passed.
+- `RECALL_MERGE_URL=https://recall-memory.pages.dev/
+  RECALL_MERGE_OUTPUT=/private/tmp/recall-remove-merge-demo-20261103/public-merge
+  node scripts/run-playwright.mjs --config e2e/weread-merge.config.ts
+  --workers=2 --timeout=120000`: 18/18 passed, 1.0 minute.
+- Public PWA command from the isolated bundle directory: `RECALL_URL=https://recall-memory.pages.dev/
+  node /Users/bytedance/Documents/CodexProject/Recall/Recall-next/scripts/run-playwright.mjs
+  --config /Users/bytedance/Documents/CodexProject/Recall/Recall-next/playwright.config.ts
+  --grep '抽屉显示固定构建版本|版本刷新检查后|PWA部署路径'
+  --workers=2 --output=/private/tmp/recall-remove-merge-demo-20261103/public-pwa-results`:
+  6/6 passed, 1.4 minutes. Five cases use the public origin; WebKit's offline
+  case is the shipped isolated-local fallback, not public WebKit offline proof.
+  Total across suites: 26 public-origin cases plus one local fallback.
+- Supplemental read-only probe checked 14 entry/preload/Workbox hashes and
+  anonymous same-origin merge POST `{}` returned 401/no-store. Across this probe
+  and the public resource test, 25 distinct resource hashes and six anonymous
+  gates passed. Local evidence: `public-extra.json` in the isolated task folder.
+  The probe itself passed; an ancillary tail command ran before the PWA log
+  existed and returned exit 1. Later log/evidence checks passed; this was not a
+  failed resource/auth check and no security assertion was changed.
+- Public test chain completed `2026-11-03T10:21:18+08:00`; no rollback occurred.
+  Physical iPhone acceptance remains unverified. The subsequently reported
+  completed-session routing bug is handled by the next release, not retroactively
+  claimed resolved by this button-only release.
+- Evidence follow-up is included with the next task's reviewed changes after
+  the user allowed continuation. Its Git locator is the commit updating this
+  section; this does not cause a second deployment of the unchanged old app.

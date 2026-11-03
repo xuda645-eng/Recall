@@ -30,6 +30,7 @@ export async function loadMergeSession(): Promise<WereadMergeSession | null> {
   if (!value) return null;
   try {
     const session = await validateMergeSession(value);
+    if (session.status === 'done') return null;
     if (session.expiresAt <= Date.now()) throw new Error('合并草稿已超过 7 天，请取消后重新选择；不会自动执行');
     return { ...session, status: ['generating', 'importing'].includes(session.status) ? 'paused' : session.status };
   } catch (error) {

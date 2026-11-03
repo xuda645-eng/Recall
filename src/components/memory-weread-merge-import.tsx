@@ -14,10 +14,11 @@ interface Props {
   drafts: WereadDraft[];
   onClose: () => void;
   onComplete: (ids: string[]) => void;
+  onImported?: () => void;
   onBusy?: (busy: boolean) => void;
 }
 
-export function MemoryWereadMergeImport({ drafts, onClose, onComplete, onBusy }: Props): JSX.Element {
+export function MemoryWereadMergeImport({ drafts, onClose, onComplete, onImported, onBusy }: Props): JSX.Element {
   const [session, setSession] = useState<WereadMergeSession | null>(null);
   const [initializing, setInitializing] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -142,6 +143,7 @@ export function MemoryWereadMergeImport({ drafts, onClose, onComplete, onBusy }:
           return result.snapshot;
         });
         await persist({ ...next, status: 'done', receipt });
+        onImported?.();
       });
     } catch (value) {
       if (current.current) publish({ ...current.current, status: 'review', error: message(value) });
@@ -169,7 +171,7 @@ export function MemoryWereadMergeImport({ drafts, onClose, onComplete, onBusy }:
     <header className="wr-heading"><span className="wr-eyebrow">CONNECTED HIGHLIGHTS</span><h1>{session?.status === 'done' ? '合并卡片已收好' : complete ? '检查你的知识单元' : '把相关划线放在一起'}</h1><p>模型只分组和提问；原文与顺序由程序保留。</p></header>
     {(error || session?.error) && <p className="m-error" role="alert">{error || session?.error}</p>}
     {initializing ? <p role="status">正在检查本机合并草稿…</p> : session ? <>
-      <div className="wr-merge-summary"><strong>{session.sources.length} 条新划线 → {session.cards.length} 张{complete ? '卡片' : '已整理卡片'}</strong><p>{session.cursor} / {session.sources.length} 条已整理，尚未确认时不写入卡片库。</p></div>
+      <div className="wr-merge-summary"><strong>{session.sources.length} 条新划线 → {session.cards.length} 张{complete ? '卡片' : '已整理卡片'}</strong><p>{session.status === 'done' ? `已保存到卡片库：新增 ${session.receipt?.added ?? 0}，更新 ${session.receipt?.updated ?? 0}，跳过 ${session.receipt?.skipped ?? 0}。` : `${session.cursor} / ${session.sources.length} 条已整理，尚未确认时不写入卡片库。`}</p></div>
       <p className="wr-consent">{session.demo ? '这是原创合成示例与预置分组，不是你的微信读书数据，也不是现场 AI 输出；没有模型调用。确认导入只保存到当前设备。' : '仅合并同章、原文有序的相邻划线；一张最多 4 条。已有卡片不重组。每批最多 12 条、6000 字，批次边界保留末组上下文。点击生成后发送所选原文到已配置的 AI，每日额度仍为全空间 300 次。'}</p>
       {!complete && <details className="wr-merge-sources"><summary>查看按原文排序的划线</summary>{session.sources.map((source, index) => <article key={source.id}><small>H{String(index + 1).padStart(3, '0')} · {source.book.title} · {source.highlight.chapterTitle}</small><p>{source.highlight.markText}</p></article>)}</details>}
       <div className="wr-merge-cards">{session.cards.map((card, index) => {
@@ -188,7 +190,7 @@ export function MemoryWereadMergeImport({ drafts, onClose, onComplete, onBusy }:
         </article>;
       })}</div>
       <div className="wr-dock">{session.status === 'done' ? <button className="m-primary" onClick={() => onComplete(session.receipt?.deckIds || [])}><Check size={17}/>查看卡组</button> : busy ? <button className="m-secondary" disabled={session.status === 'importing'} onClick={() => controller.current?.abort()}><Pause size={17}/>暂停，保留进度</button> : complete ? <button className="m-primary" onClick={() => void importCards()}>确认导入 {session.cards.length} 张卡片<ArrowRight size={17}/></button> : <button className="m-primary" onClick={() => void generate()}>{session.cursor ? '继续智能分组' : '生成分组与问题'}<ArrowRight size={17}/></button>}
-        {!busy && session.status !== 'done' && <button className="m-text" onClick={() => void cancel()}>取消合并草稿</button>}
+        {!busy && (session.status === 'done' ? <button className="m-text" onClick={onClose}>继续选择其他书</button> : <button className="m-text" onClick={() => void cancel()}>取消合并草稿</button>)}
       </div>
     </> : <button className="m-secondary" onClick={() => void cancel()}>取消无法恢复的合并草稿</button>}
   </section>;
