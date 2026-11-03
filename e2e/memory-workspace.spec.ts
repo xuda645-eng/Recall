@@ -3,8 +3,10 @@ import { createSeedSnapshot } from '../src/data/seed';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
+import { createHash } from 'node:crypto';
 
 const at = '2026-10-01T00:00:00.000Z';
+const buildDirectory = resolve(process.env.RECALL_E2E_BUILD_DIR || 'dist');
 const longFront = '为什么主动回忆有帮助？\n\n' + '先隐藏答案，尝试用自己的话说明原理与条件。\n\n'.repeat(40);
 const longBack = '因为复述会暴露遗漏。\n\n' + '对照原文，找到概念之间的关系，再重新表达。\n\n'.repeat(45);
 function fixture() {
@@ -91,7 +93,7 @@ async function seedPage(page: Page, data = fixture(), hash = 'home', entry = './
   await waitForAppReady(page);
 }
 async function serveIsolatedBuild(basePath: string, overrides = new Map<string, string>()) {
-  const root = resolve(process.cwd(), 'dist');
+  const root = buildDirectory;
   const mime: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff': 'font/woff', '.woff2': 'font/woff2' };
   const server = createServer(async (request, response) => {
     try {
@@ -190,9 +192,9 @@ test('iPhone系统安全框首帧、抽屉、缩短视口和原版更新离线�
     });
     observer.observe(document, { childList: true, subtree: true });
   });
-  const originalHtml = await readFile(resolve('dist/index.html'), 'utf8');
+  const originalHtml = await readFile(resolve(buildDirectory, 'index.html'), 'utf8');
   const oldHtml = originalHtml.replace(/<script src="[^"\n]*pwa-viewport\.js"><\/script>/, '');
-  const currentWorker = await readFile(resolve('dist/sw.js'), 'utf8');
+  const currentWorker = await readFile(resolve(buildDirectory, 'sw.js'), 'utf8');
   const oldWorker = currentWorker.replace(/url:"index.html",revision:"[^"]+"/, 'url:"index.html",revision:"legacy-cover"').replace(/\{url:"pwa-viewport\.js",revision:"[^"]+"\},?/, '');
   expect(oldWorker).not.toBe(currentWorker);
   expect(oldWorker).not.toContain('url:"pwa-viewport.js"');
@@ -487,7 +489,7 @@ test('版本刷新激活新发现的Service Worker后重开且保留归档和复
   try {
     await seedPage(page, fixture(), 'home', server.url);
     const before = await snapshot(page);
-    overrides.set('sw.js', (await readFile(resolve(process.cwd(), 'dist/sw.js'), 'utf8')) + '\nself.addEventListener("message", event => { if (event.data === "recall-refresh-test") event.ports[0]?.postMessage("updated"); });');
+    overrides.set('sw.js', (await readFile(resolve(buildDirectory, 'sw.js'), 'utf8')) + '\nself.addEventListener("message", event => { if (event.data === "recall-refresh-test") event.ports[0]?.postMessage("updated"); });');
     await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
     let reloads = 0;
     page.on('request', request => { if (request.isNavigationRequest() && request.frame() === page.mainFrame()) reloads++; });
@@ -831,6 +833,90 @@ test('长正反面仅卡片内部滚动，纵向手势不翻面或评分', async
   expect(await face.evaluate(element => element.scrollTop)).toBe(0);
   expect(await face.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
   await saveShot(page, 'reader');
+  await noOverflow(page);
+});
+
+test('来源证据默认折叠，答案和配图在上方，展开和看图不评分', async ({ page }) => {
+  const image = await readFile(new URL('./fixtures/source-screenshot.png', import.meta.url));
+  const imageId = createHash('sha256').update(image).digest('hex') + '.png';
+  const data = fixture();
+  const back = `整理后的答案。\n\n### 来源证据\n\n标黄原文：[来源文档](https://example.com/source)；版本1。\n\n> 仅在展开后显示的原文。\n\n![学习配图](recall://${imageId})`;
+  data.cards[0] = { ...data.cards[0], front: '这张卡怎样帮助理解？', back };
+  data.cards[1] = { ...data.cards[1], back: '第二张答案。\n\n### 来源证据\n\n> 第二张原文。' };
+  await seedPage(page, data);
+  await page.evaluate(({ id, bytes }) => new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open('recall-media-v1', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('images', { keyPath: 'id' });
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const transaction = request.result.transaction('images', 'readwrite');
+      transaction.objectStore('images').put({ id, mime: 'image/png', bytes: Uint8Array.from(bytes) });
+      transaction.oncomplete = () => { request.result.close(); resolve(); };
+      transaction.onerror = () => reject(transaction.error);
+    };
+  }), { id: imageId, bytes: [...image] });
+  await startReading(page);
+  await page.getByRole('button', { name: '显示答案', exact: true }).click();
+  const face = page.locator('.m-reading[data-active=true]');
+  const disclosure = face.locator('.m-source-evidence');
+  const summary = disclosure.locator('summary');
+  const preview = face.getByRole('button', { name: '放大来源图片：学习配图', exact: true });
+  await expect(disclosure).not.toHaveAttribute('open');
+  await expect(face.getByText('整理后的答案。', { exact: true })).toBeVisible();
+  await expect(preview).toBeVisible();
+  await expect(face.getByText('仅在展开后显示的原文。', { exact: true })).toBeHidden();
+  expect(await face.evaluate(element => {
+    const answer = element.querySelector('.prose > p')!;
+    const image = element.querySelector('.recall-media')!;
+    const evidence = element.querySelector('.m-source-evidence')!;
+    return !!(answer.compareDocumentPosition(image) & Node.DOCUMENT_POSITION_FOLLOWING)
+      && !!(image.compareDocumentPosition(evidence) & Node.DOCUMENT_POSITION_FOLLOWING)
+      && !evidence.querySelector('img');
+  })).toBe(true);
+  const box = (await summary.boundingBox())!;
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  expect(box.width).toBeGreaterThanOrEqual(44);
+  await summary.click();
+  await expect(disclosure).toHaveAttribute('open', '');
+  await expect(face.getByText('仅在展开后显示的原文。', { exact: true })).toBeVisible();
+  await summary.focus();
+  await page.keyboard.press('3');
+  expect((await snapshot(page)).reviewLogs).toHaveLength(0);
+  await page.keyboard.press('Space');
+  await expect(disclosure).not.toHaveAttribute('open');
+  await expect(preview).toBeVisible();
+  await preview.click();
+  await expect(page.getByRole('dialog', { name: '学习配图', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '关闭来源图片', exact: true }).click();
+  await expect(preview).toBeFocused();
+  await saveShot(page, 'answer-image-collapsed-evidence');
+  await page.getByRole('button', { name: '下一张', exact: true }).click();
+  await expect(page.locator('.m-reading[data-active=true]')).toHaveAttribute('data-card-id', 'second');
+  await page.getByRole('button', { name: '显示答案', exact: true }).click();
+  await expect(face.locator('.m-source-evidence')).not.toHaveAttribute('open');
+  expect((await snapshot(page)).cards.find((card: { id: string }) => card.id === 'first').back).toBe(back);
+  expect((await snapshot(page)).reviewLogs).toHaveLength(0);
+  await noOverflow(page);
+});
+
+test('无图来源证据可独立展开关闭，窄屏和放大文字不溢出或评分', async ({ page }) => {
+  const data = fixture();
+  data.cards[0] = { ...data.cards[0], front: '没有配图时怎样看原文？', back: '先阅读整理答案。\n\n### 来源证据\n\n> 完整保留的来源原文。' };
+  await seedPage(page, data);
+  await startReading(page);
+  await page.getByRole('button', { name: '显示答案', exact: true }).click();
+  await page.setViewportSize({ width: 320, height: 740 });
+  const face = page.locator('.m-reading[data-active=true]');
+  await face.evaluate(element => { (element as HTMLElement).style.fontSize = '36px'; });
+  const disclosure = face.locator('.m-source-evidence');
+  await expect(disclosure).not.toHaveAttribute('open');
+  expect(await face.locator('.recall-media').count()).toBe(0);
+  await disclosure.locator('summary').click();
+  await expect(face.getByText('完整保留的来源原文。')).toBeVisible();
+  await noOverflow(page);
+  await disclosure.locator('summary').click();
+  await expect(face.getByText('完整保留的来源原文。')).toBeHidden();
+  expect((await snapshot(page)).reviewLogs).toHaveLength(0);
   await noOverflow(page);
 });
 

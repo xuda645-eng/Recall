@@ -193,6 +193,8 @@
 .m-question .prose p { font-family: var(--serif); font-size: 25px; line-height: 1.8; }
 .m-reading details { margin-bottom: 18px; border-bottom: 1px solid var(--line); }
 .m-reading summary { font-size: 14px; color: var(--muted); min-height: 44px; }
+.m-reading .m-source-evidence { margin-top: 20px; border-bottom: 0; border-top: 1px solid var(--line); }
+.m-reading .m-source-evidence > summary { padding: 8px 0; font-size: .8em; font-weight: 600; cursor: pointer; }
 .m-recall-caption { font-size: 12px; color: #8b8e7b; }
 .m-reader-source { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line); padding-bottom: 14px; margin-bottom: 24px; font-size: 12px; color: var(--muted); line-height: 1.8; }
 .m-reader-source small { flex: none; font-size: 10px; }

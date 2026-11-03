@@ -9,6 +9,7 @@ import remarkMath from "remark-math";
 import remarkGfm from "remark-gfm";
 import type { CardType, ImageOcclusionData } from "@/types";
 import { renderCloze } from "@/lib/cloze";
+import { rehypeSourceEvidence } from '@/lib/rehype-source-evidence';
 import { getImageUrl } from "@/services/images";
 import { MediaImage } from '@/components/media-image';
 import { MEDIA_ID } from '../../shared/media';
@@ -22,6 +23,7 @@ interface RichCardProps {
   cardType?: CardType;
   revealed?: boolean;
   allowHtml?: boolean;
+  collapseSourceEvidence?: boolean;
 }
 
 function ClozeContent({ content, revealed }: { content: string; revealed: boolean }): JSX.Element {
@@ -109,7 +111,7 @@ function preprocessContent(content: string): string {
   );
 }
 
-export function RichCard({ content, isBack = false, cardType = "basic", revealed = true, allowHtml = false }: RichCardProps): JSX.Element {
+export function RichCard({ content, isBack = false, cardType = "basic", revealed = true, allowHtml = false, collapseSourceEvidence = false }: RichCardProps): JSX.Element {
   const { t } = useTranslation();
   // Image occlusion cards
   if (cardType === "image-occlusion") {
@@ -160,7 +162,7 @@ export function RichCard({ content, isBack = false, cardType = "basic", revealed
           tagNames: defaultSchema.tagNames?.filter(
             (t: string) => !["form", "input", "textarea", "button", "select", "details", "summary"].includes(t),
           ),
-        }], rehypeHighlight, rehypeKatex]}
+        }], ...(collapseSourceEvidence ? [rehypeSourceEvidence] : []), rehypeHighlight, rehypeKatex]}
         // SECURITY: Plugin order matters. rehypeSanitize runs BEFORE rehypeKatex.
         // rehypeKatex emits raw HTML, but KaTeX's default trust:false prevents \href{javascript:...} attacks.
         // DO NOT enable trust:true on rehypeKatex without re-auditing the sanitizer schema.
