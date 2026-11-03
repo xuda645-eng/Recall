@@ -340,6 +340,7 @@ def validate_paths(paths):
 
 
 def build_cards(extraction, plan, history, include_unchanged=False):
+    combined = extraction.get('source_mode') == 'combined'
     require(plan.get('hierarchy_confirmed') is True, 'Confirm the hierarchy before archiving')
     validate_paths(plan.get('allowed_paths'))
     parent = plan.get('import_parent')
@@ -365,19 +366,37 @@ def build_cards(extraction, plan, history, include_unchanged=False):
             entry = {**ref, 'text': regions[key]['text']}
             if 'screenshot' in regions[key]:
                 entry['screenshot'] = regions[key]['screenshot']
+            if combined:
+                entry['source'] = regions[key]['source']
             evidence.append(entry)
         return evidence
 
     for item in plan['cards']:
-        require(set(item) <= {'path', 'front', 'question_origin', 'question_note', 'refs', 'existing_id', 'identity_note',
-                              'unit_key', 'context_blocks'}, 'Unexpected card fields; answers must come from refs')
+        fields = {'path', 'front', 'question_origin', 'question_note', 'refs', 'existing_id', 'identity_note',
+                  'unit_key', 'context_blocks'}
+        if combined:
+            fields.add('answer')
+            require(isinstance(item.get('unit_key'), str) and item['unit_key'].strip(), 'Combined cards require stable unit_key')
+        require(set(item) <= fields, 'Unexpected card fields; answers must come from refs')
         require(item.get('path') in plan['allowed_paths'], 'Card path is not confirmed')
         front, origin = item.get('front'), item.get('question_origin')
         require(isinstance(front, str) and front.strip() == front and front and '\n' not in front and '\r' not in front
                 and utf16_length(front) <= 10000, 'Invalid question')
         require(origin in {'extracted', 'inferred'}, 'Invalid question_origin')
         evidence = use(item.get('refs'), 'answer', front)
-        back = '\n\n'.join(re.sub(r'^(?:答|背诵句)[：:]\s*', '', entry['text']).strip() for entry in evidence)
+        if combined:
+            answer = item.get('answer')
+            require(isinstance(answer, str) and answer.strip() == answer and answer, 'Combined cards require a supported answer')
+            parts = [answer, '### 来源证据']
+            for entry in evidence:
+                source = entry['source']
+                label = '截图红框转录' if 'screenshot' in entry else '标黄原文'
+                title = re.sub(r'([\\\[\]])', r'\\\1', source['source_title'])
+                parts.extend([f'{label}：[{title}]({source["source_url"]})；版本 {source["revision"]}。',
+                              '\n'.join('> ' + line for line in entry['text'].split('\n'))])
+            back = '\n\n'.join(parts)
+        else:
+            back = '\n\n'.join(re.sub(r'^(?:答|背诵句)[：:]\s*', '', entry['text']).strip() for entry in evidence)
         require(back and utf16_length(back) <= 20000, 'Empty or oversized answer')
         question_keys = {regions[ref_key(ref)]['question']['block_key'] for ref in item['refs'] if regions[ref_key(ref)]['question']}
         used_questions.update(question_keys)
@@ -394,7 +413,8 @@ def build_cards(extraction, plan, history, include_unchanged=False):
             require(isinstance(item['unit_key'], str) and item['unit_key'].strip(), 'unit_key must be a stable string')
             relevant = [old for old in relevant if old.get('unit_key', '') == item['unit_key']]
         exact = [old for old in relevant if {(entry['block_key'], entry['run_index']) for entry in old['evidence']} == exact_refs]
-        candidates = exact or [old for old in relevant if {entry['block_key'] for entry in old['evidence']} & block_keys]
+        candidates = (relevant if combined else
+                      exact or [old for old in relevant if {entry['block_key'] for entry in old['evidence']} & block_keys])
         existing_id = item.get('existing_id')
         if existing_id:
             require(existing_id in history, 'existing_id must identify a same-source historical card')
@@ -406,6 +426,8 @@ def build_cards(extraction, plan, history, include_unchanged=False):
                     'Historical question has a changed locator; confirm existing_id and identity_note')
             old = candidates[0] if candidates else None
         identity = [extraction['source_document_id'], evidence[0]['block_key'], item.get('unit_key', '')]
+        if combined:
+            identity = [extraction['source_document_id'], item['unit_key']]
         card_id = old['id'] if old else 'lyr-' + hashlib.sha256(json.dumps(identity, ensure_ascii=False).encode()).hexdigest()[:24]
         require(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:-]{0,127}', card_id) and card_id not in seen_ids,
                 'Duplicate card identity; distinguish independent units or confirm the mapping')
@@ -508,6 +530,12 @@ def verify_batch(project, folder, config, manifest=None):
 
 def create_archive(project, config, extraction, plan, include_unchanged=False):
     history = source_history(project, extraction['source_document_id'])
+    if extraction.get('source_mode') == 'combined':
+        explicit_ids = {item.get('existing_id') for item in plan['cards'] if item.get('existing_id')}
+        for source in extraction['sources']:
+            for card_id, old in source_history(project, source['source_document_id']).items():
+                if card_id in explicit_ids and card_id not in history:
+                    history[card_id] = old
     cards, skipped, unresolved, coverage = build_cards(extraction, plan, history, include_unchanged)
     if not cards:
         return {'status': 'no_changes', 'skipped': len(skipped), 'message': 'No empty batch created; previous generated files are not proof of APP import'}
@@ -519,6 +547,9 @@ def create_archive(project, config, extraction, plan, include_unchanged=False):
                                                'scope', 'source_sha256', 'yellow_colors']}
     if extraction.get('source_mode') == 'screenshots':
         manifest.update({'source_mode': 'screenshots', 'image_decisions': extraction['image_decisions']})
+    if extraction.get('source_mode') == 'combined':
+        manifest.update({'source_mode': 'combined', 'sources': extraction['sources'],
+                         'topic_key': extraction['topic_key'], 'learning_path': plan['learning_path']})
     manifest.update({'version': 1, 'batch': batch, 'created_at': now.isoformat(), 'status': 'generated',
                      'allowed_paths': plan['allowed_paths'], 'hierarchy_confirmed': True, 'import_parent': plan.get('import_parent'),
                      'include_unchanged': include_unchanged, 'planned_count': len(plan['cards']), 'card_count': len(cards),
@@ -541,6 +572,11 @@ def create_archive(project, config, extraction, plan, include_unchanged=False):
                  '- 仅实际解析器与纯内存验证通过；尚未在 iPhone PWA 导入。', '', '## 来源', '',
                  f'[{extraction["source_title"]}]({extraction["source_url"]})；版本 {extraction["revision"]}。', '', '## 口径提醒', '']
         notes.extend('- ' + note for note in plan.get('scope_notes', []))
+        if extraction.get('source_mode') == 'combined':
+            notes.extend(['', '## 统一学习路径', '', *('- ' + step for step in plan['learning_path']),
+                          '', '## 全部取材来源', ''])
+            notes.extend(f'- [{source["source_title"]}]({source["source_url"]})；{source["mode"]}；版本 {source["revision"]}。'
+                         for source in extraction['sources'])
         notes.extend(['', '## 待确认', ''])
         notes.extend('- ' + item['reason'] + ' 原文：' + item['text'] for item in unresolved)
         if extraction.get('source_mode') == 'screenshots':

@@ -116,6 +116,12 @@
 
 ## Publication And Recovery
 
+- Subsequent authorization: on `2026-11-04` the user requested committing all
+  outstanding source changes after identifying the six tracked Skill edits as
+  formal source, not scratch artifacts. The complete nine-file source upgrade
+  is now covered by the [Skill source commit](./20261104T005129+0800-skill-source-commit.md)
+  record. This supersedes the private-local source publication restriction
+  above, but not the exclusion of private learning material and generated cards.
 - Publication checkout baseline:
   `9953836750e0ff856c02afc57c4470d395bca307`, `xuda645-eng/Recall`, `main`.
   This SHA is the inspected repository baseline, not the private Skill's source

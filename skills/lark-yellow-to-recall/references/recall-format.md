@@ -25,6 +25,8 @@ python3 -m unittest discover -s scripts/tests -v
 
 以上为默认黄色模式。个人文档的表格截图使用 `--mode screenshots` 和 [截图红框契约](screenshot-selections.md)，先读取图片清单，再提供视觉核对后的 `--selections`。它复用以下计划与归档验证，不把图片转录伪装成源 XML 高亮。
 
+同主题多文档取材使用 [多来源整合契约](combined-sources.md) 和 `scripts/combined_batch.py`，逐来源重新读取原响应与证据文件，再生成一套 QA。它复用本脚本的历史、覆盖、归档和解析器验证；每卡 refs 带来源键，整理答案下方由脚本保留各来源证据。普通黄色/截图模式仍禁止自由填写答案。
+
 ## 计划 JSON
 
 ```json
