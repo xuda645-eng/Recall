@@ -9,7 +9,7 @@ const localURL = `http://127.0.0.1:4193/${buildMode === "pages" ? "Recall/" : ""
 export default defineConfig({
   globalSetup: "./scripts/playwright-global-setup.mjs",
   testDir: "./e2e",
-  testMatch: "memory-workspace.spec.ts",
+  testMatch: ["memory-workspace.spec.ts", "iphone15-preview.spec.ts"],
   timeout: process.env.RECALL_URL ? 300000 : 30000,
   expect: { timeout: process.env.RECALL_URL ? 30000 : 5000 },
   retries: 0,

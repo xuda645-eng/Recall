@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="referrer" content="same-origin">
+    <title>Recall - iPhone 15 批注预览</title>
+    <style>
+      :root { color-scheme: light; color: #373b35; background: #e8e8e3; font-family: Georgia, serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; height: 100dvh; overflow: hidden; background: radial-gradient(ellipse at top, #f9f9f5, #e8e8e3); }
+      header { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: calc(8px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) 8px calc(12px + env(safe-area-inset-left)); font-size: 14px; }
+      header span { color: #62675e; font-size: 12px; }
+      header a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px; color: inherit; border-radius: 12px; text-underline-offset: 4px; }
+      header a:focus-visible { outline: 2px solid #373b35; outline-offset: 2px; }
+      main { display: flex; justify-content: center; }
+      .stage { flex: 0 0 auto; width: 395px; height: 854px; }
+      .frame { width: 395px; height: 854px; border: 1px solid #bfc2b8; border-radius: 20px; overflow: hidden; background: #f5f4ee; box-shadow: 0 12px 38px #24282020; transform-origin: top left; }
+      iframe { display: block; width: 393px; height: 852px; border: 0; }
+    </style>
+  </head>
+  <body>
+    <header><strong>iPhone 15</strong><span>393 × 852 · 正式站真实数据</span><a href="./#home">返回正式首页</a></header>
+    <main><div class="stage"><div class="frame"><iframe title="Recall iPhone 15 真实页面" src="./#home"></iframe></div></div></main>
+    <script>
+      const stage = document.querySelector('.stage');
+      const frame = document.querySelector('.frame');
+      const header = document.querySelector('header');
+      function fitPreview() {
+        const bodyStyle = getComputedStyle(header);
+        const availableWidth = document.documentElement.clientWidth - parseFloat(bodyStyle.paddingLeft) - parseFloat(bodyStyle.paddingRight);
+        const availableHeight = document.documentElement.clientHeight - header.offsetHeight - 16;
+        const scale = Math.max(0, Math.min(1, availableWidth / 395, availableHeight / 854));
+        stage.style.width = `${395 * scale}px`;
+        stage.style.height = `${854 * scale}px`;
+        frame.style.transform = `scale(${scale})`;
+      }
+      new ResizeObserver(fitPreview).observe(document.body);
+      new ResizeObserver(fitPreview).observe(header);
+      window.addEventListener('resize', fitPreview);
+      fitPreview();
+    </script>
+  </body>
+</html>
