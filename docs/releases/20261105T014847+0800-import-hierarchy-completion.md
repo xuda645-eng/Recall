@@ -3,10 +3,10 @@
 ## Identity and scope
 
 - Release: `20261105T014847+0800-import-hierarchy-completion`.
-- Record opened: 2026-11-05 01:48:47 +08:00. Status: validated, publication pending.
+- Record opened: 2026-11-05 01:48:47 +08:00. Status: deployed and verified; browser acceptance completed 2026-11-05 02:08:13 +08:00. Physical iPhone acceptance remains pending.
 - Repository: `xuda645-eng/Recall`, branch `main`; starting HEAD `60e92c66b01d3ba88c71e58947d7dec4cea8d76d`.
 - Frozen production version: `1.0-20261105-0142`, root-path build.
-- Source SHA, push result, deployment and public verification will be appended after publication.
+- Deployed implementation SHA: `8150e1e52cd35e0235b125c6be7f27dfb06c73e5`; evidence follow-up is a later documentation-only commit referencing this record.
 - Only the eleven requested browser comments are in scope. Unrelated `prototypes/style-lab/` is left untouched and excluded from commit/build delivery. Parallel-delivery mode was not invoked.
 
 ## Changes
@@ -30,7 +30,7 @@ The correction marker is `recall.weread.folders-organized.v1`; backup is `recall
 Host: macOS, installed Node/dependencies. Windows Obsidian vault and Graphify are unavailable; the session used the documented handoff/architecture and targeted source fallback. No graph update could run.
 
 - `node node_modules/vitest/vitest.mjs run`: 101 files / 1649 tests passed at 2026-11-05 01:36:37 +08:00 after the final product-source changes.
-- `node node_modules/eslint/bin/eslint.js .`: 0 errors, 132 existing warnings; rerun before commit after final test edits.
+- `node node_modules/eslint/bin/eslint.js .`: 0 errors, 132 existing warnings; final reviewed rerun after test edits also passed.
 - `node node_modules/typescript/bin/tsc -b --noEmit`: passed.
 - `node node_modules/typescript/bin/tsc -p tsconfig.cloud.json`: passed.
 - `node node_modules/vitest/vitest.mjs run --config cloud-tests/vitest.config.ts`: 5 files / 382 synthetic tests passed at 2026-11-05 01:23:59 +08:00; no cloud protocol/schema source changed afterward.
@@ -58,4 +58,14 @@ Host: macOS, installed Node/dependencies. Windows Obsidian vault and Graphify ar
 
 ## Publication outcome
 
-Pending.
+- Source commit `8150e1e52cd35e0235b125c6be7f27dfb06c73e5` created at 2026-11-05 01:52:58 +08:00. `git push origin main` succeeded normally: `60e92c66..8150e1e5`.
+- A temporary clean clone checked out that exact source in detached state; no task branch was created. Its `git status --porcelain` was empty. The owner worktree's unrelated `prototypes/style-lab/` remains untracked and untouched. The validated external frozen bundle was not rebuilt during serving or copied from another task.
+- Deployment command from the clean source clone: `CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2 npx --yes wrangler@4.156.0 pages deploy /private/tmp/recall-import-refinements-20261105/dist-final --project-name recall-memory --branch main --commit-hash 8150e1e52cd35e0235b125c6be7f27dfb06c73e5 --commit-dirty=false --commit-message 'feat: refine import hierarchy completion and drawer sync'`.
+- Deployment log finished at 2026-11-05 01:54:43 +08:00. Functions compiled, 49 changed files uploaded, 156 reused. Deployment ID: `9c7d0136-1042-40da-843f-2e6ac9497896`; deployment URL: `https://9c7d0136.recall-memory.pages.dev/`. Read-only deployment listing confirmed Production / main / source `8150e1e`. Stable origin remains `https://recall-memory.pages.dev/`.
+- `node /private/tmp/recall-import-refinements-20261105/verify-public.mjs`: 205/205 public static files SHA-256 matched the frozen production bundle, zero retries/failures. Includes public root, manifest, all icons, Service Worker and hashed JS/CSS/font assets. Version `1.0-20261105-0142`; anonymous `/api/auth/me` returned 401. Results completed at 2026-11-05 01:55:57 +08:00.
+- Public UI: `RECALL_CHROMIUM=<installed Chromium> RECALL_WEBKIT=<installed WebKit> node scripts/run-playwright.mjs --config /private/tmp/recall-import-refinements-20261105/public.config.ts`: final **6/6 passed** in 40.8s. Direct production origin, anonymous browser contexts at 393 x 852 / DPR 3; only synthetic local cards, production API mutations intercepted. Verified hierarchical import, completion and saved location, collapsible stats, removed WeRead entry, drawer sync/time, transparent-X controls, no folder backup and retained full backup. This does not verify owner cards or live authenticated sync/model calls.
+- Initial public UI run: 2 passed / 4 failures. Two tests navigated to a different hash without reloading or using the app navigation, leaving the prior route mounted; one WebKit startup waited only 20s and was still loading. Temporary tests now use real drawer/import controls and allow up to 60s for UI readiness. Both engines passed all six cases without changing product source or mocking public HTML/assets.
+- Initial public SW probe reached visible app with 116 cached entries and no failed requests after its 120s installation window; it had not yet activated. One bounded five-minute recovery probe is recorded below. No rollback/data restore has been performed. Local final offline/update checks passed; real Safari home-screen install, owner-library acceptance and physical-device behavior remain unverified.
+- Recovery command: `RECALL_CHROMIUM=<installed Chromium> node /private/tmp/recall-import-refinements-20261105/public-sw-probe.mjs`, approved outside Seatbelt. Its actual browser evidence first reached active controller and active registration at **2026-11-05 02:01:57.617 +08:00**, with all required shell/manifest/icon/preview URLs cached, app visible and 161 cache entries. Chromium then successfully reopened the public app with browser networking disabled; the record finished at 2026-11-05 02:06:15 +08:00. This is browser simulation, not a physical phone or a live authenticated library test. The offline `/api/auth/session` request's `ERR_INTERNET_DISCONNECTED` was expected while offline.
+- The recovery probe nevertheless exited 1 because its temporary threshold wrongly required 165 cached files. Inspection of the **public-hash-verified frozen SW** found 165 generated entries but **161 unique URLs**: favicon and three icons each appear twice. The guard script now derives the unique expected count rather than assuming the generated-entry count. `node /private/tmp/recall-import-refinements-20261105/verify-sw-evidence.mjs` replayed assertions against the saved real-browser record and that frozen SW at 2026-11-05 02:08:13 +08:00: activated controller/registration, 161/161 unique cached entries, required URLs present, visible app and successful offline reopen all passed. The original failed exit is retained in evidence; no additional browser run or product-source change is claimed.
+- This documentation-only follow-up records the source/deployment/verification outcomes and does not rebuild or redeploy the application. Its normal push outcome is reported with delivery. No paid resource, new origin, D1 mutation test, rollback or owner data restoration was performed.
