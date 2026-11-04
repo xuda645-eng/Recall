@@ -3,15 +3,15 @@
 ## Identity And Scope
 
 - Record created: 2026-11-04 23:11:04 +08:00.
-- Status: all local validation passed; source publication and production deployment pending.
+- Status: source pushed and production deployed; public assets verified,
+  browser validation partially recovered with transport/readiness failures.
 - Repository: `xuda645-eng/Recall`, branch `main`, starting HEAD
   `06fd71a654682d0d805272c2115a35bc4edb8f80`.
 - Production origin remains `https://recall-memory.pages.dev/`.
 - Previous production: `42cff2af-bd29-4900-b851-51361b20f742`, source
   `9d6c0bd6`, deployment URL `https://42cff2af.recall-memory.pages.dev/`.
 - Final bundle version: `1.0-20261104-2318`.
-- Source SHA, push outcome, deployment ID and completion time will be appended
-  after the actual publication. No unpublished result is claimed as deployed.
+- Published source and actual deployment outcomes are recorded below.
 
 ## Changes By Browser Comment
 
@@ -128,3 +128,108 @@
   cards, logs or folders, erase tombstones or restore backups automatically.
 - Keep local/cloud libraries, backups, attachments and device credentials intact.
   Data restoration or destructive database operations are outside this release.
+
+## Publication Outcomes
+
+- Source commit: `888360c9d5279cfbff1c93c99d8313e6d386a499`, created at
+  2026-11-04 23:27:24 +08:00. Normal `git push origin main` succeeded:
+  `06fd71a6..888360c9`. No force-push, unrelated work or private-card files.
+- The first Git staging command was blocked by sandbox `.git/index.lock`
+  permissions. Reran the identical scoped commit/push with approved escalation.
+- Deployment command: `CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2
+  npx --yes wrangler@4.156.0 pages deploy
+  /private/tmp/recall-annotation-ui-20261104/dist-final --project-name
+  recall-memory --branch main --commit-hash
+  888360c9d5279cfbff1c93c99d8313e6d386a499 --commit-dirty=false
+  --commit-message 'feat: refine review picker and archived item actions'`.
+- Deployment completed at 2026-11-04 23:29:40 +08:00. Full deployment ID:
+  `a5dc808c-7b1c-4777-8474-3154484d21f9`; deployment URL:
+  `https://a5dc808c.recall-memory.pages.dev/`. Wrangler confirms production
+  branch `main` and source `888360c`. Stable origin is unchanged.
+- The frozen clean bundle uploaded 28 changed files and reused 175 existing
+  files. The unchanged Functions source compiled and existing production
+  bindings were reused; no migration or library mutation was performed.
+- Public static verification: `node
+  /private/tmp/recall-annotation-ui-20261104/verify-public.mjs` matched all
+  203 publicly served files byte-for-byte using SHA-256, including HTML,
+  manifest/icons, CSS/JavaScript and Service Worker. Nine bounded fetch retries
+  were needed; no final mismatch or missing file. Public version is
+  `1.0-20261104-2318`; anonymous `/api/auth/me` remains HTTP 401.
+- Public browser command uses the same guarded temporary config, final clean
+  bundle and browser executables with `RECALL_URL=https://recall-memory.pages.dev/`,
+  `--grep '批注修订|PWA部署路径'` and two workers. Every mutation uses an isolated
+  synthetic local snapshot without owner credentials. WebKit's PWA offline
+  case uses the stopped-local-server fallback, not the public origin.
+- First public browser run: 5/10 passed in 16.3 minutes. Both picker cases,
+  WebKit concurrent-scope rejection, Chromium public-origin offline reopening
+  and WebKit local offline fallback passed. Three cases failed before archive
+  operations at Service Worker control readiness; both single-card cases
+  failed before application visibility. These are failed checks, not passes.
+- First recovery: the identical folder/single-card cases with `--workers=1
+  --trace=on` finished 2/4 passed in 10.4 minutes. Both folder cases passed all
+  assertions, including deletion cancellation, confirmation and persistence.
+  Chromium single-card readiness timed out before the app was visible;
+  WebKit single-card navigation timed out before `domcontentloaded`.
+- Chromium's retained recovery trace shows HTTP 200 static asset requests
+  taking 54-79 seconds, exceeding the existing 30-second visible-app readiness
+  window. No source or assertion changes were made for that run. Anonymous
+  session requests return the expected HTTP 401. Public connectivity and cold
+  cache readiness remain under investigation; do not infer a clean aggregate
+  pass from successful individual recoveries.
+- Anonymous comparison probe: `RECALL_CHROMIUM=<installed Chromium>
+  node /private/tmp/recall-annotation-ui-20261104/public-sw-probe.mjs
+  https://42cff2af.recall-memory.pages.dev/ https://recall-memory.pages.dev/`.
+  The prior deployment reached active Service Worker control at 23:54:10
+  +08:00, about 86 seconds after navigation started. The stable origin's next
+  navigation returned `net::ERR_TIMED_OUT` with zero HTTP responses before
+  application execution. This establishes transport/readiness failures in
+  the probe, not a JavaScript archive-action failure. It does not establish
+  reliable public cold-start performance or physical phone acceptance.
+- Final bounded recovery uses the same tests and bundle through
+  `playwright-public-slow.config.ts`, `--grep '批注修订：单张归档卡片|批注修订：确认后缓存'
+  --workers=1 --trace=on`. Only time limits differ: 180-second expectation
+  waits and 600-second test limit, with zero automatic retries. No assertions,
+  application source, security guards or cache contents were bypassed.
+- The longer-wait recovery made no progress beyond its first case for 6.5
+  minutes. At 2026-11-05 00:02 +08:00, interrupted only its identified
+  Playwright CLI process with SIGINT, preserving diagnostics. Exit 130;
+  one case interrupted and three not run. This is not a passing check.
+- A final diagnostic run targets the exact current production deployment URL
+  `https://a5dc808c.recall-memory.pages.dev/`, with the original time limits,
+  same four single-card/concurrent-scope cases, one worker and retained trace.
+  This is an alternate verification host for the same published source, not a
+  production-origin switch. The first Chromium single-card case failed after
+  five minutes at `sw-control`, before seeded archive operations. Retained
+  diagnostics show the app visible, Service Worker still installing, 83 cache
+  entries and 19 missing required shell entries. Interrupted only this run's
+  identified CLI with `kill -INT 29569`; final outcome: one failed, one
+  interrupted and two not run, exit 130. No pass is claimed for this attempt.
+- Public browser coverage across all attempts: six distinct direct-public
+  cases passed (both pickers, both folder-menu cases, WebKit concurrent-scope
+  protection and Chromium public offline reopening). WebKit offline reopening
+  passed only on the isolated local fallback. Three direct-public cases remain
+  unverified: both single-card flows and Chromium concurrent-scope protection.
+  All corresponding final-bundle local cases passed, but that does not replace
+  public acceptance. There was no clean all-public aggregate pass.
+- Stable-origin version recheck at 2026-11-05 00:06:54 +08:00:
+  `curl -L --fail --connect-timeout 10 --max-time 20 -sS
+  https://recall-memory.pages.dev/version.json`, HTTP 200 in 2.659 seconds,
+  version `1.0-20261104-2318`. Static identity, successful public folder/offline
+  checks and local regressions do not prove reliable cold-start connectivity.
+- No archive-action or asset-integrity regression was observed. The retained
+  failures occur at transport/application readiness or incomplete Service
+  Worker installation, before the new single-card operations. This does not
+  prove the absence of every production regression. No automatic asset or data
+  rollback was performed; compatible rollback instructions remain above.
+- Delivery state as of 2026-11-05 00:10:45 +08:00: requested source/UI changes
+  are published; complete public browser and physical iPhone acceptance remain
+  open. Owner data was never used for mutation tests. Documentation-only
+  evidence follow-up is ready for validation and normal push, without another
+  app deployment.
+- Final read-only hosting check: `CLOUDFLARE_ACCOUNT_ID=<verified account>
+  npx --yes wrangler@4.156.0 pages deployment list --project-name recall-memory`
+  still lists `a5dc808c-7b1c-4777-8474-3154484d21f9` as production `main`, source
+  `888360c`. Remote main still matches the full source SHA. The follow-up changes
+  only this release record and its index; 67 Markdown local links resolved and
+  `git diff --check` passed. Its commit/push outcome is reported in the chat;
+  documentation publication does not replace the deployed application bundle.
