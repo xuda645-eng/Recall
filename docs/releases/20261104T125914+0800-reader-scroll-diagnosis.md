@@ -63,4 +63,5 @@ RECALL_WEBKIT='/Users/bytedance/Library/Caches/ms-playwright/webkit-2272/pw_run.
 ## Documentation Publication
 
 - 2026-11-04 13:00:21 +08:00: `git diff --check` passed. A Node filesystem check of Markdown links in this record and `docs/RELEASES.md` passed; the new record contains no forbidden Unicode dash characters. Only the two intended documentation files are modified/untracked.
-- Documentation source SHA, push outcome and completion timestamp: pending publication, appended in a documentation-only follow-up. No app deployment is triggered by either documentation commit.
+- Documentation source commit: `241851126e7686346ffc3630d888d27f8161bbaa`. Normal HTTPS push advanced `main` from `37273252` to `24185112`, completed 2026-11-04 13:00:53 +08:00. No force push or unrelated staging.
+- This publication-outcome follow-up changes only this record. Its commit is the next documentation-only commit after `24185112`; the final user report records its actual push result. No app deployment is triggered by either documentation commit. Production remains version `1.0-20261104-1057` with the diagnosed defects unresolved.
