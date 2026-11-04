@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
+import { snapshotEntities } from '../shared/cloud';
 
 const at = '2026-10-01T00:00:00.000Z';
 const buildDirectory = resolve(process.env.RECALL_E2E_BUILD_DIR || 'dist');
@@ -844,6 +845,142 @@ test('长正反面仅卡片内部滚动，纵向手势不翻面或评分', async
   expect(await face.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
   await saveShot(page, 'reader');
   await noOverflow(page);
+});
+
+test('答案滚动后轻触、短距离触摸和重复空格不跳顶或评分', async ({ page, context, browserName }) => {
+  await seedPage(page);
+  await startReading(page);
+  await page.getByRole('button', { name: '显示答案', exact: true }).click();
+  const face = page.locator('.m-reading[data-active=true]');
+  await face.evaluate(element => { element.scrollTop = 500; });
+  const box = (await face.boundingBox())!;
+  if (browserName === 'chromium') {
+    const client = await context.newCDPSession(page);
+    const startY = box.y + box.height - 60;
+    await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: box.x + 100, y: startY }] });
+    for (let step = 1; step <= 8; step++) {
+      await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: box.x + 100, y: startY - step * 24 }] });
+      await page.waitForTimeout(25);
+    }
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } else {
+    await face.evaluate(element => {
+      const box = element.getBoundingClientRect();
+      element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: box.x + 100, clientY: box.y + 300 }));
+      element.scrollTop = 700;
+      element.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: box.x + 100, clientY: box.y + 100 }));
+      element.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: box.x + 100, clientY: box.y + 100 }));
+    });
+  }
+  await page.waitForTimeout(1200);
+  const position = await face.evaluate(element => element.scrollTop);
+  expect(position).toBeGreaterThan(500);
+  await page.touchscreen.tap(box.x + 100, box.y + 160);
+  await page.touchscreen.tap(box.x + 100, box.y + 160);
+  await face.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: box.x + 100, clientY: box.y + 160 }));
+    element.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: box.x + 102, clientY: box.y + 164 }));
+    element.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: box.x + 102, clientY: box.y + 164 }));
+    (element as HTMLElement).tabIndex = 0;
+    (element as HTMLElement).focus({ preventScroll: true });
+  });
+  await page.keyboard.press('Space');
+  await page.keyboard.press('Space');
+  expect(await face.evaluate(element => element.scrollTop)).toBe(position);
+  await expect(face).toHaveAttribute('data-card-id', 'first');
+  expect((await snapshot(page)).reviewLogs).toHaveLength(0);
+  await noOverflow(page);
+});
+
+test('摘录轻触不重置，阅读选项与远距离切卡后各自恢复答案位置', async ({ page }) => {
+  const data = fixture();
+  data.cards = Array.from({ length: 4 }, (_, index) => ({ ...data.cards[0], id: ['first', 'second', 'third', 'fourth'][index], createdAt: new Date(Date.parse(at) + index * 1000).toISOString(), contentKind: 'excerpt' as const, front: `长摘录 ${index}`, back: longBack }));
+  await seedPage(page, data);
+  await page.getByRole('button', { name: '开始复习', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /确认开始复习|开始学习新卡/ }).click();
+  const face = page.locator('.m-reading[data-active=true]');
+  await expect(face).toHaveAttribute('data-card-id', 'first');
+  await face.evaluate(element => { element.scrollTop = 500; });
+  await expect.poll(() => face.evaluate(element => element.scrollTop)).toBe(500);
+  const box = (await face.boundingBox())!;
+  await page.touchscreen.tap(box.x + 100, box.y + 160);
+  expect(await face.evaluate(element => element.scrollTop)).toBe(500);
+  await page.getByRole('button', { name: '卡片与复习选项', exact: true }).click();
+  await page.getByRole('button', { name: '阅读字号', exact: true }).click();
+  await page.getByRole('combobox', { name: '正文字号', exact: true }).selectOption('22');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const firstPosition = await face.evaluate(element => element.scrollTop);
+  expect(firstPosition).toBeGreaterThan(0);
+  for (const id of ['second', 'third', 'fourth']) {
+    await page.getByRole('button', { name: '下一张', exact: true }).click();
+    await expect(face).toHaveAttribute('data-card-id', id);
+    if (id === 'second') {
+      await face.evaluate(element => { element.scrollTop = 300; });
+      await expect.poll(() => face.evaluate(element => element.scrollTop)).toBe(300);
+    }
+  }
+  for (const id of ['third', 'second', 'first']) {
+    await page.getByRole('button', { name: '上一张', exact: true }).click();
+    await expect(face).toHaveAttribute('data-card-id', id);
+    if (id === 'second') expect(await face.evaluate(element => element.scrollTop)).toBe(300);
+  }
+  expect(await face.evaluate(element => element.scrollTop)).toBe(firstPosition);
+  expect((await snapshot(page)).reviewLogs).toHaveLength(0);
+  await noOverflow(page);
+});
+
+test.describe('隔离的同步阅读回归', () => {
+  test.use({ serviceWorkers: 'block' });
+  test('无内容变更的云同步重连和每分钟刷新不打断答案滚动', async ({ page, context }) => {
+    const data = fixture();
+    const entities = snapshotEntities(data).map(entity => ({ ...entity, revision: 1 }));
+    const spaceId = 'synthetic-reader-scroll';
+    const cloudJournal = { version: 1, spaceId, base: { revision: 1, entities }, pending: null, conflicts: [], migrating: false };
+    let revision = 1;
+    await context.route('**/api/**', async route => {
+      const path = new URL(route.request().url()).pathname;
+      if (path === '/api/auth/session') {
+        await route.fulfill({ status: 200, json: { spaceId, device: { id: 'synthetic-reader', label: 'Synthetic reader' } } });
+      } else if (path === '/api/sync') {
+        expect(route.request().method()).toBe('GET');
+        await route.fulfill({ status: 200, json: { revision: ++revision, entities } });
+      } else {
+        await route.fulfill({ status: 503, json: { error: 'Unrelated synthetic endpoint disabled' } });
+      }
+    });
+    await page.clock.install();
+    const cached = { ...data, cloudJournal };
+    await page.addInitScript(value => {
+      Reflect.deleteProperty(navigator, 'serviceWorker');
+      Reflect.deleteProperty(Object.getPrototypeOf(navigator), 'serviceWorker');
+      localStorage.setItem('recall.snapshot.v1', JSON.stringify(value));
+    }, cached);
+    await page.goto('./', { waitUntil: 'domcontentloaded' });
+    expect(await page.evaluate(() => 'serviceWorker' in navigator)).toBe(false);
+    await expect(page.locator('.memory-app')).toBeVisible();
+    await expect.poll(async () => (await snapshot(page)).cloudJournal.base.revision).toBeGreaterThan(1);
+    await startReading(page);
+    await page.getByRole('button', { name: '显示答案', exact: true }).click();
+    const face = page.locator('.m-reading[data-active=true]');
+    await face.evaluate(element => { element.scrollTop = 500; });
+    await expect.poll(() => face.evaluate(element => element.scrollTop)).toBe(500);
+    const before = await snapshot(page);
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await expect.poll(async () => (await snapshot(page)).cloudJournal.base.revision).toBeGreaterThan(before.cloudJournal.base.revision);
+    expect(await face.evaluate(element => element.scrollTop)).toBe(500);
+    await face.evaluate(element => { element.scrollTop = 700; });
+    await expect.poll(() => face.evaluate(element => element.scrollTop)).toBe(700);
+    const afterReconnect = await snapshot(page);
+    await page.clock.fastForward(60000);
+    await expect.poll(async () => (await snapshot(page)).cloudJournal.base.revision).toBeGreaterThan(afterReconnect.cloudJournal.base.revision);
+    expect(await face.evaluate(element => element.scrollTop)).toBe(700);
+    await expect(face).toHaveAttribute('data-card-id', 'first');
+    expect((await snapshot(page)).cards).toEqual(before.cards);
+    expect((await snapshot(page)).reviewLogs).toEqual(before.reviewLogs);
+    await noOverflow(page);
+  });
 });
 
 test('来源证据默认折叠，答案和配图在上方，展开和看图不评分', async ({ page }) => {

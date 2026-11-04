@@ -25,6 +25,7 @@ export function MemoryReader({ ids: initialIds, scopeIds = initialIds, onQueueCh
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [undo, setUndo] = useState<Undo[]>([]);
   const [browseScoring, setBrowseScoring] = useState(false);
   const viewport = useRef<HTMLDivElement>(null), rail = useRef<HTMLDivElement>(null), indexRef = useRef(initialIndex), views = useRef<Record<string, ReadingPosition>>({});
+  const mountedPanels = useRef(new WeakSet<HTMLElement>()), layoutIndex = useRef<number | null>(null);
   const ratedRef = useRef<Record<string, ReviewRating>>({}), pending = useRef(false), switching = useRef(false), scheduled = useRef(0), token = useRef(0), timer = useRef<ReturnType<typeof setTimeout>|null>(null);
   const gesture = useRef<{ x: number; y: number; at: number; max: number; scroll: number; axis: 'x'|'y'|null }|null>(null);
   const session = useRef({ id: createId('session'), startedAt: new Date().toISOString() }), alive = useRef(true);
@@ -49,13 +50,16 @@ export function MemoryReader({ ids: initialIds, scopeIds = initialIds, onQueueCh
     if (panel) position.scroll = panel.scrollTop;
     token.current++; if (timer.current) clearTimeout(timer.current);
     switching.current = false; scheduled.current = 0;
+    resetRail();
     const next = replanMemoryStudyQueue(ids, current.id, Object.keys(ratedRef.current), cards.filter(card => scopeIds.includes(card.id)), preferences, new Date(), settings);
     onQueueChange(next);
     setReplanned(true);
   }, [preferenceKey, reviewMode, onQueueChange, current, ids, cards, preferences, settings, scopeIds]);
   useLayoutEffect(() => {
     let nextIndex = indexRef.current;
-    if (previousIds.current.join('\0') !== ids.join('\0')) {
+    const queueChanged = previousIds.current.join('\0') !== ids.join('\0');
+    let restored = false;
+    if (queueChanged) {
       const previousId = previousIds.current[indexRef.current];
       nextIndex = ids.includes(previousId) ? ids.indexOf(previousId) : Math.min(indexRef.current, ids.length);
       previousIds.current = ids;
@@ -63,11 +67,20 @@ export function MemoryReader({ ids: initialIds, scopeIds = initialIds, onQueueCh
     }
     if (restoreRequest && restoreRequest.token !== restoredToken.current && ids.includes(restoreRequest.id)) {
       restoredToken.current = restoreRequest.token;
+      restored = true;
       nextIndex = ids.indexOf(restoreRequest.id);
       cancelTransition(); switching.current = false; scheduled.current = 0;
     }
-    if (nextIndex !== index) { indexRef.current = nextIndex; setIndex(nextIndex); }
-    resetRail(); rail.current?.querySelectorAll<HTMLElement>('[data-card-id]').forEach(el => { el.scrollTop = view(el.dataset.cardId!).scroll; });
+    if (nextIndex !== index) { indexRef.current = nextIndex; setIndex(nextIndex); onIndex(nextIndex); return; }
+    let mounted = false;
+    rail.current?.querySelectorAll<HTMLElement>('[data-card-id]').forEach(panel => {
+      if (mountedPanels.current.has(panel)) return;
+      mountedPanels.current.add(panel);
+      panel.scrollTop = view(panel.dataset.cardId!).scroll;
+      mounted = true;
+    });
+    if (mounted || queueChanged || restored || layoutIndex.current !== index) resetRail();
+    layoutIndex.current = index;
     onIndex(nextIndex);
   }, [index, revision, onIndex, ids, restoreRequest]);
   function cancelTransition():void{token.current++;if(timer.current)clearTimeout(timer.current);}
@@ -85,7 +98,7 @@ export function MemoryReader({ ids: initialIds, scopeIds = initialIds, onQueueCh
     rail.current?.addEventListener('transitionend', finish, { once: true });
     timer.current = setTimeout(finish, motion ? 280 : 0);
   }
-  function reveal(): void { if (!current || switching.current || pending.current) return; remember(); view(current.id).revealed = true; view(current.id).scroll = 0; setRevision(n => n+1); }
+  function reveal(): void { if (!current || switching.current || pending.current || view(current.id).revealed || current.contentKind === 'excerpt') return; remember(); view(current.id).revealed = true; view(current.id).scroll = 0; setRevision(n => n+1); }
   function pointerDown(e: PointerEvent<HTMLDivElement>): void {
     if (e.button > 0 || switching.current || pending.current || (e.target as HTMLElement).closest('button,a,summary,input,textarea,select')) return;
     gesture.current = { x: e.clientX, y: e.clientY, at: performance.now(), max: 0, scroll: currentPanel()?.scrollTop ?? 0, axis: null };
@@ -152,7 +165,7 @@ export function MemoryReader({ ids: initialIds, scopeIds = initialIds, onQueueCh
   });
   function panel(n:number):JSX.Element{
     const card=cards.find(c=>c.id===ids[n]&&!c.archivedAt),active=n===index,shown=card&&(view(card.id).revealed||card.contentKind==='excerpt');
-    return <article key={card ? `${card.id}:${shown ? 'back' : 'front'}` : n} className="m-reading" data-active={active} data-card-id={card?.id} aria-hidden={!active} inert={!active} aria-label={shown?'卡片正文':'回忆问题'} style={{fontSize:font}}>{card?<>
+    return <article key={card ? `${card.id}:${shown ? 'back' : 'front'}` : n} className="m-reading" data-active={active} data-card-id={card?.id} aria-hidden={!active} inert={!active} aria-label={shown?'卡片正文':'回忆问题'} style={{fontSize:font}} onScroll={event => { if (card && event.currentTarget.isConnected) view(card.id).scroll = event.currentTarget.scrollTop; }}>{card?<>
       {card.bookTitle&&<div className="m-reader-source"><span>{card.bookTitle}{card.chapter?' · '+card.chapter:''}</span>{shown&&<small>划线原文</small>}</div>}
       {card.contentKind==='excerpt'?<div className="m-source"><strong>{card.front||card.bookTitle||decks.find(d=>d.id===card.deckId)?.name}</strong>{card.chapter&&<small>{card.chapter}</small>}</div>:shown&&card.cardType==='basic'?<details><summary>{card.front.split('\n')[0].slice(0, 96)}{card.front.length > 96 ? '…' : ''}</summary><RichCard content={card.front} allowHtml={false}/></details>:null}
       {shown?<>{card.cardType!=='basic'&&<RichCard content={card.front} cardType={card.cardType} revealed allowHtml={false}/>}<p className="m-weread-source-count">{card.sourceRef?.highlights ? `${card.sourceRef.highlights.length} 条划线 · 按原文顺序` : ''}</p>{card.sourceRef?.highlights ? <div className="m-weread-source-segments">{card.sourceRef.highlights.map((segment, index) => <section key={segment.bookmarkId}><small>划线 {index + 1}</small><p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{segment.markText}</p></section>)}</div> : <RichCard content={card.back} allowHtml={false} collapseSourceEvidence/>} {card.aiSummary&&<details className="m-ai-summary"><summary>查看辅助总结 · 非原文</summary><p>{card.aiSummary}</p></details>}</>:<><p className="m-recall-caption">{card.recallKind==='task'?'试着用自己的话复述':'先回忆，再看答案'}</p><div className="m-question"><RichCard content={card.front} cardType={card.cardType} revealed={false} allowHtml={false}/></div>{card.hint&&<p className="m-hint">{card.hint}</p>}</>}
