@@ -55,7 +55,10 @@ test('面板保留层级且选择不启动，父组含下级，关闭路径及�
   await expect(child).not.toBeVisible();
   await page.getByRole('button', { name: '展开AI汽车的子卡组' }).click();
   await page.getByRole('button', { name: '选择卡组：AI汽车' }).click();
-  await expect(page.locator('.m-picker-selection')).toContainText('本轮 2 张');
+  await expect(page.locator('.m-picker-selection')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '确认开始复习（2）', exact: true })).toBeVisible();
+  await expect(page.locator('.m-picker-footer')).not.toContainText('时长目标');
+  await expect(page.locator('.m-picker-hint')).toHaveCount(0);
   await expect(page.locator('.m-reading')).toHaveCount(0);
   await page.getByRole('button', { name: '确认开始复习' }).focus();
   await page.keyboard.press('Tab');
@@ -81,7 +84,7 @@ test('新卡可学习，未到期卡只浏览，空卡组可见但禁用，混�
   await page.getByRole('button', { name: '选择卡组：empty' }).click();
   await expect(page.getByRole('button', { name: '暂无卡片' })).toBeDisabled();
   await page.getByRole('button', { name: '选择卡组：new' }).click();
-  await expect(page.locator('.m-picker-selection')).toContainText('旧卡 0 张 · 新卡 1 张');
+  await expect(page.getByRole('button', { name: '开始学习新卡（1）', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '开始学习新卡' }).click();
   await expect(page.getByRole('region', { name: '到期复习' })).toContainText('new');
   await page.getByRole('button', { name: '退出复习' }).click();
@@ -122,7 +125,7 @@ test('面板独立滚动与安全区，窄屏横屏和大字号下固定确认�
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   }
   await page.setViewportSize({ width: 393, height: 852 });
-  await page.addStyleTag({ content: '.m-picker-name strong, .m-picker-selection strong { font-size:22px; }' });
+  await page.addStyleTag({ content: '.m-picker-name strong { font-size:22px; }' });
   await page.locator('.m-picker-body').evaluate(element => { element.scrollTop = 0; });
   await page.screenshot({ path: test.info().outputPath('picker-safe-area.png'), scale: 'css' });
   const buttons = await page.getByRole('dialog').locator('button:visible').all();
@@ -144,4 +147,28 @@ test('无卡组仍可打开面板，失效偏好不自动开启混合', async ({
   await page.getByRole('button', { name: '开始复习', exact: true }).click();
   await expect(page.getByRole('button', { name: '选择卡组：智能驾驶' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: /混合全部卡组/ })).not.toBeVisible();
+});
+
+test('批注修订：卡组选择行紧凑等高，数字标签横排，底部仅保留居中数量按钮', async ({ page }) => {
+  await seedPage(page);
+  await page.getByRole('button', { name: '开始复习', exact: true }).click();
+  const parent = page.getByRole('button', { name: '选择卡组：AI汽车', exact: true });
+  const child = page.getByRole('button', { name: '选择卡组：智能驾驶', exact: true });
+  const parentBox = (await parent.boundingBox())!;
+  const childBox = (await child.boundingBox())!;
+  expect(Math.abs(parentBox.height - childBox.height)).toBeLessThanOrEqual(1);
+  expect(parentBox.height).toBeLessThanOrEqual(80);
+  const metric = child.locator('.m-picker-metrics > span').first();
+  const metricBox = (await metric.boundingBox())!;
+  const numberBox = (await metric.locator('b').boundingBox())!;
+  expect(metricBox.height).toBeLessThanOrEqual(numberBox.height + 2);
+  await expect(page.locator('.m-picker-footer').locator(':scope > *')).toHaveCount(1);
+  const confirm = page.getByRole('button', { name: '确认开始复习（1）', exact: true });
+  await expect(confirm).toHaveCSS('justify-content', 'center');
+  const close = page.getByRole('button', { name: '关闭面板', exact: true });
+  await expect(close).toHaveCSS('border-radius', '50%');
+  const closeBox = (await close.boundingBox())!;
+  expect(closeBox.width).toBeGreaterThanOrEqual(44);
+  expect(closeBox.height).toBeGreaterThanOrEqual(44);
+  await page.screenshot({ path: test.info().outputPath('compact-picker.png'), scale: 'css' });
 });

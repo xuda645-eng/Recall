@@ -36,16 +36,19 @@ describe('review deck picker', () => {
     const { onStart } = picker();
     expect(screen.getByRole('button', { name: '选择卡组：child' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: '收起root的子卡组' })).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('status')).toHaveTextContent('本轮 4 张 · 旧卡 4 张 · 新卡 0 张');
+    expect(screen.getByRole('button', { name: '确认开始复习（4）' })).toBeEnabled();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByText('含子卡组')).not.toBeInTheDocument();
+    expect(screen.queryByText(/时长目标/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '选择卡组：root' }));
     expect(onStart).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: '确认开始复习' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认开始复习（4）' }));
     expect(onStart).toHaveBeenCalledWith(cards.slice(0, 9), true, 'root');
   });
   it('supports new-only learning, ungraded browsing and disabled empty decks', () => {
     const { onStart } = picker();
     fireEvent.click(screen.getByRole('button', { name: '选择卡组：new' }));
-    fireEvent.click(screen.getByRole('button', { name: '开始学习新卡' }));
+    fireEvent.click(screen.getByRole('button', { name: '开始学习新卡（1）' }));
     expect(onStart).toHaveBeenLastCalledWith([cards[9]], true, 'new');
     fireEvent.click(screen.getByRole('button', { name: '选择卡组：future' }));
     fireEvent.click(screen.getByRole('button', { name: '自由浏览（不评分）' }));

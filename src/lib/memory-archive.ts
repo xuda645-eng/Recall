@@ -98,3 +98,28 @@ export function restoreMemoryFolder(snapshot: RecallStateSnapshot, id: string): 
     return restored;
   }) } };
 }
+
+export function deleteArchivedMemoryCard(snapshot: RecallStateSnapshot, id: string, expectedArchivedAt: string): RecallStateSnapshot {
+  const card = snapshot.cards.find(candidate => candidate.id === id);
+  if (!card?.archivedAt || card.archivedAt !== expectedArchivedAt) throw new Error('归档状态已变化，请重新确认删除');
+  return { ...snapshot, cards: snapshot.cards.filter(candidate => candidate.id !== id), reviewLogs: snapshot.reviewLogs.filter(log => log.cardId !== id) };
+}
+
+export function deleteArchivedMemoryFolder(snapshot: RecallStateSnapshot, id: string, expected: { deckIds: string[]; cardIds: string[] }): RecallStateSnapshot {
+  if (!memoryArchiveFolderState(snapshot.decks, snapshot.cards).ids.has(id)) throw new Error('卡组已不在归档中，请重新确认');
+  const folders = subtreeIds(snapshot.decks, id);
+  const cards = snapshot.cards.filter(card => folders.has(card.deckId));
+  const expectedDecks = new Set(expected.deckIds);
+  const expectedCards = new Set(expected.cardIds);
+  if (cards.some(card => !card.archivedAt) || folders.size !== expectedDecks.size || [...folders].some(folder => !expectedDecks.has(folder)) || cards.length !== expectedCards.size || cards.some(card => !expectedCards.has(card.id))) {
+    throw new Error('卡组内容已变化，请重新确认删除范围');
+  }
+  const affected = new Set(cards.map(card => card.id));
+  return {
+    ...snapshot,
+    decks: snapshot.decks.filter(deck => !folders.has(deck.id)),
+    cards: snapshot.cards.filter(card => !affected.has(card.id)),
+    reviewLogs: snapshot.reviewLogs.filter(log => !affected.has(log.cardId)),
+    studySessions: snapshot.studySessions.filter(session => !session.deckId || !folders.has(session.deckId)),
+  };
+}

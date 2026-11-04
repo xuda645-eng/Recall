@@ -161,11 +161,16 @@
 .m-sheet { background: var(--card-paper); padding: 14px max(22px, env(safe-area-inset-left)) var(--safe-bottom) max(22px, env(safe-area-inset-right)); max-height: 80dvh; border-radius: 20px 20px 0 0; }
 .m-grab { width: 40px; height: 4px; margin: 0 auto 12px; border-radius: 4px; background: #d3d6c6; }
 .m-sheet > header { display: flex; align-items: center; justify-content: space-between; min-height: 58px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
+.memory-app .m-sheet-close { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 50%; color: var(--muted); background: transparent; }
+.memory-app .m-sheet-close:hover, .memory-app .m-sheet-close:active { background: var(--soft); color: var(--ink); }
+.m-sheet-close svg { width: 18px; height: 18px; stroke-width: 1.5; }
 .m-sheet h2 { font-size: 19px; font-weight: 600; }
 .m-sheet form > .m-primary { position: sticky; bottom: 0; z-index: 1; width: 100%; box-shadow: 0 -10px 0 5px var(--card-paper); }
 .m-sheet .m-panel { border: 0; padding: 0; background: none; margin: 0; }
 .m-sheet-list { display: grid; gap: 4px; }
 .m-sheet-list button { display: flex; align-items: center; gap: 12px; min-height: 50px; text-align: left; border-bottom: 1px solid var(--line); font-size: 14px; }
+.memory-app .m-danger { color: #963e49; }
+.dark .memory-app .m-danger { color: #efacb4; }
 .m-about { font-size: 14px; line-height: 1.8; }
 .m-about p { margin-bottom: 14px; }
 .m-review-modes > label { display: grid; grid-template-columns: 22px 1fr; gap: 6px 10px; padding: 15px; border: 1px solid var(--line); border-radius: 13px; }

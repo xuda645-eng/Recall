@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createSeedSnapshot } from '@/data/seed';
-import { archiveMemoryCard, archiveMemoryFolder, memoryArchiveFolderState, restoreMemoryCard, restoreMemoryCards, restoreMemoryFolder } from './memory-archive';
+import { archiveMemoryCard, archiveMemoryFolder, deleteArchivedMemoryCard, deleteArchivedMemoryFolder, memoryArchiveFolderState, restoreMemoryCard, restoreMemoryCards, restoreMemoryFolder } from './memory-archive';
+import { pendingChanges, type CloudJournal } from '@/services/cloud-cache';
+import { snapshotEntities } from '../../shared/cloud';
 import { isCardDue, isCardDueToday } from './stats';
 import { getDueCards } from '@/services/fsrs-engine';
 
@@ -165,5 +167,71 @@ describe('folder archive lifecycle', () => {
       expect(changed).toEqual(before);
     }
     expect(() => restoreMemoryCards(result.snapshot, [...result.ids, 'missing'], archivedAt)).toThrow('状态已变化');
+  });
+});
+
+describe('permanent archived deletion', () => {
+  const archivedAt = '2026-11-04T00:00:00.000Z';
+  function fixture() {
+    const seed = createSeedSnapshot();
+    const decks = ['root', 'child', 'empty', 'outside'].map(id => ({ ...seed.decks[0], id, name: id, parentId: id === 'child' || id === 'empty' ? 'root' : null }));
+    const cards = ['root', 'child', 'outside'].map(id => ({ ...seed.cards[0], id, deckId: id, archivedAt }));
+    const reviewLogs = cards.map(card => ({ id: `log-${card.id}`, cardId: card.id, rating: 'good' as const, reviewDate: archivedAt, stability: 1, difficulty: 1, elapsedDays: 1, scheduledDays: 1 }));
+    const studySessions = decks.map(deck => ({ id: `session-${deck.id}`, deckId: deck.id, startedAt: archivedAt, endedAt: archivedAt, cardsStudied: 1 }));
+    return { ...seed, decks, cards, reviewLogs, studySessions };
+  }
+  const scope = { deckIds: ['root', 'child', 'empty'], cardIds: ['root', 'child'] };
+  it('deletes only the selected archived card and its logs, without mutating the input', () => {
+    const before = fixture();
+    const original = structuredClone(before);
+    const after = deleteArchivedMemoryCard(before, 'child', archivedAt);
+    expect(after.cards.map(card => card.id)).toEqual(['root', 'outside']);
+    expect(after.reviewLogs.map(log => log.cardId)).toEqual(['root', 'outside']);
+    expect(after.decks).toBe(before.decks);
+    expect(after.studySessions).toBe(before.studySessions);
+    expect(after.settings).toBe(before.settings);
+    expect(before).toEqual(original);
+    expect(() => deleteArchivedMemoryCard(after, 'child', archivedAt)).toThrow('状态已变化');
+  });
+  it('rejects a missing, restored or re-archived card', () => {
+    const before = fixture();
+    expect(() => deleteArchivedMemoryCard(before, 'missing', archivedAt)).toThrow('状态已变化');
+    expect(() => deleteArchivedMemoryCard(restoreMemoryCard(before, 'child'), 'child', archivedAt)).toThrow('状态已变化');
+    expect(() => deleteArchivedMemoryCard(before, 'child', '2020-01-01T00:00:00.000Z')).toThrow('状态已变化');
+  });
+  it('deletes the entire archived subtree, its logs and sessions while preserving outside data', () => {
+    const before = fixture();
+    const original = structuredClone(before);
+    const after = deleteArchivedMemoryFolder(before, 'root', scope);
+    expect(after.decks).toEqual([before.decks[3]]);
+    expect(after.cards).toEqual([before.cards[2]]);
+    expect(after.reviewLogs).toEqual([before.reviewLogs[2]]);
+    expect(after.studySessions).toEqual([before.studySessions[3]]);
+    expect(after.settings).toBe(before.settings);
+    expect(before).toEqual(original);
+    const journal: CloudJournal = { version: 1, spaceId: 'synthetic-unit-test', base: { revision: 1, entities: snapshotEntities(before).map(entity => ({ ...entity, revision: 1 })) }, pending: null, conflicts: [], migrating: false };
+    const changes = pendingChanges(after, journal);
+    expect(changes).toHaveLength(10);
+    expect(changes.every(change => change.value === null && change.expectedRevision === 1)).toBe(true);
+    expect(changes.some(change => change.id === 'outside' || change.kind === 'setting')).toBe(false);
+  });
+  it('rejects restored cards, added descendants, changed card membership and missing roots atomically', () => {
+    const before = fixture();
+    const original = structuredClone(before);
+    expect(() => deleteArchivedMemoryFolder(restoreMemoryCard(before, 'child'), 'root', scope)).toThrow('不在归档中');
+    const added = { ...before, decks: [...before.decks, { ...before.decks[1], id: 'added', name: 'added' }] };
+    expect(() => deleteArchivedMemoryFolder(added, 'root', scope)).toThrow('内容已变化');
+    const extra = { ...before, cards: [...before.cards, { ...before.cards[1], id: 'added-card' }] };
+    expect(() => deleteArchivedMemoryFolder(extra, 'root', scope)).toThrow('内容已变化');
+    expect(() => deleteArchivedMemoryFolder(before, 'root', { ...scope, cardIds: ['root', 'replacement'] })).toThrow('内容已变化');
+    expect(() => deleteArchivedMemoryFolder(before, 'missing', scope)).toThrow('不在归档中');
+    expect(before).toEqual(original);
+  });
+  it('allows deleting an inherited empty archived child without deleting its parent or cards', () => {
+    const before = fixture();
+    const after = deleteArchivedMemoryFolder(before, 'empty', { deckIds: ['empty'], cardIds: [] });
+    expect(after.decks.map(deck => deck.id)).toEqual(['root', 'child', 'outside']);
+    expect(after.cards).toEqual(before.cards);
+    expect(after.reviewLogs).toEqual(before.reviewLogs);
   });
 });

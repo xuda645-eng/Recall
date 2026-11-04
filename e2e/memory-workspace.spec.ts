@@ -1234,7 +1234,8 @@ test('整组归档刷新后移到归档目录，可切换仅卡片逐张恢复',
   await page.getByLabel('内容', { exact: true }).selectOption('仅卡片');
   await page.getByRole('button', { name: '应用', exact: true }).click();
   await expect(page.locator('.memory-card-row')).toHaveCount(4);
-  await page.locator('[data-card-id="second"]').getByRole('button', { name: '移出归档', exact: true }).click();
+  await page.locator('[data-card-id="second"]').getByRole('button', { name: /管理归档卡片/ }).click();
+  await page.getByRole('button', { name: '移出归档（恢复）', exact: true }).click();
   await expect.poll(async () => (await snapshot(page)).cards[1]).toEqual(before.cards[1]);
   const restored = await snapshot(page);
   expect(restored.cards[1]).toEqual(before.cards[1]);
@@ -1272,7 +1273,10 @@ test('归档目录兼容已有整组归档，保留空卡组并按层级浏览�
   await page.getByRole('searchbox').fill('');
   await page.locator('.m-folder[data-folder-id="root"] .m-folder-open').click();
   await expect(page.locator('.m-folder[data-folder-id="archived-empty"]')).toBeVisible();
-  await expect(page.getByRole('button', { name: '移出归档卡组：归档空子卡组', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '管理归档卡组：归档空子卡组', exact: true }).click();
+  await expect(page.getByRole('button', { name: '移出归档（恢复）', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '彻底删除', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: '关闭面板', exact: true }).click();
   await expect(page.locator('.m-folder[data-folder-id="leaf"]')).toBeVisible();
   await expect(page.locator('[data-card-id="first"]')).toBeVisible();
   await page.locator('.m-folder[data-folder-id="leaf"] .m-folder-open').click();
@@ -1285,11 +1289,13 @@ test('归档目录兼容已有整组归档，保留空卡组并按层级浏览�
   await expect(page.getByRole('dialog')).toContainText('3 张归档卡片');
   await page.getByRole('button', { name: '取消', exact: true }).click();
   await page.getByRole('button', { name: '全部归档', exact: true }).click();
-  await page.getByRole('button', { name: '移出归档卡组：回忆方法', exact: true }).click();
+  await page.getByRole('button', { name: '管理归档卡组：回忆方法', exact: true }).click();
+  await page.getByRole('button', { name: '移出归档（恢复）', exact: true }).click();
   await expect(page.getByRole('dialog')).toContainText('4 张归档卡片');
   await page.getByRole('button', { name: '取消', exact: true }).click();
   expect(await snapshot(page)).toEqual(before);
-  await page.getByRole('button', { name: '移出归档卡组：回忆方法', exact: true }).click();
+  await page.getByRole('button', { name: '管理归档卡组：回忆方法', exact: true }).click();
+  await page.getByRole('button', { name: '移出归档（恢复）', exact: true }).click();
   await page.getByRole('button', { name: '确认移出归档 4 张卡片', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   const restored = await snapshot(page);
@@ -1374,7 +1380,7 @@ test('归档卡组筛选与恢复在安全区窄屏断点和横屏保持可触�
   for (const viewport of [{ width: 393, height: 852 }, { width: 320, height: 852 }, { width: 760, height: 852 }, { width: 761, height: 852 }, { width: 852, height: 393 }]) {
     await page.setViewportSize(viewport);
     await page.locator('.memory-app').evaluate(element => { (element as HTMLElement).style.setProperty('--safe-top', '59px'); (element as HTMLElement).style.setProperty('--safe-bottom', '34px'); });
-    for (const name of ['筛选与排序', '移出归档卡组：回忆方法']) {
+    for (const name of ['筛选与排序', '管理归档卡组：回忆方法']) {
       const button = page.getByRole('button', { name, exact: true });
       await button.scrollIntoViewIfNeeded();
       const box = (await button.boundingBox())!;
@@ -1387,6 +1393,88 @@ test('归档卡组筛选与恢复在安全区窄屏断点和横屏保持可触�
     }
     await noOverflow(page);
   }
+});
+
+test('批注修订：归档卡组去掉重复路径，三点菜单恢复和删除需明确确认', async ({ page }) => {
+  const data = folderArchiveFixture();
+  data.cards = data.cards.map(card => card.deckId === 'outside' ? card : { ...card, archivedAt: '2026-11-04T00:00:00.000Z' });
+  await seedPage(page, data, 'archived');
+  const before = await snapshot(page);
+  const folder = page.locator('[data-folder-id="root"]');
+  await expect(folder.locator('.m-folder-copy small')).toHaveCount(1);
+  const menu = folder.getByRole('button', { name: '管理归档卡组：回忆方法', exact: true });
+  await menu.click();
+  await expect(page.getByRole('button', { name: '移出归档（恢复）', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '彻底删除', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('2 个子卡组、4 张归档卡片');
+  await expect(page.getByRole('button', { name: '确认彻底删除', exact: true })).toBeDisabled();
+  await page.getByLabel('删除确认').fill('删除');
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  await page.getByRole('button', { name: '关闭面板', exact: true }).click();
+  await expect(menu).toBeFocused();
+  expect(await snapshot(page)).toEqual(before);
+  await menu.click();
+  await page.screenshot({ path: test.info().outputPath('archive-folder-menu.png'), scale: 'css' });
+  await page.getByRole('button', { name: '彻底删除', exact: true }).click();
+  await expect(page.getByRole('button', { name: '确认彻底删除', exact: true })).toBeDisabled();
+  await page.getByLabel('删除确认').fill('删除');
+  await page.getByRole('button', { name: '确认彻底删除', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const after = await snapshot(page);
+  expect(after.decks.map((deck: { id: string }) => deck.id)).toEqual(['outside']);
+  expect(after.cards).toEqual([before.cards[4]]);
+  expect(after.settings).toMatchObject(before.settings);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForAppReady(page);
+  expect(await snapshot(page)).toEqual(after);
+});
+
+test('批注修订：单张归档卡片使用相同菜单，取消不删除，确认仅删除目标和关联记录', async ({ page }) => {
+  const data = fixture();
+  await seedPage(page, data, 'archived');
+  const before = await snapshot(page);
+  const card = page.locator('[data-card-id="archived"]');
+  const menu = card.getByRole('button', { name: '管理归档卡片：归档示例', exact: true });
+  await menu.click();
+  await expect(page.getByRole('button', { name: '移出归档（恢复）', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '彻底删除', exact: true }).click();
+  await page.getByLabel('删除确认').fill('删除');
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeFocused();
+  expect(await snapshot(page)).toEqual(before);
+  await menu.click();
+  await page.screenshot({ path: test.info().outputPath('archive-card-menu.png'), scale: 'css' });
+  await page.getByRole('button', { name: '彻底删除', exact: true }).click();
+  await expect(page.getByRole('button', { name: '确认彻底删除', exact: true })).toBeDisabled();
+  await page.getByLabel('删除确认').fill('错误');
+  await expect(page.getByRole('button', { name: '确认彻底删除', exact: true })).toBeDisabled();
+  await page.getByLabel('删除确认').fill('删除');
+  await page.getByRole('button', { name: '确认彻底删除', exact: true }).click();
+  await expect(card).toHaveCount(0);
+  const after = await snapshot(page);
+  expect(after.cards).toEqual(before.cards.filter((candidate: { id: string }) => candidate.id !== 'archived'));
+  expect(after.decks).toEqual(before.decks);
+  expect(after.settings).toMatchObject(before.settings);
+});
+
+test('批注修订：确认后缓存新增归档卡片，删除范围不扩大且原子拒绝', async ({ page }) => {
+  const data = folderArchiveFixture();
+  data.cards = data.cards.map(card => card.deckId === 'outside' ? card : { ...card, archivedAt: '2026-11-04T00:00:00.000Z' });
+  await seedPage(page, data, 'archived');
+  await page.getByRole('button', { name: '管理归档卡组：回忆方法', exact: true }).click();
+  await page.getByRole('button', { name: '彻底删除', exact: true }).click();
+  await page.getByLabel('删除确认').fill('删除');
+  const changed = await page.evaluate(() => {
+    const current = JSON.parse(localStorage.getItem('recall.snapshot.v1')!);
+    current.cards.push({ ...current.cards[0], id: 'concurrent-archive', front: '并发新增的归档卡片' });
+    current.cloudJournal = { version: 1, spaceId: 'synthetic-concurrency-test', base: { revision: 0, entities: [] }, pending: null, conflicts: [], migrating: false };
+    localStorage.setItem('recall.snapshot.v1', JSON.stringify(current));
+    return current;
+  });
+  await page.getByRole('button', { name: '确认彻底删除', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('卡组内容已变化');
+  expect(await snapshot(page)).toEqual(changed);
+  await expect(page.getByRole('dialog')).toBeVisible();
 });
 
 test('整组归档面板在安全区、窄屏和断点保持可读可触达', async ({ page }) => {

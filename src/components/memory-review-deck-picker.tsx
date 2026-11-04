@@ -25,7 +25,6 @@ export function MemoryReviewDeckPicker({ decks, cards, preferences, settings, la
     return () => clearInterval(timer);
   }, []);
   const selected = choice === '__all' ? data.all : data.decks.find(item => item.deck.id === choice);
-  const selectedName = choice === '__all' ? '混合全部卡组' : data.decks.find(item => item.deck.id === choice)?.deck.name || '请选择卡组';
   const round = selectMemoryStudyCards(selected?.cards || [], preferences, now, settings);
   const action = !selected?.total ? '暂无卡片' : round.cards.length ? round.oldCount ? '确认开始复习' : '开始学习新卡' : '自由浏览（不评分）';
 
@@ -46,7 +45,6 @@ export function MemoryReviewDeckPicker({ decks, cards, preferences, settings, la
           <button className="m-picker-choice" aria-pressed={choice === item.deck.id} aria-label={`选择卡组：${item.deck.name}`} onClick={() => setChoice(item.deck.id)}>
             <span className="m-picker-name"><Folder size={19}/><strong>{item.deck.name}</strong>{lastDeck === item.deck.id && <small>上次选择</small>}<span className="m-picker-check">{choice === item.deck.id && <Check size={18}/>}</span></span>
             <span className="m-picker-metrics"><span><b>{item.due}</b>待复习</span><span><b>{item.fresh}</b>新卡</span><span><b>{item.total}</b>未归档</span></span>
-            {(hasChildren || !item.total) && <small className="m-picker-hint">{hasChildren ? '含子卡组' : '还没有卡片'}</small>}
           </button>
           {hasChildren && <button className="m-picker-expand" aria-label={`${open ? '收起' : '展开'}${item.deck.name}的子卡组`} aria-expanded={open} aria-controls={`review-children-${item.deck.id}`} onClick={() => setExpanded(previous => {
             const next = new Set(previous); if (open) next.delete(item.deck.id); else next.add(item.deck.id); return next;
@@ -65,9 +63,7 @@ export function MemoryReviewDeckPicker({ decks, cards, preferences, settings, la
       <details className="m-picker-definition"><summary>这些数字怎么算？</summary><p>待复习只计现在已到期的已学卡，新卡单列。上级卡组包含下级，已归档内容不计入；混合总数不重复累计父子卡组。每轮按复习计划分配，不要求一次清空。</p></details>
     </div>
     <footer className="m-picker-footer">
-      <div role="status" className="m-picker-selection"><strong>{selectedName}</strong><span>{round.cards.length ? `本轮 ${round.cards.length} 张 · 旧卡 ${round.oldCount} 张 · 新卡 ${round.newCount} 张` : selected?.total ? '暂无到期任务，可随手翻一张' : '新建或导入卡片后再来温习'}</span></div>
-      <small>{round.cards.length ? `时长目标 ${preferences.sessionMinutes} 分钟 · 随时可以结束` : selected?.total ? '浏览不会更新评分和排期' : '空卡组暂不能开始'}</small>
-      <button className="m-primary" disabled={!selected?.total} onClick={confirm}>{action}<ChevronRight size={18}/></button>
+      <button className="m-primary" disabled={!selected?.total} onClick={confirm}>{action}{round.cards.length > 0 && `（${round.cards.length}）`}</button>
     </footer>
   </div>;
 }
