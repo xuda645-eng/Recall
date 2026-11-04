@@ -125,6 +125,7 @@ async function noOverflow(page: Page) {
 }
 async function startReading(page: Page) {
   await page.getByRole('button', { name: '开始复习', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /确认开始复习|开始学习新卡/ }).click();
   await expect(page.getByRole('button', { name: '显示答案', exact: true })).toBeVisible();
 }
 async function openDiagnostics(page: Page) {

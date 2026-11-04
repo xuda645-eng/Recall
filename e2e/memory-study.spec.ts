@@ -65,13 +65,14 @@ test.afterEach(async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
 });
 
-test('首页区分总积压、新卡和小轮次，按比例推荐而不承诺清零', async ({ page }) => {
+test('首页不预设卡组轮次，选择面板区分积压与实际推荐', async ({ page }) => {
   await seedPage(page);
-  const hero = page.getByRole('region', { name: '本次温习推荐' });
-  await expect(hero.locator('.m-big')).toContainText('10');
-  await expect(hero).toContainText('旧卡 7 张 · 新卡 3 张');
-  await expect(hero).toContainText('时长目标 30 分钟');
-  await expect(page.locator('.m-study-backlog')).toContainText('本卡组待复习 12 张 · 待学习 12 张');
+  const hero = page.getByRole('region', { name: '开始按卡组复习' });
+  await expect(hero).toContainText('慢慢读，认真记。');
+  await page.getByRole('button', { name: '开始复习', exact: true }).click();
+  await expect(page.getByRole('status').last()).toContainText('本轮 10 张 · 旧卡 7 张 · 新卡 3 张');
+  await expect(page.getByRole('dialog')).toContainText('时长目标 30 分钟');
+  await expect(page.getByRole('button', { name: '选择卡组：子卡组 1 的长标题', exact: true })).toContainText('12待复习12新卡26未归档');
   await expect(hero).not.toContainText('今日复习已完成');
 });
 
@@ -81,8 +82,10 @@ test('无效旧版FSRS权重不阻断首页和设置入口，选卡不改写原�
   weights[20] = { valueOf: 0, toString: 0 } as unknown as number;
   data.settings.fsrsWeights = weights;
   await seedPage(page, data);
-  await expect(page.locator('.m-hero')).toContainText('旧卡 7 张 · 新卡 3 张');
+  await page.getByRole('button', { name: '开始复习', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('旧卡 7 张 · 新卡 3 张');
   expect((await snapshot(page)).settings.fsrsWeights).toEqual(weights);
+  await page.getByRole('button', { name: '关闭面板' }).click();
   await navigate(page, '设置与数据');
   await page.getByRole('button', { name: '配置', exact: true }).click();
   await expect(page.getByRole('dialog').getByRole('slider', { name: '新卡占比', exact: true })).toBeVisible();
@@ -117,12 +120,14 @@ test('PWA比例和轮次设置持久化，保存不改写卡片排期和历史',
   await expect(page.locator('.memory-app')).toBeVisible();
   expect((await snapshot(page)).settings.studyPreferences).toEqual(updated.settings.studyPreferences);
   await navigate(page, '今日复习');
-  await expect(page.locator('.m-hero')).toContainText('旧卡 0 张 · 新卡 5 张');
+  await page.getByRole('button', { name: '开始复习', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('旧卡 0 张 · 新卡 5 张');
 });
 
 test('智能评分隐藏所有预测时间，记住了至少完整24小时且可撤销', async ({ page }) => {
   await seedPage(page, fixture({ newCardRatio: 1, batchSize: 2 }));
   await page.getByRole('button', { name: '开始复习', exact: true }).click();
+  await page.getByRole('button', { name: '开始学习新卡', exact: true }).click();
   const currentId = await page.locator('.m-reading[data-active="true"]').getAttribute('data-card-id');
   await page.getByRole('button', { name: '显示答案', exact: true }).click();
   await expect(page.locator('.m-ratings small')).toHaveCount(0);
@@ -139,6 +144,7 @@ test('智能评分隐藏所有预测时间，记住了至少完整24小时且可
 test('进行中修改配比只调整未练部分，保留当前卡、滚动和评分记录', async ({ page }) => {
   await seedPage(page, fixture({ newCardRatio: 0, batchSize: 3 }));
   await page.getByRole('button', { name: '开始复习', exact: true }).click();
+  await page.getByRole('button', { name: '确认开始复习', exact: true }).click();
   await grade(page);
   await expect.poll(async () => (await snapshot(page)).reviewLogs.length).toBe(1);
   const active = page.locator('.m-reading[data-active="true"]');
@@ -166,6 +172,7 @@ test('进行中修改配比只调整未练部分，保留当前卡、滚动和�
 test('小轮次完成不强迫清空，可继续下一轮并保留撤销', async ({ page }) => {
   await seedPage(page, fixture({ newCardRatio: 1, batchSize: 2 }));
   await page.getByRole('button', { name: '开始复习', exact: true }).click();
+  await page.getByRole('button', { name: '开始学习新卡', exact: true }).click();
   await grade(page);
   await expect.poll(async () => (await snapshot(page)).reviewLogs.length).toBe(1);
   await expect(page.getByRole('button', { name: '显示答案', exact: true })).toBeVisible();

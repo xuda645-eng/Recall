@@ -7,7 +7,7 @@ assertBrowserLaunchAllowed();
 export default defineConfig({
   ...baseline,
   testDir: '.',
-  testMatch: ['product-review.spec.ts', 'memory-workspace.spec.ts', 'memory-study.spec.ts', 'media.spec.ts', 'import-choices.spec.ts'],
+  testMatch: ['product-review.spec.ts', 'review-deck-picker.spec.ts', 'memory-workspace.spec.ts', 'memory-study.spec.ts', 'media.spec.ts', 'import-choices.spec.ts'],
   globalSetup: '../scripts/playwright-global-setup.mjs',
   webServer: process.env.RECALL_URL ? undefined : {
     ...baseline.webServer,

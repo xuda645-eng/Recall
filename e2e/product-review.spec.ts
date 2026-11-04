@@ -37,18 +37,25 @@ test.afterEach(async ({ page }) => {
 test('默认按单一卡组复习，选择与刷新保留偏好，不改变卡片数据', async ({ page }) => {
   await seedPage(page);
   const before = await page.evaluate(() => localStorage.getItem('recall.snapshot.v1'));
-  await expect(page.getByRole('combobox', { name: '复习卡组' })).toHaveValue('deck-a');
-  const deckBounds = await page.getByRole('combobox', { name: '复习卡组' }).boundingBox();
-  expect(deckBounds?.width).toBeGreaterThanOrEqual(44);
-  expect(deckBounds?.height).toBeGreaterThanOrEqual(44);
+  await expect(page.getByRole('combobox', { name: '复习卡组' })).toHaveCount(0);
   await expect(page.locator('.m-home-summary')).toContainText('今日总复习次数');
   await expect(page.locator('.m-home-summary')).toContainText('全部长期复习');
   await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))));
   await page.screenshot({ path: test.info().outputPath('home-deck.png'), scale: 'css' });
-  await page.getByRole('combobox', { name: '复习卡组' }).selectOption('deck-b');
-  await page.reload();
-  await expect(page.getByRole('combobox', { name: '复习卡组' })).toHaveValue('deck-b');
   await page.getByRole('button', { name: '开始复习', exact: true }).click();
+  await expect(page.getByRole('button', { name: '选择卡组：主题甲' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: '选择卡组：主题乙' }).click();
+  await expect(page.locator('.m-picker-selection')).toContainText('本轮 9 张');
+  expect(await page.evaluate(() => localStorage.getItem('recall.snapshot.v1'))).toBe(before);
+  await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))));
+  await page.screenshot({ path: test.info().outputPath('review-picker.png'), scale: 'css' });
+  await page.getByRole('button', { name: '确认开始复习' }).click();
+  await page.getByRole('button', { name: '退出复习' }).click();
+  await expect(page.getByRole('button', { name: '开始复习', exact: true })).toBeFocused();
+  await page.reload();
+  await page.getByRole('button', { name: '开始复习', exact: true }).click();
+  await expect(page.getByRole('button', { name: '选择卡组：主题乙' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: '确认开始复习' }).click();
   await expect(page.getByRole('region', { name: '到期复习' })).toContainText('主题乙');
   await expect(page.locator('.m-context')).toHaveText('1 / 9');
   await page.getByRole('button', { name: '退出复习' }).click();
@@ -57,15 +64,20 @@ test('默认按单一卡组复习，选择与刷新保留偏好，不改变卡�
   await recent.click();
   await page.getByRole('button', { name: '退出浏览' }).click();
   await expect(recent).toBeFocused();
-  await page.getByRole('combobox', { name: '复习卡组' }).selectOption('__all');
+  await page.getByRole('button', { name: '开始复习', exact: true }).click();
+  await page.getByText('其他复习方式', { exact: true }).click();
+  await page.getByRole('button', { name: /混合全部卡组/ }).click();
+  await page.getByRole('button', { name: '确认开始复习' }).click();
+  await page.getByRole('button', { name: '退出复习' }).click();
   await page.evaluate(() => {
     const data = JSON.parse(localStorage.getItem('recall.snapshot.v1')!);
     data.cards = data.cards.map((card: { deckId: string }) => card.deckId === 'deck-b' ? { ...card, archivedAt: new Date().toISOString() } : card);
     localStorage.setItem('recall.snapshot.v1', JSON.stringify(data));
   });
   await page.reload();
-  await expect(page.getByRole('combobox', { name: '复习卡组' })).toHaveValue('__all');
-  await expect(page.getByRole('combobox', { name: '复习卡组' }).locator('option:checked')).toHaveText('混合全部卡组（可选）');
+  await page.getByRole('button', { name: '开始复习', exact: true }).click();
+  await expect(page.getByRole('button', { name: /混合全部卡组/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: '选择卡组：主题乙' })).toHaveCount(0);
 });
 
 test('搜索阅读沿用匹配范围，退出保留条件、位置与焦点，浏览不写评分', async ({ page }) => {
