@@ -21,6 +21,23 @@ test.afterEach(async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
 });
 
+test('点击不评分的自由浏览时，即使刚到复习时间也不自动开启评分', async ({ page }) => {
+  const data = fixture();
+  const time = new Date('2026-11-04T12:00:00Z');
+  data.cards = [{ ...data.cards.find(card => card.id === 'future')!, nextReviewDate: new Date(time.getTime() + 5000).toISOString() }];
+  await seedPage(page, data, 'future');
+  await page.clock.install({ time });
+  await page.getByRole('button', { name: '开始复习', exact: true }).click();
+  const browse = page.getByRole('button', { name: '自由浏览（不评分）' });
+  await expect(browse).toBeVisible();
+  await page.clock.setSystemTime(new Date(time.getTime() + 6000));
+  await browse.click();
+  await page.getByRole('button', { name: '显示答案' }).click();
+  await expect(page.locator('[data-rating]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '退出浏览' })).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('recall.snapshot.v1')!).reviewLogs)).toEqual([]);
+});
+
 test('面板保留层级且选择不启动，父组含下级，关闭路径及键盘焦点均安全', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));

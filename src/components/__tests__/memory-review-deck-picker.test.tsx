@@ -6,7 +6,7 @@ import { createSeedSnapshot } from '@/data/seed';
 import { MemoryReviewDeckPicker } from '@/components/memory-review-deck-picker';
 import type { Card } from '@/types';
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.useRealTimers(); });
 const seed = createSeedSnapshot();
 const past = '2026-10-01T00:00:00Z';
 const decks = ['root', 'child', 'new', 'future', 'empty'].map(id => ({ ...seed.decks[0], id, name: id, parentId: id === 'child' ? 'root' : null }));
@@ -21,6 +21,17 @@ function picker(lastDeck = 'child', scope = cards) {
   return { ...render(createElement(MemoryReviewDeckPicker, props)), onStart, props };
 }
 describe('review deck picker', () => {
+  it('keeps an explicitly ungraded browse action ungraded when a card becomes due before the click', () => {
+    vi.useFakeTimers();
+    const time = new Date('2026-11-04T12:00:00Z').getTime();
+    vi.setSystemTime(time);
+    const scope = [{ ...cards[10], nextReviewDate: new Date(time + 5000).toISOString() }];
+    const { onStart } = picker('future', scope);
+    const browse = screen.getByRole('button', { name: '自由浏览（不评分）' });
+    vi.setSystemTime(time + 6000);
+    fireEvent.click(browse);
+    expect(onStart).toHaveBeenCalledWith(scope, false, 'future');
+  });
   it('opens the remembered child, selects without starting and uses the actual batch settings', () => {
     const { onStart } = picker();
     expect(screen.getByRole('button', { name: '选择卡组：child' })).toHaveAttribute('aria-pressed', 'true');

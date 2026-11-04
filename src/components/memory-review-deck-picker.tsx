@@ -34,7 +34,8 @@ export function MemoryReviewDeckPicker({ decks, cards, preferences, settings, la
     const scope = choice === '__all' ? latest.all : latest.decks.find(item => item.deck.id === choice);
     if (!scope?.total) return;
     const next = selectMemoryStudyCards(scope.cards, preferences, new Date(), settings);
-    onStart(scope.cards, next.cards.length > 0, choice);
+    if (round.cards.length && !next.cards.length) { setNow(new Date()); return; }
+    onStart(scope.cards, round.cards.length > 0, choice);
   }
   function rows(parentId: string | null, depth = 0): JSX.Element[] {
     return data.decks.filter(item => (item.deck.parentId || null) === parentId).map(item => {
