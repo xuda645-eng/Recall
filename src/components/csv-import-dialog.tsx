@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRecallStore } from "@/stores/recall-store";
+import type { ImportCompletionReceipt } from "@/components/import-hub";
 
 interface CsvImportDialogProps {
   open: boolean;
@@ -20,6 +21,7 @@ interface CsvImportDialogProps {
   deckId?: string | null;
   /** Pre-load a file (from drag-and-drop) */
   file?: File | null;
+  onComplete?: (receipt: ImportCompletionReceipt) => void;
 }
 
 interface CsvRow {
@@ -29,13 +31,14 @@ interface CsvRow {
   tags: string;
 }
 
-export function CsvImportDialog({ open, onClose, deckId, file }: CsvImportDialogProps): JSX.Element {
+export function CsvImportDialog({ open, onClose, deckId, file, onComplete }: CsvImportDialogProps): JSX.Element {
   const { t } = useTranslation();
   const decks = useRecallStore((s) => s.decks);
   const createCard = useRecallStore((s) => s.createCard);
   const [targetDeck, setTargetDeck] = useState(deckId ?? "");
   const [rows, setRows] = useState<CsvRow[] | null>(null);
   const [pending, setPending] = useState(false);
+  const [skippedRows, setSkippedRows] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Pre-load file from drag-and-drop
@@ -112,6 +115,7 @@ export function CsvImportDialog({ open, onClose, deckId, file }: CsvImportDialog
       }
 
       setRows(csvRows);
+      setSkippedRows(dataRows.length - csvRows.length);
       toast.success(t("csvImport.parsedCards", { count: csvRows.length }));
     };
     reader.readAsText(f);
@@ -124,9 +128,10 @@ export function CsvImportDialog({ open, onClose, deckId, file }: CsvImportDialog
   }
 
   async function handleImport(): Promise<void> {
-    if (!rows || !targetDeck) return;
+    if (!rows || rows.length === 0 || !targetDeck || pending) return;
     setPending(true);
     let imported = 0;
+    let receipt: ImportCompletionReceipt | undefined;
     try {
       for (const row of rows) {
         await createCard({
@@ -146,12 +151,14 @@ export function CsvImportDialog({ open, onClose, deckId, file }: CsvImportDialog
       setRows(null);
       if (fileRef.current) fileRef.current.value = "";
       onClose();
+      receipt = { source: "CSV", added: imported, updated: 0, skipped: skippedRows, deckIds: [targetDeck] };
     } catch (err) {
       const message = err instanceof Error ? err.message : t("csvImport.unknownError");
       toast.error(t("csvImport.importFailed", { message }));
     } finally {
       setPending(false);
     }
+    if (receipt) onComplete?.(receipt);
   }
 
   function handleOpenChange(isOpen: boolean): void {

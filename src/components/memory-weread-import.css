@@ -150,6 +150,13 @@
 .wr-merge-choice p, .wr-merge-choice small, .wr-merge-summary p { display: block; color: var(--muted); font-size: 12px; line-height: 1.7; margin: 8px 0; }
 .wr-merge-choice button { width: 100%; min-height: 44px; }
 .wr-merge-summary { margin: 20px 0; padding: 16px; border-radius: 14px; background: var(--wr-olive-soft); }
+.wr-merge-progress-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--muted); }
+.wr-merge-progress-heading strong { color: var(--wr-olive); font-size: 15px; }
+.wr-merge-progress-count { display: flex; align-items: baseline; gap: 8px; margin: 12px 0; }
+.wr-merge-progress-count > strong { font-family: 'Iowan Old Style', 'Songti SC', serif; font-size: 32px; font-weight: 400; line-height: 1; }
+.wr-merge-progress-count > span { font-size: 12px; color: var(--muted); }
+.wr-merge-progress { height: 6px; border-radius: 3px; overflow: hidden; background: var(--line); }
+.wr-merge-progress > i { display: block; height: 100%; background: var(--wr-olive); }
 .wr-merge-cards { display: grid; gap: 16px; }
 .wr-merge-card { min-width: 0; padding: 16px; overflow-wrap: anywhere; }
 .wr-merge-card > small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 14px; }

@@ -164,19 +164,20 @@ async function boot(page: Page, data = snapshotFixture()): Promise<void> {
   await expect(page.locator('.memory-app')).toBeVisible();
   expect(await page.evaluate(() => ({ width: innerWidth, height: innerHeight, dpr: devicePixelRatio }))).toEqual({ width: 393, height: 852, dpr: 3 });
   await page.getByRole('button', { name: '导入知识', exact: true }).tap();
-  await page.getByRole('button', { name: '导入划线', exact: true }).tap();
+  await page.getByLabel('导入文件').setInputFiles({ name: 'synthetic-weread.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'recall-weread-export-v1', books: booksFixture() })) });
   await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'weread');
-  await page.getByRole('button', { name: '其他导入方式', exact: true }).tap();
+  await expect(page.getByRole('heading', { name: '微信读书 Skill 导出导入', exact: true })).toBeVisible();
 }
 
 async function reopen(page: Page, data?: RecallStateSnapshot): Promise<void> {
   await page.evaluate(value => {
     if (value) localStorage.setItem('recall.snapshot.v1', JSON.stringify(value));
-    location.hash = 'weread';
+    location.hash = 'import';
   }, data);
   await page.reload();
-  await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'weread');
-  await page.getByRole('button', { name: '其他导入方式', exact: true }).tap();
+  await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'import');
+  await page.getByLabel('导入文件').setInputFiles({ name: 'synthetic-weread.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'recall-weread-export-v1', books: booksFixture() })) });
+  await expect(page.getByRole('heading', { name: '微信读书 Skill 导出导入', exact: true })).toBeVisible();
 }
 
 const draftCards = (page: Page) => page.locator('.m-weread-card');
@@ -216,6 +217,7 @@ async function noOverflow(page: Page): Promise<void> {
 
 async function touchTarget(control: Locator): Promise<void> {
   await control.scrollIntoViewIfNeeded();
+  await control.evaluate(element => element.scrollIntoView({ block: 'center', behavior: 'instant' }));
   const target = await control.evaluate(element => {
     const region = element.matches('input[type="checkbox"]') ? element.closest('label') ?? element : element;
     const bounds = region.getBoundingClientRect();
@@ -230,6 +232,8 @@ async function touchTarget(control: Locator): Promise<void> {
 async function confirm(page: Page): Promise<void> {
   await touchTarget(page.getByRole('button', { name: '确认导入', exact: true }));
   await page.getByRole('button', { name: '确认导入', exact: true }).tap();
+  await expect(page.getByRole('region', { name: '导入任务完成' })).toBeVisible();
+  await page.getByRole('button', { name: '查看卡组', exact: true }).tap();
   await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'folders');
 }
 
@@ -305,8 +309,9 @@ test('AI 问题可编辑，确认前不落库，重复导入保留编辑与全�
   await confirm(page);
   const imported = await snapshot(page);
   expect(imported.cards).toHaveLength(2);
-  expect(imported.decks).toHaveLength(1);
-  expect(imported.decks[0]).toMatchObject({ name: '合成阅读书', parentId: null });
+  expect(imported.decks).toHaveLength(2);
+  expect(imported.decks.find(deck => deck.name === '微信读书')).toMatchObject({ parentId: null });
+  expect(imported.decks.find(deck => deck.name === '合成阅读书')).toMatchObject({ parentId: 'weread-library' });
   for (const [index, highlight] of api.books[0].highlights.entries()) {
     const card = imported.cards.find(candidate => candidate.sourceRef?.bookmarkId === highlight.bookmarkId)!;
     expect(card.back).toBe(highlight.markText);
@@ -316,6 +321,7 @@ test('AI 问题可编辑，确认前不落库，重复导入保留编辑与全�
   }
   expect(imported.cards.find(card => card.sourceRef?.bookmarkId === 'synthetic-mark-1')?.front).toBe(editedQuestion);
   const reviewed = reviewedSnapshot(api.books);
+  reviewed.decks = imported.decks;
   reviewed.cards = reviewed.cards.map((card, index) => ({ ...card, front: imported.cards.find(candidate => candidate.id === card.id)!.front, aiSummary: imported.cards[index].aiSummary }));
   await reopen(page, reviewed);
   const preserved = await snapshot(page);
@@ -513,6 +519,8 @@ test('iPhone 15 长问题与原文独立滚动，安全区、触控与纵向阅�
   await page.locator('#memory-drawer').getByRole('button', { name: '今日复习', exact: true }).tap();
   await expect(page.locator('.memory-shell')).not.toHaveClass(/is-open/);
   await page.getByRole('button', { name: '开始复习', exact: true }).tap();
+  await page.getByRole('button', { name: '选择卡组：微信读书', exact: true }).tap();
+  await page.getByRole('dialog').getByRole('button', { name: /确认开始复习|开始学习新卡/ }).tap();
   await page.locator('.memory-app').evaluate(element => {
     (element as HTMLElement).style.setProperty('--safe-inset-top', '59px');
     (element as HTMLElement).style.setProperty('--safe-bottom', '34px');

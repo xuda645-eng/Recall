@@ -13,7 +13,15 @@ import { cn } from "@/lib/utils";
 import { useRecallStore } from "@/stores/recall-store";
 import { toast } from "sonner";
 
-export function ImportHub({ onClose }: { onClose?: () => void } = {}): JSX.Element {
+export interface ImportCompletionReceipt {
+  source: string;
+  added: number;
+  updated: number;
+  skipped: number;
+  deckIds: string[];
+}
+
+export function ImportHub({ onClose, onComplete }: { onClose?: () => void; onComplete?: (receipt: ImportCompletionReceipt) => void } = {}): JSX.Element {
   const { t } = useTranslation();
   const showDashboard = useRecallStore((state) => state.showDashboard);
   const decks = useRecallStore((state) => state.decks);
@@ -62,6 +70,15 @@ export function ImportHub({ onClose }: { onClose?: () => void } = {}): JSX.Eleme
   const [manualImporting, setManualImporting] = useState(false);
   const manualParsed = useMemo(() => parseBulkCards(manualText), [manualText]);
 
+  function handleComplete(receipt: ImportCompletionReceipt): void {
+    setShowCsv(false);
+    setCsvFile(null);
+    setShowMd(false);
+    setMdText("");
+    setShowManual(false);
+    onComplete?.(receipt);
+  }
+
   // Manual entry dialog: Escape key closes
   useEffect(() => {
     if (!showManual) return;
@@ -75,6 +92,7 @@ export function ImportHub({ onClose }: { onClose?: () => void } = {}): JSX.Eleme
   async function handleManualImport(): Promise<void> {
     if (manualParsed.length === 0 || !manualDeckId) return;
     setManualImporting(true);
+    let receipt: ImportCompletionReceipt | undefined;
     try {
       for (const card of manualParsed) {
         await createCard({
@@ -89,12 +107,14 @@ export function ImportHub({ onClose }: { onClose?: () => void } = {}): JSX.Eleme
       toast.success(t("bulkAdd.imported", { count: manualParsed.length }));
       setManualText("");
       setShowManual(false);
+      receipt = { source: t("importHub.manual"), added: manualParsed.length, updated: 0, skipped: 0, deckIds: [manualDeckId] };
     } catch (err) {
       const message = err instanceof Error ? err.message : t("bulkAdd.unknownError");
       toast.error(t("bulkAdd.importFailed", { message }));
     } finally {
       setManualImporting(false);
     }
+    if (receipt && onComplete) handleComplete(receipt);
   }
 
   return (
@@ -145,7 +165,7 @@ export function ImportHub({ onClose }: { onClose?: () => void } = {}): JSX.Eleme
           icon={Package}
           title={t("importHub.anki")}
           desc={t("importHub.ankiDesc")}
-          dialog={<AnkiImportDialog />}
+          dialog={<AnkiImportDialog onComplete={onComplete ? handleComplete : undefined} />}
           emphasized
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -153,14 +173,14 @@ export function ImportHub({ onClose }: { onClose?: () => void } = {}): JSX.Eleme
             icon={FileSpreadsheet}
             title={t("importHub.csv")}
             desc={t("importHub.csvDesc")}
-            dialog={<CsvImportDialog open={showCsv} onClose={() => { setShowCsv(false); setCsvFile(null); }} file={csvFile} />}
+            dialog={<CsvImportDialog open={showCsv} onClose={() => { setShowCsv(false); setCsvFile(null); }} file={csvFile} onComplete={onComplete ? handleComplete : undefined} />}
             onClick={() => setShowCsv(true)}
           />
           <ImportCard
             icon={FileText}
             title={t("importHub.markdown")}
             desc={t("importHub.markdownDesc")}
-            dialog={<MarkdownImportDialog open={showMd} onOpenChange={(v) => { setShowMd(v); if (!v) setMdText(""); }} initialText={mdText} />}
+            dialog={<MarkdownImportDialog open={showMd} onOpenChange={(v) => { setShowMd(v); if (!v) setMdText(""); }} initialText={mdText} onComplete={onComplete ? handleComplete : undefined} />}
           />
           <ImportCard
             icon={Plus}
@@ -176,7 +196,7 @@ export function ImportHub({ onClose }: { onClose?: () => void } = {}): JSX.Eleme
         icon={ArrowRight}
         title={t("importHub.recall")}
         desc={t("importHub.recallDesc")}
-        dialog={<RecallImportDialog />}
+        dialog={<RecallImportDialog onComplete={onComplete ? handleComplete : undefined} />}
       />
 
       <div className="text-center mt-6">

@@ -12,6 +12,8 @@ import type { MemoryWereadImportProps } from './memory-weread-import';
 import { MemoryWereadMergeImport } from './memory-weread-merge-import';
 import { loadMergeSession } from '@/services/weread-merge-storage';
 import { createMergeSession } from '@/lib/weread-merge-session';
+import { MemoryImportCompletion } from '@/components/memory-import-completion';
+import { memoryImportLocations } from '@/lib/memory-folders';
 
 function Cover({ book }: { book: { title: string; cover?: string | null } }): JSX.Element {
   const [failed, setFailed] = useState(false);
@@ -34,7 +36,7 @@ function ReadingCard({ book, selected, disabled, imported, onSelect, onVisible }
     <p className="wr-book-foot">{!book.highlightCount ? '暂无可导入划线' : book.lastNoteAt ? `最近笔记 ${book.lastNoteAt}` : '笔记时间未提供'}{imported && <span> · 已导入 Recall</span>}</p></div>
   </button>;
 }
-export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal, onBackChange }: MemoryWereadImportProps & { onLocal: () => void }): JSX.Element {
+export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onBackChange }: MemoryWereadImportProps): JSX.Element {
   const [stage, setStage] = useState<'connect' | 'books' | 'confirm' | 'job'>('connect');
   const [books, setBooks] = useState<WereadOnlineBook[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -233,6 +235,7 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal,
   }
   const mergeSelected = !renewed && generationMode === 'merge';
   if (merging) return <MemoryWereadMergeImport drafts={drafts} onClose={() => setMerging(false)} onComplete={onComplete} onImported={() => { setSelected(new Set()); setStage(books.length ? 'books' : 'connect'); }} onBusy={report}/>;
+  if (stage === 'job' && done && job) return <section className="wr-workspace" aria-label="微信读书导入"><MemoryImportCompletion source="微信读书" added={job.receipt?.added ?? 0} updated={job.receipt?.updated ?? 0} skipped={job.receipt?.skipped ?? 0} processed={{ count: job.drafts.filter(draft => draft.include).reduce((count, draft) => count + (draft.members?.length || 1), 0), label: '条原划线' }} locations={memoryImportLocations(useRecallStore.getState().decks, job.receipt?.deckIds || [])} onView={() => onComplete(job.receipt?.deckIds || [])} onContinue={() => void clearJob()} continueLabel="继续选择其他书"/></section>;
   return <section className="wr-workspace" aria-label="微信读书导入" aria-busy={busy}>
     {error && <p role="alert" className="m-error">{error}</p>}
     {confirmationError && <p role="alert" className="m-error">{confirmationError}</p>}
@@ -240,7 +243,7 @@ export function MemoryWereadOnlineImport({ onClose, onComplete, onBusy, onLocal,
     {initializing ? <p role="status">正在检查本机任务草稿…</p> : stage === 'connect' ? <div className="wr-landing">
       <span className="wr-eyebrow">YOUR READING, RECALLED</span><h1>读过的，<br/>也能记得住。</h1><p>把微信读书里的划线，<br/>变成下一次温习的问题。</p>
       <div className="wr-art" aria-hidden="true"><div><span>阅读的回声</span></div><div><span>思考的尺度</span></div><div><Check size={30}/></div></div>
-      <button className="m-primary" disabled={busy || draftBlocked} onClick={() => void connect()}>{busy ? <LoaderCircle className="wr-spin" size={18}/> : null}{busy ? '正在连接' : '连接微信读书'}<ArrowRight size={17}/></button><small>只导入我的划线，不包含其他人的热门划线。</small><button className="m-text" disabled={busy} onClick={onLocal}>其他导入方式</button>
+      <button className="m-primary" disabled={busy || draftBlocked} onClick={() => void connect()}>{busy ? <LoaderCircle className="wr-spin" size={18}/> : null}{busy ? '正在连接' : '连接微信读书'}<ArrowRight size={17}/></button><small>只导入我的划线，不包含其他人的热门划线。</small>
     </div> : stage === 'books' ? <>
       <header className="wr-heading"><span className="wr-eyebrow">YOUR NOTEBOOKS</span><h1>选择想记住的书</h1><p>我的笔记本 · 已载入 {books.length} 本{cursor !== null ? '，还有更多' : ''}</p></header>
       <div className="wr-search"><label><Search size={18}/><input type="search" aria-label="搜索书名或作者" placeholder="搜索书名或作者" value={query} onChange={event => setQuery(event.target.value)}/></label><button className="m-secondary" aria-label="更多筛选" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}><SlidersHorizontal size={18}/></button></div>

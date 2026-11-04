@@ -15,12 +15,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { openRecallPackage, restorePackageImages } from "@/services/import-export";
 import { useRecallStore } from "@/stores/recall-store";
+import type { ImportCompletionReceipt } from "@/components/import-hub";
 
 interface RecallImportDialogProps {
   deckId?: string;
+  onComplete?: (receipt: ImportCompletionReceipt) => void;
 }
 
-export function RecallImportDialog({ deckId }: RecallImportDialogProps): JSX.Element {
+export function RecallImportDialog({ deckId, onComplete }: RecallImportDialogProps): JSX.Element {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [pkgData, setPkgData] = useState<{
@@ -118,6 +120,9 @@ export function RecallImportDialog({ deckId }: RecallImportDialogProps): JSX.Ele
     toast.success(t("recallImport.imported", { imported, total: pkgData.cards.length }));
     setOpen(false);
     setPkgData(null);
+    if (imported === pkgData.cards.length && imported > 0) {
+      onComplete?.({ source: "Recall", added: imported, updated: 0, skipped: 0, deckIds: [targetId] });
+    }
   }
 
   function handleClose(): void {

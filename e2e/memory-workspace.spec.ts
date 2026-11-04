@@ -1560,17 +1560,18 @@ test('Markdown预览、增量更新与归档状态和排期保留', async ({ pag
 });
 
 test('微信读书按书导入、章节元数据、原文不改写及重复导入保留状态', async ({ page }) => {
-  await seedPage(page, fixture(), 'weread');
-  await page.getByRole('button', { name: '其他导入方式', exact: true }).click();
+  await seedPage(page, fixture(), 'import');
   const markText = '  原文第一行。\n\n原文第二行。  ';
   const file = { name: 'weread.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'recall-weread-export-v1', books: [{ bookId: 'book-test', title: '测试书', highlights: [{ bookmarkId: 'highlight-1', markText, chapterUid: 'chapter-1', chapterTitle: '第一章', question: '这个结论的条件是什么？', recallKind: 'qa' }] }] })) };
   async function load() {
-    await page.locator('input[type="file"]').setInputFiles(file);
+    await page.getByLabel('导入文件').setInputFiles(file);
     await page.getByRole('checkbox').check();
     await page.getByRole('button', { name: '预览并编辑回忆卡', exact: true }).click();
     await page.getByRole('button', { name: '检查导入变化', exact: true }).click();
     await saveShot(page, 'weread-preview');
     await page.getByRole('button', { name: '确认导入', exact: true }).click();
+    await expect(page.getByRole('region', { name: '导入任务完成' })).toBeVisible();
+    await page.getByRole('button', { name: '查看卡组', exact: true }).click();
     await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'folders');
   }
   await load();
@@ -1579,8 +1580,7 @@ test('微信读书按书导入、章节元数据、原文不改写及重复导�
   expect(imported.back).toBe(markText); expect(imported.chapter).toBe('第一章');
   expect(stored.decks.filter((deck: { name: string }) => deck.name === '第一章')).toHaveLength(0);
   imported.archivedAt = at; imported.reps = 8;
-  await seedPage(page, stored, 'weread');
-  await page.getByRole('button', { name: '其他导入方式', exact: true }).click();
+  await seedPage(page, stored, 'import');
   await load();
   const updated = (await snapshot(page)).cards.find((card: { id: string }) => card.id === imported.id);
   expect(updated.back).toBe(markText); expect(updated.archivedAt).toBe(at); expect(updated.reps).toBe(8);
@@ -1588,9 +1588,8 @@ test('微信读书按书导入、章节元数据、原文不改写及重复导�
 });
 
 test('带凭证的微信读书文件被拒绝，不落库', async ({ page }) => {
-  await seedPage(page, fixture(), 'weread');
-  await page.getByRole('button', { name: '其他导入方式', exact: true }).click();
-  await page.locator('input[type="file"]').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'recall-weread-export-v1', apiKey: 'test-only-not-a-real-key', books: [] })) });
+  await seedPage(page, fixture(), 'import');
+  await page.getByLabel('导入文件').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'recall-weread-export-v1', apiKey: 'test-only-not-a-real-key', books: [] })) });
   await expect(page.getByRole('alert')).toBeVisible();
   expect((await snapshot(page)).cards).toHaveLength(3);
 });
@@ -1675,4 +1674,124 @@ test('PWA部署路径manifest、Service Worker及断网重开和复习持久化'
   expect((await snapshot(page)).reviewLogs).toHaveLength(1);
   await noOverflow(page);
   } finally { await context.setOffline(false); await isolated?.stop(); }
+});
+
+test('本轮批注：导入目录按层级收起展开并保存到所选子目录，完成页统一', async ({ page }) => {
+  await seedPage(page);
+  await navigate(page, '导入');
+  const markdown = '# 合成知识\n\n<!-- recall:card {"id":"hierarchical-import"} -->\n问题：层级导入的合成问题？\n\n合成答案。\n<!-- recall:end -->\n';
+  await page.getByLabel('导入文件').setInputFiles({ name: 'synthetic.md', mimeType: 'text/markdown', buffer: Buffer.from(markdown) });
+  await page.getByRole('button', { name: '导入到 根目录' }).click();
+  await expect(page.getByRole('button', { name: '选择目录：阅读练习', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '展开回忆方法的子目录', exact: true }).click();
+  await expect(page.getByRole('button', { name: '选择目录：阅读练习', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '收起回忆方法的子目录', exact: true }).click();
+  await expect(page.getByRole('button', { name: '选择目录：阅读练习', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '展开回忆方法的子目录', exact: true }).click();
+  await page.getByRole('button', { name: '选择目录：阅读练习', exact: true }).click();
+  await page.getByRole('button', { name: '确认导入', exact: true }).click();
+  const complete = page.getByRole('region', { name: '导入任务完成' });
+  await expect(complete.getByRole('heading', { name: '导入完成' })).toBeFocused();
+  await expect(complete).toContainText('回忆方法 / 阅读练习 / 合成知识');
+  await expect(page.getByRole('button', { name: '确认导入', exact: true })).toHaveCount(0);
+  const imported = await snapshot(page);
+  const destination = imported.decks.find((deck: { name: string }) => deck.name === '合成知识');
+  expect(destination.parentId).toBe('leaf');
+  expect(imported.cards.find((card: { id: string }) => card.id === 'hierarchical-import').deckId).toBe(destination.id);
+  await noOverflow(page);
+  await saveShot(page, 'shared-markdown-completion');
+  await complete.getByRole('button', { name: '查看卡组', exact: true }).click();
+  await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'folders');
+  await expect(page.locator('.m-card-open').filter({ hasText: '层级导入的合成问题' })).toBeVisible();
+});
+
+test('本轮批注：带图文件采用同一完成页并保留图片和带编号下载', async ({ page }) => {
+  await seedPage(page);
+  await navigate(page, '导入');
+  const image = await readFile(new URL('./fixtures/source-screenshot.png', import.meta.url));
+  const imageId = createHash('sha256').update(image).digest('hex') + '.png';
+  const markdown = `# 合成带图知识\n\n<!-- recall:card {"id":"media-completion"} -->\n问题：带图文件的合成问题？\n\n合成答案。\n\n![合成来源图片](recall://${imageId})\n<!-- recall:end -->\n`;
+  const packed = { format: 'recall-media', version: 1, markdown, images: [{ id: imageId, mime: 'image/png', base64: image.toString('base64') }] };
+  await page.getByLabel('导入文件').setInputFiles({ name: 'synthetic.recall-media.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(packed)) });
+  await page.getByRole('button', { name: '确认导入', exact: true }).click();
+  const complete = page.getByRole('region', { name: '导入任务完成' });
+  await expect(complete.getByRole('heading', { name: '导入完成' })).toBeVisible();
+  await expect(complete).toContainText('带图文件');
+  await expect(complete.getByRole('button', { name: '保存带编号的 Markdown' })).toBeVisible();
+  expect((await snapshot(page)).cards.find((card: { id: string }) => card.id === 'media-completion').back).toContain(`recall://${imageId}`);
+  await complete.getByRole('button', { name: '查看卡组', exact: true }).click();
+  await page.locator('.m-card-open').filter({ hasText: '带图文件的合成问题' }).click();
+  await page.getByRole('button', { name: '显示答案', exact: true }).click();
+  const importedImage = page.locator('.m-reading[data-active="true"] img');
+  await expect(importedImage).toHaveCount(1);
+  await expect.poll(() => importedImage.evaluate((element: HTMLImageElement) => element.complete && element.naturalWidth > 0)).toBe(true);
+  await noOverflow(page);
+});
+
+test('本轮批注：统计范围共用层级选择器且选择父级保留子树统计', async ({ page }) => {
+  await seedPage(page);
+  await navigate(page, '统计');
+  await page.getByRole('button', { name: '统计范围 全部卡片' }).click();
+  await page.getByRole('button', { name: '展开回忆方法的子目录' }).click();
+  await page.getByRole('button', { name: '选择目录：阅读练习', exact: true }).click();
+  await expect(page.locator('.m-stats-summary > div').first()).toContainText('2');
+  const trigger = page.getByRole('button', { name: '统计范围 回忆方法 / 阅读练习' });
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await page.getByRole('button', { name: '选择目录：回忆方法', exact: true }).click();
+  await expect(page.locator('.m-stats-summary > div').first()).toContainText('2');
+  await noOverflow(page);
+});
+
+test('本轮批注：微信读书历史书籍安全归组，原文进度归档状态与记录保留', async ({ page }) => {
+  const data = fixture();
+  data.decks.push({ ...data.decks[0], id: 'weread-book:synthetic-history', name: '合成历史书籍', parentId: null, description: 'weread-book:synthetic-history' });
+  const historical = { ...data.cards[2], id: 'synthetic-history-card', deckId: 'weread-book:synthetic-history', bookTitle: '合成历史书籍', sourceRef: { provider: 'weread' as const, bookId: 'synthetic-history', bookmarkId: 'old-one' }, reps: 17, stability: 30 };
+  data.cards.push(historical);
+  await seedPage(page, data, 'folders');
+  await expect.poll(async () => (await snapshot(page)).decks.find((deck: { id: string }) => deck.id === 'weread-book:synthetic-history')?.parentId).toBe('weread-library');
+  const result = await snapshot(page);
+  expect(result.cards).toEqual(data.cards);
+  expect(result.reviewLogs).toEqual(data.reviewLogs);
+  expect(result.studySessions).toEqual(data.studySessions);
+  expect(result.decks.find((deck: { id: string }) => deck.id === 'leaf')).toEqual(data.decks[1]);
+  const backup = await page.evaluate(() => JSON.parse(localStorage.getItem('recall.snapshot.pre-weread-folders.v1') || 'null'));
+  expect(backup.decks).toEqual(data.decks);
+  expect(backup.cards).toEqual(data.cards);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForAppReady(page);
+  expect((await snapshot(page)).cards).toEqual(data.cards);
+});
+
+test('本轮批注：同步状态仅在抽屉显示，保留管理同步时间并去掉添加卡片入口', async ({ page }) => {
+  await seedPage(page);
+  await expect(page.locator('.m-main .m-cloud')).toHaveCount(0);
+  await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
+  const drawer = page.locator('#memory-drawer');
+  await expect(drawer.getByRole('region', { name: '云同步状态' })).toBeVisible();
+  await expect(drawer).toContainText('最近同步：');
+  await expect(drawer.getByRole('button', { name: '立即同步' })).toBeDisabled();
+  await expect(drawer.getByRole('button', { name: '添加卡片', exact: true })).toHaveCount(0);
+  await drawer.getByRole('button', { name: /管理云同步：/ }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  const close = page.getByRole('button', { name: '关闭面板', exact: true });
+  await expect(close).toBeFocused();
+  expect(await close.evaluate(element => ({ radius: getComputedStyle(element).borderRadius, outline: getComputedStyle(element).outlineStyle, background: getComputedStyle(element).backgroundColor }))).toEqual({ radius: '0px', outline: 'none', background: 'rgba(0, 0, 0, 0)' });
+  const box = (await close.boundingBox())!;
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  expect(box.width).toBeGreaterThanOrEqual(44);
+  await close.click();
+  await expect(page.getByRole('button', { name: '打开项目菜单', exact: true })).toBeFocused();
+  await navigate(page, '设置与数据');
+  await expect(page.locator('.m-main .m-cloud')).toHaveCount(0);
+  await noOverflow(page);
+});
+
+test('本轮批注：所有卡组管理去掉单组备份，全库备份保留在设置', async ({ page }) => {
+  await seedPage(page, fixture(), 'folders');
+  await page.getByRole('button', { name: '管理回忆方法', exact: true }).click();
+  await expect(page.getByRole('button', { name: '备份此卡组（含来源图片）', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '关闭面板', exact: true }).click();
+  await navigate(page, '设置与数据');
+  await expect(page.getByRole('button', { name: '备份', exact: true })).toBeVisible();
 });

@@ -6,6 +6,9 @@ export function folderPath(decks: Deck[], id: string | null): Deck[] {
   while (id) { if (seen.has(id)) throw new Error('卡组不能循环嵌套'); seen.add(id); const d = decks.find(x => x.id === id); if (!d) throw new Error('上级卡组不存在'); result.unshift(d); id = d.parentId ?? null; }
   return result;
 }
+export function memoryImportLocations(decks: Deck[], ids: string[]): string[] {
+  return ids.filter(id => decks.some(deck => deck.id === id)).map(id => folderPath(decks, id).map(deck => deck.name).join(' / '));
+}
 export function subtreeIds(decks: Deck[], root: string | null): Set<string> {
   const found = new Set<string>(), queue = root ? [root] : decks.filter(d => !d.parentId).map(d => d.id);
   while (queue.length) { const id = queue.shift()!; if (found.has(id)) continue; found.add(id); queue.push(...decks.filter(d => d.parentId === id).map(d => d.id)); }

@@ -3,6 +3,7 @@ import { newMemoryCard, validateTree } from '@/lib/memory-folders';
 import { snapshotFingerprint } from '@/lib/memory-markdown';
 import { normalizeName } from '@/lib/utils';
 import { validateMergedWereadDraft } from './memory-weread-merge';
+import { organizeWereadFolders, wereadBookFolder } from './memory-weread-folders';
 
 export const WEREAD_MAX_BYTES = 5 * 1024 * 1024;
 export type WereadKind = 'qa' | 'task' | 'excerpt';
@@ -249,7 +250,7 @@ function bookDeck(snapshot: RecallStateSnapshot, book: WereadDraft['book']): Dec
   const id = `weread-book:${encodeURIComponent(book.bookId)}`, deck = snapshot.decks.find(deck => deck.id === id);
   if (deck) {
     const owned = deck.description === id || snapshot.cards.some(card => card.deckId === id && card.sourceRef?.provider === 'weread' && card.sourceRef.bookId === book.bookId);
-    if (deck.parentId || !owned) throw new Error('书籍卡组编号与已有卡组冲突');
+    if (!owned) throw new Error('书籍卡组编号与已有卡组冲突');
     return deck;
   }
   const roots = snapshot.decks.filter(deck => !deck.parentId && snapshot.cards.some(card => card.deckId === deck.id && card.sourceRef?.provider === 'weread' && card.sourceRef.bookId === book.bookId)
@@ -300,23 +301,15 @@ export function planWereadImport(snapshot: RecallStateSnapshot, drafts: WereadDr
   });
   return { fingerprint: snapshotFingerprint(snapshot), rows };
 }
-function uniqueBookName(decks: Deck[], title: string): string {
-  const used = new Set(decks.filter(deck => !deck.parentId).map(deck => normalizeName(deck.name).toLowerCase()));
-  const base = normalizeName(title);
-  if (!used.has(base.toLowerCase())) return base;
-  for (let index = 1; ; index++) {
-    const suffix = ` (微信读书 ${index})`, name = base.slice(0, 80 - suffix.length).trimEnd() + suffix;
-    if (!used.has(name.toLowerCase())) return name;
-  }
-}
 export function applyWereadImport(snapshot: RecallStateSnapshot, plan: WereadImportPlan, updates: Set<string>): WereadImportResult {
   if (snapshotFingerprint(snapshot) !== plan.fingerprint) throw new Error('数据已变化，请重新检查导入变化');
   const verified = planWereadImport(snapshot, plan.rows.map(row => row.draft));
   if (JSON.stringify(verified.rows) !== JSON.stringify(plan.rows)) throw new Error('导入预览已变化，请重新检查');
   if ([...updates].some(id => !plan.rows.some(row => row.draft.id === id && row.status === 'change'))) throw new Error('更新选择与预览不一致');
-  const next = { ...snapshot, decks: [...snapshot.decks], cards: [...snapshot.cards] }, deckIds = new Set<string>();
-  let added = 0, updated = 0, skipped = 0;
   const at = new Date().toISOString();
+  const organized = organizeWereadFolders(snapshot, at, verified.rows.map(row => row.draft.book));
+  const next = { ...organized, decks: [...organized.decks], cards: [...organized.cards] }, deckIds = new Set<string>();
+  let added = 0, updated = 0, skipped = 0;
   for (const row of verified.rows) {
     const old = row.existingId ? next.cards.find(card => card.id === row.existingId) : undefined;
     if (old) {
@@ -327,12 +320,8 @@ export function applyWereadImport(snapshot: RecallStateSnapshot, plan: WereadImp
       } else skipped++;
       continue;
     }
-    let deck = bookDeck(next, row.draft.book);
-    if (!deck) {
-      const id = `weread-book:${encodeURIComponent(row.draft.book.bookId)}`;
-      deck = { id, name: uniqueBookName(next.decks, row.content.bookTitle!), description: id, parentId: null, color: 'slate', createdAt: at, updatedAt: at, importedAt: at };
-      next.decks.push(deck);
-    }
+    const deck = wereadBookFolder(next, row.draft.book.bookId);
+    if (!deck) throw new Error('微信读书目标卡组不存在，未保存导入');
     next.cards.push(newMemoryCard({ ...row.content, id: row.draft.id, deckId: deck.id, lastImportedAt: at }, at));
     deckIds.add(deck.id);
     added++;

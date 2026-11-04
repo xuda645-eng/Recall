@@ -166,9 +166,7 @@ test('确认页仅顶栏返回保留选书，退出和再次进入不残留返�
   await expect(page.getByRole('heading', { name: '把知识，收进卡片。' })).toBeVisible();
   await page.getByRole('button', { name: '导入划线', exact: true }).click();
   await expect(page.getByRole('button', { name: '连接微信读书', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '其他导入方式', exact: true }).click();
-  await expect(page.locator('input[type="file"][accept=".json,application/json"]')).toBeVisible();
-  await back.click();
+  await expect(page.getByRole('button', { name: '其他导入方式', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '连接微信读书', exact: true })).toBeVisible();
   expect(await snapshot(page)).toEqual(before);
   expect(calls).toEqual([]);
@@ -206,7 +204,7 @@ test('展开划线支持全选全不选和半选，数量同步且仅导入确�
   expect(await snapshot(page)).toEqual(before);
   expect(calls).toEqual([]);
   await generate.click();
-  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
   expect(calls).toEqual([original[0]]);
   expect((await snapshot(page)).cards.map((card: { back: string }) => card.back)).toEqual([original[0]]);
 });
@@ -216,19 +214,20 @@ test('确认后真实流程生成并自动导入，原文保持，重复导入�
   expect((await snapshot(page)).cards).toHaveLength(0);
   expect(calls).toEqual([]);
   await page.getByRole('button', { name: '生成并自动导入' }).click();
-  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
   const data = await snapshot(page);
   expect(data.cards).toHaveLength(2);
   expect(data.cards.map((card: { back: string }) => card.back)).toEqual(original);
   expect(data.cards.map((card: { front: string }) => card.front)).toEqual(questions);
-  expect(data.decks).toHaveLength(1);
+  expect(data.decks).toHaveLength(2);
+  expect(data.decks.find((deck: { name: string }) => deck.name === '阅读的回声').parentId).toBe('weread-library');
   expect(calls).toEqual(original);
   await page.getByRole('button', { name: '继续选择其他书' }).click();
   await page.getByRole('button', { name: '阅读的回声，2 条我的划线' }).click();
   await page.getByRole('button', { name: '下一步 · AI 问题与导入' }).click();
   await expect(page.locator('.wr-confirm-count')).toContainText('0');
   await page.getByRole('button', { name: '生成并自动导入' }).click();
-  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
   expect(calls).toEqual(original);
   expect((await snapshot(page)).cards).toHaveLength(2);
 });
@@ -247,7 +246,7 @@ test('失败全批不导入，刷新保留已成功问题且不续跑，重试�
   await page.waitForTimeout(500);
   expect(calls).toHaveLength(2);
   await page.getByRole('button', { name: '重试并继续' }).click();
-  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
   expect(calls.filter(value => value === original[0])).toHaveLength(1);
   expect(calls.filter(value => value === original[1])).toHaveLength(2);
   expect((await snapshot(page)).cards.map((card: { back: string }) => card.back)).toEqual(original);
@@ -279,7 +278,7 @@ test('四并发生成乱序完成，保存不丢失且自动导入保持原文�
     const partial = await savedJob(page);
     expect(partial.generated[0]).toBe(partial.drafts[3].id);
     for (const index of [2, 0, 1]) releases[index]();
-    await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
     const job = await savedJob(page);
     expect(job.generated).toHaveLength(9);
     expect(new Set(job.generated).size).toBe(9);
@@ -313,7 +312,7 @@ test('并发遇到429停止补位，保存其他在途成功问题且重试只�
   await page.reload();
   await expect(page.getByRole('heading', { name: '进度已为你保留' })).toBeVisible();
   await page.getByRole('button', { name: '重试并继续' }).click();
-  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
   expect(calls).toHaveLength(10);
   expect(calls.filter(text => text === original[0])).toHaveLength(2);
   for (const draft of job.drafts.filter(item => job.generated.includes(item.id))) expect(calls.filter(text => text === draft.highlight.markText)).toHaveLength(1);
@@ -329,7 +328,7 @@ test('单次101条默认全选并全部生成导入，重复导入不重做问�
   expect(calls).toEqual([]);
   expect((await snapshot(page)).cards).toHaveLength(0);
   await page.getByRole('button', { name: '生成并自动导入' }).click();
-  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible({ timeout: 30000 });
   const data = await snapshot(page);
   expect(data.cards).toHaveLength(101);
   expect(data.cards.map((card: { back: string }) => card.back)).toEqual(calls);
@@ -340,7 +339,7 @@ test('单次101条默认全选并全部生成导入，重复导入不重做问�
   await page.getByRole('button', { name: '下一步 · AI 问题与导入' }).click();
   await expect(page.locator('.wr-confirm-count')).toContainText('0');
   await page.getByRole('button', { name: '生成并自动导入' }).click();
-  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
   expect(calls).toHaveLength(101);
   expect((await snapshot(page)).cards).toHaveLength(101);
 });
@@ -371,7 +370,7 @@ test('超过20个成功问题的任务失败后刷新可恢复，重试只处理
   await page.waitForTimeout(300);
   expect(calls).toHaveLength(failedCalls);
   await page.getByRole('button', { name: '重试并继续' }).click();
-  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
   expect(calls).toHaveLength(42);
   for (const text of completed) expect(calls.filter(value => value === text)).toHaveLength(1);
   expect((await snapshot(page)).cards.map((card: { back: string }) => card.back)).toEqual([...new Set(calls)]);
@@ -380,7 +379,7 @@ test('大批量任务超过20条后可以主动暂停，刷新不续跑且已完
   const calls = await setup(page, 41, false, 300, 50);
   await choose(page);
   await page.getByRole('button', { name: '生成并自动导入' }).click();
-  await expect.poll(async () => Number.parseInt(await page.locator('.wr-job-summary strong').innerText(), 10)).toBeGreaterThan(20);
+  await expect.poll(async () => Number.parseInt(await page.locator('.wr-job-summary strong').innerText(), 10), { intervals: [100] }).toBeGreaterThan(20);
   await page.getByRole('button', { name: '暂停，保留进度' }).click();
   await expect(page.getByRole('heading', { name: '进度已为你保留' })).toBeVisible();
   const count = Number.parseInt(await page.locator('.wr-job-summary strong').innerText(), 10);
@@ -396,7 +395,7 @@ test('大批量任务超过20条后可以主动暂停，刷新不续跑且已完
   await page.waitForTimeout(300);
   expect(calls).toHaveLength(pausedCalls);
   await page.getByRole('button', { name: '重试并继续' }).click();
-  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
   for (const text of completed) expect(calls.filter(value => value === text)).toHaveLength(1);
   expect(new Set(calls).size).toBe(41);
   expect((await snapshot(page)).cards.map((card: { back: string }) => card.back)).toEqual([...new Set(calls)]);
@@ -464,7 +463,7 @@ test('草稿写入失败不调用模型，恢复存储后才继续', async ({ pa
   expect(calls).toEqual([]); expect((await snapshot(page)).cards).toHaveLength(0);
   await page.evaluate(() => (window as unknown as { restoreDraftWrites: () => void }).restoreDraftWrites());
   await page.getByRole('button', { name: '重试并继续' }).click();
-  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
   expect(calls).toEqual(original);
 });
 test('生成后的草稿写入失败保留内存问题，重试不重做已成功问题', async ({ page }) => {
@@ -483,7 +482,7 @@ test('生成后的草稿写入失败保留内存问题，重试不重做已成�
   expect(calls).toEqual(original); expect((await snapshot(page)).cards).toHaveLength(0);
   await page.evaluate(() => (window as unknown as { restoreDraftWrites: () => void }).restoreDraftWrites());
   await page.getByRole('button', { name: '重试并继续' }).click();
-  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
   expect(calls).toEqual(original);
 });
 test('卡片保存失败只重试导入，成功的问题和原文不丢失', async ({ page }) => {
@@ -502,7 +501,7 @@ test('卡片保存失败只重试导入，成功的问题和原文不丢失', as
   expect(calls).toEqual(original); expect((await snapshot(page)).cards).toHaveLength(0);
   await page.evaluate(() => (window as unknown as { restoreCardWrites: () => void }).restoreCardWrites());
   await page.getByRole('button', { name: '重试导入', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
   expect(calls).toEqual(original); expect((await snapshot(page)).cards.map((card: { back: string }) => card.back)).toEqual(original);
 });
 test('另一个页面持有任务锁时不保存、不发原文；释放后可继续', async ({ page }) => {
@@ -520,7 +519,7 @@ test('另一个页面持有任务锁时不保存、不发原文；释放后可�
   expect(calls).toEqual([]);
   await page.evaluate(() => (window as unknown as { releaseJobLock: () => void }).releaseJobLock());
   await page.getByRole('button', { name: '重试并继续' }).click();
-  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
   expect(calls).toEqual(original);
 });
 test('卡片已写入但完成记录失败时明确告知，重试跳过已写入卡片', async ({ page }) => {
@@ -540,7 +539,7 @@ test('卡片已写入但完成记录失败时明确告知，重试跳过已写�
   expect((await snapshot(page)).cards).toHaveLength(2);
   await page.evaluate(() => (window as unknown as { restoreDraftWrites: () => void }).restoreDraftWrites());
   await page.getByRole('button', { name: '重试导入', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
   expect(calls).toEqual(original); expect((await snapshot(page)).cards).toHaveLength(2);
 });
 test('内容冲突暂停且刷新后可重新确认，保留已经生成的问题和复习进度', async ({ page }) => {
@@ -577,7 +576,7 @@ test('内容冲突暂停且刷新后可重新确认，保留已经生成的问�
   await expect(page.locator('.wr-confirm-count')).toContainText('0');
   await page.locator('.wr-changes input').check();
   await page.getByRole('button', { name: '生成并自动导入' }).click();
-  await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
   expect(calls).toEqual(original);
   const data = await snapshot(page);
   expect(data.cards).toHaveLength(2); expect(data.cards[0].reps).toBe(7); expect(data.cards[0].front).toBe(questions[0]);

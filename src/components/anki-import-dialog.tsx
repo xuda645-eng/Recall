@@ -2,6 +2,7 @@ import { toast } from "sonner";
 import { parseAnkiApkg } from "@/services/anki-import";
 import type { AnkiCard } from "@/services/anki-import";
 import { useRecallStore } from "@/stores/recall-store";
+import type { ImportCompletionReceipt } from "@/components/import-hub";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -26,12 +27,13 @@ interface ImportReport {
   tags: string[];
   warnings: string[];
   decksCreated: string[];
+  deckIds: string[];
   mediaImported: number;
   schedulingPreserved: number;
   fsrsStateImported: number;
 }
 
-export function AnkiImportDialog(): JSX.Element {
+export function AnkiImportDialog({ onComplete }: { onComplete?: (receipt: ImportCompletionReceipt) => void } = {}): JSX.Element {
   const { t } = useTranslation();
   const [openDialog, setOpenDialog] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -103,6 +105,7 @@ export function AnkiImportDialog(): JSX.Element {
       let fsrsStateImported = 0;
       const tagSet = new Set<string>();
       const decksCreated: string[] = [];
+      const deckIds: string[] = [];
 
       // Create decks and import cards per deck
       for (const [ankiDeckName, deckCards] of cardsByDeck) {
@@ -116,6 +119,7 @@ export function AnkiImportDialog(): JSX.Element {
           color: "blue",
         });
         decksCreated.push(resolvedName);
+        deckIds.push(newDeckId);
 
         for (const ankiCard of deckCards) {
           try {
@@ -174,6 +178,7 @@ export function AnkiImportDialog(): JSX.Element {
         tags: [...tagSet].sort(),
         warnings: ankiReport.warnings,
         decksCreated,
+        deckIds,
         mediaImported: ankiReport.media_imported,
         schedulingPreserved,
         fsrsStateImported,
@@ -197,6 +202,13 @@ export function AnkiImportDialog(): JSX.Element {
   function handleClose(): void {
     setOpenDialog(false);
     resetState();
+  }
+
+  function handleDone(): void {
+    handleClose();
+    if (report && report.failed === 0 && report.imported > 0) {
+      onComplete?.({ source: "Anki", added: report.imported, updated: 0, skipped: Math.max(0, report.totalFound - report.imported), deckIds: report.deckIds });
+    }
   }
 
   return (
@@ -394,7 +406,7 @@ export function AnkiImportDialog(): JSX.Element {
           </div>
 
           <DialogFooter>
-            <button className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-lg hover:shadow-xl active:scale-95 transition-all w-full" onClick={handleClose}>
+            <button className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-lg hover:shadow-xl active:scale-95 transition-all w-full" onClick={handleDone}>
               {t("ankiImport.done")}
             </button>
           </DialogFooter>

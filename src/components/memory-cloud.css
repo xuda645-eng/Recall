@@ -33,6 +33,17 @@
 .m-cloud .m-cloud-note { color: var(--muted, #737368); font-size: 13px; line-height: 1.8; }
 .m-cloud-counts { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; }
 .m-cloud .m-error { margin: 0; }
+.m-drawer-sync { display: grid; gap: 4px; padding: 0 0 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line); min-width: 0; }
+.m-drawer-sync-controls { display: flex; gap: 2px; align-items: center; min-width: 0; }
+.memory-drawer .m-drawer-sync-status { flex: 1; min-width: 0; padding: 8px 0; gap: 8px; font-size: 12px; font-weight: 400; border: 0; background: transparent; }
+.m-drawer-sync-status > svg { flex-shrink: 0; }
+.m-drawer-sync-status > span { overflow-wrap: anywhere; }
+.memory-drawer .m-drawer-sync-action { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; padding: 0; color: var(--muted); }
+.m-drawer-sync-action.is-syncing svg { animation: drawer-sync-spin 1s linear infinite; }
+.m-drawer-footer .m-drawer-sync small { padding: 0; font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+.m-drawer-sync-error { color: #963e49; font-size: 12px; line-height: 1.6; }
+@keyframes drawer-sync-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .m-drawer-sync-action.is-syncing svg { animation: none; } }
 
 .m-cloud-warning {
   border-left: 3px solid var(--muted, #737368);

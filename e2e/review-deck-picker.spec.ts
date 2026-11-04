@@ -166,7 +166,8 @@ test('批注修订：卡组选择行紧凑等高，数字标签横排，底部�
   const confirm = page.getByRole('button', { name: '确认开始复习（1）', exact: true });
   await expect(confirm).toHaveCSS('justify-content', 'center');
   const close = page.getByRole('button', { name: '关闭面板', exact: true });
-  await expect(close).toHaveCSS('border-radius', '50%');
+  await expect(close).toHaveCSS('border-radius', '0px');
+  await expect(close).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const closeBox = (await close.boundingBox())!;
   expect(closeBox.width).toBeGreaterThanOrEqual(44);
   expect(closeBox.height).toBeGreaterThanOrEqual(44);

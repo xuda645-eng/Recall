@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Check, Pause } from 'lucide-react';
+import { ArrowRight, Pause } from 'lucide-react';
 import { useRecallStore } from '@/stores/recall-store';
 import { applyWereadImport, planWereadImport, type WereadDraft } from '@/lib/memory-weread';
 import { buildMergedWereadDraft } from '@/lib/memory-weread-merge';
@@ -9,6 +9,8 @@ import { checkWereadBudget, withWereadJobLock } from '@/services/weread-job-stor
 import { generateWereadMerge } from '@/services/weread-online';
 import { commitMemory } from '@/services/memory-actions';
 import { MERGE_MAX_MEMBERS } from '../../shared/weread-merge';
+import { MemoryImportCompletion } from '@/components/memory-import-completion';
+import { memoryImportLocations } from '@/lib/memory-folders';
 
 interface Props {
   drafts: WereadDraft[];
@@ -167,11 +169,13 @@ export function MemoryWereadMergeImport({ drafts, onClose, onComplete, onImporte
   }
 
   const complete = session && session.cursor === session.sources.length;
+  if (session?.status === 'done') return <section className="wr-workspace wr-merge" aria-label="智能合并划线"><MemoryImportCompletion source={session.demo ? '原创合成示例 · 智能合并' : '微信读书 · 智能合并'} added={session.receipt?.added ?? 0} updated={session.receipt?.updated ?? 0} skipped={session.receipt?.skipped ?? 0} processed={{ count: session.cursor, label: '条原划线' }} locations={memoryImportLocations(useRecallStore.getState().decks, session.receipt?.deckIds || [])} onView={() => onComplete(session.receipt?.deckIds || [])} onContinue={onClose} continueLabel="继续选择其他书"/></section>;
+  const percentage = session?.sources.length ? Math.round(session.cursor / session.sources.length * 100) : 0;
   return <section className="wr-workspace wr-merge" aria-label="智能合并划线" aria-busy={busy}>
-    <header className="wr-heading"><span className="wr-eyebrow">CONNECTED HIGHLIGHTS</span><h1>{session?.status === 'done' ? '合并卡片已收好' : complete ? '检查你的知识单元' : '把相关划线放在一起'}</h1><p>模型只分组和提问；原文与顺序由程序保留。</p></header>
+    <header className="wr-heading"><span className="wr-eyebrow">CONNECTED HIGHLIGHTS</span><h1>{complete ? '检查你的知识单元' : '把相关划线放在一起'}</h1><p>模型只分组和提问；原文与顺序由程序保留。</p></header>
     {(error || session?.error) && <p className="m-error" role="alert">{error || session?.error}</p>}
     {initializing ? <p role="status">正在检查本机合并草稿…</p> : session ? <>
-      <div className="wr-merge-summary"><strong>{session.sources.length} 条新划线 → {session.cards.length} 张{complete ? '卡片' : '已整理卡片'}</strong><p>{session.status === 'done' ? `已保存到卡片库：新增 ${session.receipt?.added ?? 0}，更新 ${session.receipt?.updated ?? 0}，跳过 ${session.receipt?.skipped ?? 0}。` : `${session.cursor} / ${session.sources.length} 条已整理，尚未确认时不写入卡片库。`}</p></div>
+      <section className="wr-merge-summary" aria-label="划线整理进度"><div className="wr-merge-progress-heading"><span>原划线整理进度</span><strong>{percentage}%</strong></div><div className="wr-merge-progress-count"><strong>{session.cursor}</strong><span>/ {session.sources.length} 条原划线已整理</span></div><div className="wr-merge-progress" role="progressbar" aria-label="原划线整理进度" aria-valuemin={0} aria-valuemax={session.sources.length} aria-valuenow={session.cursor} aria-valuetext={`已整理 ${session.cursor} / ${session.sources.length} 条原划线，${percentage}%`}><i style={{ width: `${percentage}%` }}/></div><p role="status">{session.status === 'importing' ? '整理已完成，正在保存卡片。' : complete ? `已整理为 ${session.cards.length} 张卡片，待确认导入。` : session.status === 'paused' ? `已暂停，${session.cards.length} 张卡片草稿与进度保存在本机。` : `已形成 ${session.cards.length} 张卡片草稿，尚未写入卡片库。`}</p></section>
       <p className="wr-consent">{session.demo ? '这是原创合成示例与预置分组，不是你的微信读书数据，也不是现场 AI 输出；没有模型调用。确认导入只保存到当前设备。' : '仅合并同章、原文有序的相邻划线；一张最多 4 条。已有卡片不重组。每批最多 12 条、6000 字，批次边界保留末组上下文。点击生成后发送所选原文到已配置的 AI，每日额度仍为全空间 300 次。'}</p>
       {!complete && <details className="wr-merge-sources"><summary>查看按原文排序的划线</summary>{session.sources.map((source, index) => <article key={source.id}><small>H{String(index + 1).padStart(3, '0')} · {source.book.title} · {source.highlight.chapterTitle}</small><p>{source.highlight.markText}</p></article>)}</details>}
       <div className="wr-merge-cards">{session.cards.map((card, index) => {
@@ -180,17 +184,17 @@ export function MemoryWereadMergeImport({ drafts, onClose, onComplete, onImporte
         const canCombine = following && following.book.bookId === card.book.bookId && following.highlight.chapterUid === card.highlight.chapterUid
           && members.length + (following.members?.length || 1) <= MERGE_MAX_MEMBERS;
         return <article className="m-panel wr-merge-card" key={`${card.id}:${card.kind}`}><small>卡片 {index + 1} · {members.length} 条划线 · {card.book.title} · {card.highlight.chapterTitle}</small>
-          <label>共同问题<textarea key={card.question} aria-label={`合并卡片 ${index + 1} 的问题`} defaultValue={card.question} maxLength={160} rows={3} disabled={busy || session.status === 'done'} onBlur={event => {
+          <label>共同问题<textarea key={card.question} aria-label={`合并卡片 ${index + 1} 的问题`} defaultValue={card.question} maxLength={160} rows={3} disabled={busy} onBlur={event => {
             const question = event.target.value;
             if (question !== card.question) void edit(async value => ({ ...value, cards: value.cards.map(item => item.id === card.id ? { ...item, question, kind: 'qa' } : item) }));
           }}/></label>
           {card.kind === 'task' && <p className="m-note">手动拆分或合并后的回忆任务，请检查或改成具体问题。</p>}
           <div className="wr-merge-originals" aria-label="划线原文，按原文顺序">{members.map(member => <div key={member.bookmarkId}><small>H{String(session.sources.findIndex(source => source.book.bookId === card.book.bookId && source.highlight.bookmarkId === member.bookmarkId) + 1).padStart(3, '0')}</small><p>{member.markText}</p></div>)}</div>
-          {complete && session.status !== 'done' && <div className="wr-merge-actions"><button className="m-secondary" disabled={busy || members.length < 2} onClick={() => void split(index)}>拆分为单条</button>{canCombine && <button className="m-secondary" disabled={busy} onClick={() => void combine(index)}>与下一张合并</button>}</div>}
+          {complete && <div className="wr-merge-actions"><button className="m-secondary" disabled={busy || members.length < 2} onClick={() => void split(index)}>拆分为单条</button>{canCombine && <button className="m-secondary" disabled={busy} onClick={() => void combine(index)}>与下一张合并</button>}</div>}
         </article>;
       })}</div>
-      <div className="wr-dock">{session.status === 'done' ? <button className="m-primary" onClick={() => onComplete(session.receipt?.deckIds || [])}><Check size={17}/>查看卡组</button> : busy ? <button className="m-secondary" disabled={session.status === 'importing'} onClick={() => controller.current?.abort()}><Pause size={17}/>暂停，保留进度</button> : complete ? <button className="m-primary" onClick={() => void importCards()}>确认导入 {session.cards.length} 张卡片<ArrowRight size={17}/></button> : <button className="m-primary" onClick={() => void generate()}>{session.cursor ? '继续智能分组' : '生成分组与问题'}<ArrowRight size={17}/></button>}
-        {!busy && (session.status === 'done' ? <button className="m-text" onClick={onClose}>继续选择其他书</button> : <button className="m-text" onClick={() => void cancel()}>取消合并草稿</button>)}
+      <div className="wr-dock">{busy ? <button className="m-secondary" disabled={session.status === 'importing'} onClick={() => controller.current?.abort()}><Pause size={17}/>暂停，保留进度</button> : complete ? <button className="m-primary" onClick={() => void importCards()}>确认导入 {session.cards.length} 张卡片<ArrowRight size={17}/></button> : <button className="m-primary" onClick={() => void generate()}>{session.cursor ? '继续智能分组' : '生成分组与问题'}<ArrowRight size={17}/></button>}
+        {!busy && <button className="m-text" onClick={() => void cancel()}>取消合并草稿</button>}
       </div>
     </> : <button className="m-secondary" onClick={() => void cancel()}>取消无法恢复的合并草稿</button>}
   </section>;

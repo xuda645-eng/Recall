@@ -1,0 +1,119 @@
+.m-folder-selector {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--ink, #30302b);
+  font: inherit;
+}
+
+.m-folder-selector-label {
+  overflow-wrap: anywhere;
+}
+
+.m-folder-selector button {
+  min-width: 44px;
+  min-height: 44px;
+  box-sizing: border-box;
+  font: inherit;
+  line-height: 1.6;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.m-folder-selector button:disabled {
+  opacity: .42;
+  cursor: default;
+}
+
+.m-folder-selector-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line, #e0dfd5);
+  border-radius: 14px;
+  background: var(--card-paper, #fffef9);
+  text-align: left;
+}
+
+.m-folder-selector button span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.m-folder-selector svg {
+  flex: none;
+}
+
+.m-folder-selector-panel {
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid var(--line, #e0dfd5);
+  border-radius: 14px;
+  background: var(--card-paper, #fffef9);
+}
+
+.m-folder-selector ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.m-folder-selector-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+  margin-inline-start: var(--folder-indent, 0px);
+  border-radius: 10px;
+}
+
+.m-folder-selector .m-folder-selector-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 44px;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
+}
+
+.m-folder-selector .m-folder-selector-expand {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.m-folder-selector-select[aria-pressed="true"] {
+  background: var(--soft, #eae9df);
+  font-weight: 650;
+}
+
+.m-folder-selector-select > svg:first-child,
+.m-folder-selector-expand {
+  color: #5f684c;
+}
+
+.m-folder-selector button:focus-visible,
+.m-folder-selector [role="treeitem"]:focus-visible > .m-folder-selector-row {
+  outline: 3px solid #889075;
+  outline-offset: 2px;
+}
+
+.m-folder-selector [role="treeitem"]:focus {
+  outline: none;
+}

@@ -136,22 +136,23 @@ describe('bounded incremental WeRead imports', () => {
     expect(JSON.stringify(plan).length).toBeLessThan(2000000);
     const result = applyWereadImport(snapshot, plan, new Set());
     expect(result.added).toBe(1000);
-    expect(result.snapshot.decks).toHaveLength(1);
+    expect(result.snapshot.decks).toHaveLength(2);
     expect(importBooks(result.snapshot, [value])).toMatchObject({ added: 0, skipped: 1000 });
   });
-  it('imports selected books into one root each, never chapter subgroups; summaries do not replace originals', () => {
+  it('imports one book subgroup per selected book under WeRead, never chapter subgroups; summaries do not replace originals', () => {
     const snapshot = emptySnapshot(), first = book(), second = book('second');
     first.highlights.push({ bookmarkId: 'another', markText: 'A second chapter.', chapterUid: 'chapter-2', chapterTitle: 'Second chapter' });
     const selected = buildWereadDrafts(snapshot, [first, second], [first.bookId]);
     const result = applyWereadImport(snapshot, planWereadImport(snapshot, selected), new Set());
     expect(result).toMatchObject({ added: 2, updated: 0, skipped: 0 });
-    expect(result.snapshot.decks).toHaveLength(1);
+    expect(result.snapshot.decks).toHaveLength(2);
     expect(result.snapshot.decks[0].parentId).toBeNull();
     expect(new Set(result.snapshot.cards.map(card => card.deckId)).size).toBe(1);
     expect(result.snapshot.cards[0]).toMatchObject({ back: original, sourceRef: { provider: 'weread', bookId: first.bookId, bookmarkId: 'mark:one', chapterUid: 'chapter-1' }, source: '微信读书 · Original test book · A chapter', aiSummary: 'Auxiliary summary only.', contentKind: 'qa', recallKind: 'question' });
     expect(snapshot.cards).toEqual([]);
     expect(snapshot.decks).toEqual([]);
-    expect(result.deckIds).toEqual([result.snapshot.decks[0].id]);
+    expect(result.deckIds).toEqual([result.snapshot.cards[0].deckId]);
+    expect(result.snapshot.decks.find(deck => deck.id === result.deckIds[0])?.parentId).toBe('weread-library');
   });
   it('keeps stable IDs and skips repeated imports without resetting any existing fields', () => {
     const initial = importBooks(), old = initial.snapshot.cards[0];
@@ -173,13 +174,13 @@ describe('bounded incremental WeRead imports', () => {
     expect(importBooks(snapshot, [value]).snapshot.cards[0]).toEqual(snapshot.cards[0]);
   });
   it('matches sourceRef even after the card ID and root group were changed', () => {
-    const initial = importBooks(), old = initial.snapshot.cards[0], deck = initial.snapshot.decks[0];
-    const snapshot = { ...initial.snapshot, decks: [{ ...deck, id: 'user-root' }], cards: [{ ...old, id: 'user-card', deckId: 'user-root' }] };
+    const initial = importBooks(), old = initial.snapshot.cards[0], deck = initial.snapshot.decks.find(item => item.id === old.deckId)!;
+    const snapshot = { ...initial.snapshot, decks: [{ ...deck, id: 'user-root', parentId: null }], cards: [{ ...old, id: 'user-card', deckId: 'user-root' }] };
     const value = book(); value.highlights.push({ bookmarkId: 'fresh', markText: 'Fresh original.' });
     const result = importBooks(snapshot, [value]);
     expect(result).toMatchObject({ added: 1, skipped: 1 });
     expect(result.snapshot.cards[0].id).toBe('user-card');
-    expect(result.snapshot.decks).toHaveLength(1);
+    expect(result.snapshot.decks).toHaveLength(2);
     expect(result.snapshot.cards[1].deckId).toBe('user-root');
   });
   it('only applies explicit updates to content/source; IDs, all dates, scheduling, archive and unrelated fields stay intact', () => {
@@ -237,9 +238,9 @@ describe('bounded incremental WeRead imports', () => {
     const snapshot = emptySnapshot();
     snapshot.decks.push({ id: 'unrelated', name: book().title, description: 'Keep me', color: 'slate', parentId: null, createdAt: at, updatedAt: at });
     const next = importBooks(snapshot, [book('one'), book('two')]);
-    expect(next.snapshot.decks).toHaveLength(3);
+    expect(next.snapshot.decks).toHaveLength(4);
     expect(next.snapshot.decks[0]).toEqual(snapshot.decks[0]);
-    expect(new Set(next.snapshot.decks.map(deck => deck.name)).size).toBe(3);
+    expect(new Set(next.snapshot.decks.filter(deck => deck.parentId === 'weread-library').map(deck => deck.name)).size).toBe(2);
     expect(next.deckIds).not.toContain('unrelated');
   });
   it.each(['cards', 'decks', 'reviewLogs', 'studySessions'] as const)('uses the shared fingerprint to reject stale %s previews', field => {
@@ -275,7 +276,9 @@ describe('local importer interaction and pending/cancellation guards', () => {
     expect(runtime.commit).toHaveBeenCalledTimes(1);
     expect(runtime.snapshot?.cards[0]).toMatchObject({ front: 'My edited question?', back: original });
     expect(screen.getByRole('heading', { name: '导入完成' })).toBeTruthy();
-    expect(complete).toHaveBeenCalledWith([runtime.snapshot?.decks[0].id]);
+    expect(complete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '查看卡组' }));
+    expect(complete).toHaveBeenCalledWith([runtime.snapshot?.cards[0].deckId]);
     expect(complete).toHaveBeenCalledTimes(1);
   });
   it('shows original sample provenance and question/task/excerpt interaction, never calls a model/network', () => {
@@ -307,7 +310,7 @@ describe('local importer interaction and pending/cancellation guards', () => {
     expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false);
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '确认导入' })); });
     expect(runtime.snapshot?.cards[0].back).toBe(original);
-    expect(screen.getByRole('status').textContent).toContain('跳过 1');
+    expect(screen.getByText('跳过已有').parentElement?.textContent).toContain('1');
   });
   it('prevents double import, closing, Escape and document unload while commit is pending', async () => {
     const hold = deferred<void>(), close = vi.fn(), escaped = vi.fn();
@@ -326,7 +329,7 @@ describe('local importer interaction and pending/cancellation guards', () => {
     expect(close).not.toHaveBeenCalled();
     expect(runtime.commit).toHaveBeenCalledTimes(1);
     await act(async () => { hold.resolve(); await hold.promise; });
-    fireEvent.click(screen.getByRole('button', { name: '返回导入' }));
+    fireEvent.click(screen.getByRole('button', { name: '继续选择其他书' }));
     expect(close).toHaveBeenCalledTimes(1);
   });
   it('preserves save errors and the preview for retry without calling completion on failure', async () => {
@@ -435,6 +438,8 @@ describe('local importer interaction and pending/cancellation guards', () => {
     expect(complete).not.toHaveBeenCalled();
     await act(async () => { save.resolve(); await save.promise; });
     expect(onBusy.mock.calls).toEqual([[true], [false], [true], [false]]);
+    expect(complete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '查看卡组' }));
     expect(complete).toHaveBeenCalledTimes(1);
   });
   it('releases busy on save failure and restores it during a successful retry', async () => {

@@ -80,7 +80,7 @@ for (const days of [0, 8]) {
     const completed = await completedMergeDraft(page, days);
     await page.reload();
     await expect(page.getByRole('button', { name: '连接微信读书', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: '合并卡片已收好' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: '导入完成' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '取消无法恢复的合并草稿' })).toHaveCount(0);
     expect(await mergeDraft(page)).toBe(completed);
     expect(await snapshot(page)).toEqual(before);
@@ -97,15 +97,22 @@ test('选书后出现旧完成记录也从当前选择生成，完成返回书�
   await completedMergeDraft(page);
   await enterMerge(page);
   await expect(page.getByRole('heading', { name: '把相关划线放在一起' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '合并卡片已收好' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '导入完成' })).toHaveCount(0);
   await expect(page.locator('.wr-merge-sources')).toContainText('合成关联书');
   await expect(page.locator('.wr-merge-sources')).not.toContainText('原创合并示例');
   expect((await snapshot(page)).cards).toEqual([]);
+  const progress = page.getByRole('progressbar', { name: '原划线整理进度' });
+  await expect(progress).toHaveAttribute('aria-valuenow', '0');
+  await expect(progress).toHaveAttribute('aria-valuemax', '4');
   await page.getByRole('button', { name: '生成分组与问题', exact: true }).click();
+  await expect(progress).toHaveAttribute('aria-valuenow', '4');
+  await expect(page.getByRole('region', { name: '划线整理进度' })).toContainText('100%');
   await page.getByRole('button', { name: '确认导入 2 张卡片', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '合并卡片已收好' })).toBeVisible();
-  await expect(page.locator('.wr-merge-summary')).toContainText('新增 2');
-  await expect(page.locator('.wr-merge-summary')).not.toContainText('尚未确认');
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '导入任务完成' })).toContainText('4 条原划线已处理');
+  await expect(page.locator('.m-import-completion-counts > div').first()).toContainText('2');
+  await expect(page.locator('.wr-merge-summary')).toHaveCount(0);
+  await expect(page.locator('.wr-merge-cards')).toHaveCount(0);
   const firstImport = await snapshot(page);
   expect(firstImport.cards).toHaveLength(2);
   await page.locator('.memory-bar').getByRole('button', { name: '返回', exact: true }).click();
@@ -118,7 +125,7 @@ test('选书后出现旧完成记录也从当前选择生成，完成返回书�
   expect(await snapshot(page)).toEqual(firstImport);
   await page.getByRole('button', { name: '生成分组与问题', exact: true }).click();
   await page.getByRole('button', { name: '确认导入 2 张卡片', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '合并卡片已收好' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
   const secondImport = await snapshot(page);
   expect(secondImport.cards).toHaveLength(4);
   for (const card of firstImport.cards) expect(secondImport.cards.find((item: { id: string }) => item.id === card.id)).toEqual(card);
@@ -181,7 +188,7 @@ test('智能分组合并、原文顺序、改问题、确认后导入与刷新�
   await page.setViewportSize({ width: 393, height: 852 });
   await page.screenshot({ path: info.outputPath('grouped-originals-iphone15.png'), fullPage: true });
   await page.getByRole('button', { name: '确认导入 2 张卡片' }).click();
-  await expect(page.getByRole('heading', { name: '合并卡片已收好' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
   const saved = await snapshot(page);
   expect(saved.cards).toHaveLength(2);
   expect(saved.cards[0].back).toBe(originals.slice(0, 2).join('\n\n'));
@@ -286,14 +293,14 @@ test('连接页无公开合成示例，保留真实连接与其他导入入口',
   const connect = page.getByRole('button', { name: '连接微信读书', exact: true });
   await expect(connect).toBeEnabled();
   await expect(page.getByRole('button', { name: /体验合并示例/ })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '其他导入方式', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '其他导入方式', exact: true })).toHaveCount(0);
   await page.evaluate(() => {
     document.querySelector<HTMLElement>('.memory-app')?.style.setProperty('--safe-top', '59px');
     document.querySelector<HTMLElement>('.memory-app')?.style.setProperty('--safe-bottom', '34px');
   });
   for (const viewport of [{ width: 393, height: 852 }, { width: 320, height: 740 }, { width: 760, height: 852 }, { width: 761, height: 852 }, { width: 852, height: 393 }]) {
     await page.setViewportSize(viewport);
-    for (const button of [connect, page.getByRole('button', { name: '其他导入方式', exact: true })]) {
+    for (const button of [connect]) {
       await button.scrollIntoViewIfNeeded();
       const box = (await button.boundingBox())!;
       expect(box.height).toBeGreaterThanOrEqual(44);

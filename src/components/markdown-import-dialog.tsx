@@ -16,15 +16,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { parseMarkdownCards, type MarkdownCardInput } from "@/lib/markdown-importer";
 import { useRecallStore } from "@/stores/recall-store";
+import type { ImportCompletionReceipt } from "@/components/import-hub";
 
 interface MarkdownImportDialogProps {
   deckId?: string;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   initialText?: string;
+  onComplete?: (receipt: ImportCompletionReceipt) => void;
 }
 
-export function MarkdownImportDialog({ deckId, open: controlledOpen, onOpenChange, initialText }: MarkdownImportDialogProps): JSX.Element {
+export function MarkdownImportDialog({ deckId, open: controlledOpen, onOpenChange, initialText, onComplete }: MarkdownImportDialogProps): JSX.Element {
   const { t } = useTranslation();
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -102,6 +104,9 @@ export function MarkdownImportDialog({ deckId, open: controlledOpen, onOpenChang
     }
     setOpen(false);
     setCards([]);
+    if (failed === 0) {
+      onComplete?.({ source: "Markdown", added: imported, updated: 0, skipped: 0, deckIds: [targetDeckId] });
+    }
   }
 
   function handleClose(): void {

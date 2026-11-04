@@ -11,6 +11,8 @@ import './memory-weread-import.css';
 import { MemoryWereadOnlineImport } from './memory-weread-online-import';
 import { MemoryWereadMergeImport } from './memory-weread-merge-import';
 import { createMergeSession } from '@/lib/weread-merge-session';
+import { MemoryImportCompletion } from '@/components/memory-import-completion';
+import { memoryImportLocations } from '@/lib/memory-folders';
 
 export interface MemoryWereadImportProps {
   onClose: () => void;
@@ -33,17 +35,9 @@ const originalSample = {
 };
 
 export function MemoryWereadImport(props: MemoryWereadImportProps): JSX.Element {
-  const [manual, setManual] = useState(false);
-  const { onBackChange } = props;
-  useEffect(() => {
-    if (!manual) return;
-    onBackChange?.(() => setManual(false));
-    return () => onBackChange?.(null);
-  }, [manual, onBackChange]);
-  return manual ? <MemoryWereadManualImport {...props} onClose={() => setManual(false)}/>
-    : <MemoryWereadOnlineImport {...props} onLocal={() => setManual(true)}/>;
+  return <MemoryWereadOnlineImport {...props}/>;
 }
-export function MemoryWereadManualImport({ onClose, onComplete, onBusy }: MemoryWereadImportProps): JSX.Element {
+export function MemoryWereadManualImport({ onClose, onComplete, onBusy, initialFile }: MemoryWereadImportProps & { initialFile?: File }): JSX.Element {
   const { t } = useTranslation();
   const [stage, setStage] = useState<Stage>('load');
   const [books, setBooks] = useState<WereadBook[]>([]);
@@ -150,6 +144,9 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy }: Memory
       if (mounted.current && current === generation.current) { setLoading(false); reportBusy(false); }
     }
   }
+  const initialLoader = useRef(load);
+  useEffect(() => { initialLoader.current = load; });
+  useEffect(() => { if (initialFile) void initialLoader.current(initialFile); }, [initialFile]);
   function sample(): void {
     if (lock.current) return;
     controller.current?.abort();
@@ -239,7 +236,6 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy }: Memory
       lock.current = false;
       if (mounted.current) { setPending(false); reportBusy(false); }
     }
-    if (mounted.current && completed.current && result) onComplete(result.deckIds);
   }
   const notice = demo ? t('memory.weread.demoNotice', '原创预置书架和问题，仅用于流程演示，不是你的微信读书数据，也不是 AI 输出。')
     : '可在线连接真实微信读书笔记本，或载入本地文件。AI 逐条生成问题，划线原文始终作为答案。密钥仅在服务端，必须先授权当前设备。';
@@ -250,6 +246,7 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy }: Memory
     try { createMergeSession(useRecallStore.getState(), drafts); } catch (value) { mergeError = message(value); }
   }
   if (merging) return <MemoryWereadMergeImport drafts={drafts} onClose={() => setMerging(false)} onComplete={onComplete} onBusy={reportBusy}/>;
+  if (stage === 'done' && receipt) return <MemoryImportCompletion source={demo ? '原创流程示例 · 非真实微信读书数据' : '微信读书'} added={receipt.added} updated={receipt.updated} skipped={receipt.skipped} locations={memoryImportLocations(useRecallStore.getState().decks, receipt.deckIds)} onView={() => onComplete(receipt.deckIds)} onContinue={onClose} continueLabel="继续选择其他书"/>;
 
   return <section aria-label={t('memory.weread.importTitle', '微信读书 Skill 导出导入')} aria-busy={loading || pending}>
     <header className="m-weread-heading">
@@ -257,7 +254,7 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy }: Memory
       <p>连接或载入 → 选书与划线 → AI 问题 / 手动编辑 → 检查变化 → 确认导入</p>
     </header>
     <p className="m-source-notice">{notice}</p>
-    <p>{t('memory.weread.mapping', '一本书对应一个根卡组，每条划线对应一张卡。章节仅作来源信息，不建立章节子卡组。原文不改写，摘要单独保留。')}</p>
+    <p>书籍默认保存在“微信读书”根卡组下，每本书一个子卡组。章节只作来源信息；原文不改写，摘要单独保留。</p>
     {error && <p role="alert" className="m-error">{error}</p>}
     <fieldset disabled={pending} style={{ minWidth: 0, border: 0, padding: 0, margin: 0 }}>
       {(stage === 'load' || stage === 'books') && <>
@@ -345,10 +342,6 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy }: Memory
           <button type="button" className="m-primary" disabled={pending} onClick={() => void confirm()}>{pending ? t('memory.weread.committing', '正在保存，请勿离开…') : t('memory.weread.confirmImport', '确认导入')}</button>
         </div>
       </>}
-      {stage === 'done' && receipt && <div className="m-panel">
-        <h3>{t('memory.weread.importDone', '导入完成')}</h3>
-        <p role="status">{t('memory.weread.resultCounts', { defaultValue: '新增 {{added}}，更新 {{updated}}，跳过 {{skipped}}', added: receipt.added, updated: receipt.updated, skipped: receipt.skipped })}</p>
-      </div>}
       <div className="m-actions"><button type="button" disabled={pending || loading || generating} onClick={close}>{t('memory.weread.close', '返回导入')}</button></div>
     </fieldset>
   </section>;
