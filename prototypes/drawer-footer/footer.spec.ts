@@ -8,7 +8,7 @@ test('底部所有文字同字号和字重，右侧只有一个小图标，原�
     await page.setViewportSize(dimensions);
     const action = page.getByRole('button', { name: '同步并检查更新', exact: true });
     await expect(action).toBeInViewport();
-    expect(await page.locator('.health button').count()).toBe(1);
+    expect(await page.locator('.sync-action').count()).toBe(1);
     const geometry = await action.evaluate(element => { const bounds = element.getBoundingClientRect(); const icon = element.querySelector('svg')!.getBoundingClientRect(); const footer = element.closest('.drawer-footer')!.getBoundingClientRect(); return { width: bounds.width, height: bounds.height, icon: icon.width, rightGap: footer.right - bounds.right, hit: element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)) }; });
     expect(geometry).toMatchObject({ width: 44, height: 44, icon: 18, rightGap: 12, hit: true });
     const typography = await page.evaluate(() => ['.settings', '.sync-line > span', '.sync-time', '.version-line', '.feedback'].map(selector => { const style = getComputedStyle(document.querySelector(selector)!); return { size: style.fontSize, weight: style.fontWeight, family: style.fontFamily, lineHeight: style.lineHeight }; }));
@@ -16,6 +16,15 @@ test('底部所有文字同字号和字重，右侧只有一个小图标，原�
       expect(style).toEqual(typography[0]);
       expect(style).toMatchObject({ size: '13px', weight: '400', lineHeight: '20px' });
     }
+    const rows = await page.locator('.health-copy').evaluate(element => ['.settings', '.sync-line > span', '.sync-time', '.version-line'].map(selector => { const row = element.querySelector(selector)!; const bounds = row.getBoundingClientRect(); const style = getComputedStyle(row); return { top: bounds.top, bottom: bounds.bottom, left: bounds.left, paddingTop: style.paddingTop, paddingBottom: style.paddingBottom, marginTop: style.marginTop, marginBottom: style.marginBottom }; }));
+    for (const [index, row] of rows.entries()) {
+      expect(row).toMatchObject({ left: rows[0].left, paddingTop: '12px', paddingBottom: '12px', marginTop: '0px', marginBottom: '0px' });
+      if (index > 0) expect(row.top).toBe(rows[index - 1].bottom);
+    }
+    await expect(page.getByRole('button', { name: '设置与数据', exact: true })).toBeInViewport();
+    const surface = await action.evaluate(element => { const style = getComputedStyle(element, '::before'); return { inset: style.top, radius: style.borderRadius, background: style.backgroundColor }; });
+    expect(surface).toMatchObject({ inset: '6px', radius: '50%' });
+    expect(surface.background).not.toBe('rgba(0, 0, 0, 0)');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: test.info().outputPath(`footer-${dimensions.width}.png`), scale: 'css' });
     if (dimensions.width === 525) await page.locator('.drawer-footer').screenshot({ path: test.info().outputPath('footer-detail.png'), scale: 'css' });

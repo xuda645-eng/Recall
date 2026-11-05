@@ -20,20 +20,22 @@ nav button[aria-current="page"] { background: var(--card); }
 .nav-selected { width: 30px; height: 30px; display: grid; place-items: center; background: var(--olive); color: #fff; border-radius: 9px; }
 .nav-selected svg { width: 21px; height: 21px; }
 .drawer-footer { --footer-font-size: 13px; margin-top: auto; border-top: 1px solid var(--line); padding: 16px 12px 0; font-size: var(--footer-font-size); font-weight: 400; line-height: 20px; }
-.settings { min-height: 44px; padding: 8px 0; margin-bottom: 13px; border: 0; background: none; font: inherit; }
+.settings { grid-column: 2; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
 .health { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; gap: 10px; }
-.health-copy { min-width: 0; display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 8px; row-gap: 6px; }
+.health-copy { min-width: 0; display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 8px; row-gap: 0; }
+.settings, .sync-line > span, .sync-time, .version-line { min-height: 44px; padding: 12px 0; margin: 0; }
 .sync-line { display: contents; font: inherit; }
 .sync-line svg { width: 18px; height: 18px; align-self: center; }
 .sync-line > span { overflow-wrap: anywhere; }
 .sync-time { grid-column: 2; font: inherit; color: var(--muted); overflow-wrap: anywhere; }
-.version-line { grid-column: 2; margin: 3px 0 0; font: inherit; color: var(--muted); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.version-line { grid-column: 2; font: inherit; color: var(--muted); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .sync-action { width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 14px; background: transparent; color: var(--olive); padding: 0; position: relative; align-self: center; }
-.sync-action::before { content: ""; position: absolute; inset: 7px; border: 1px solid #a6b09b80; border-radius: 9px; transition: background-color 160ms ease; }
-.sync-action:hover::before { background: #fffcf660; }
-.sync-action svg { width: 18px; height: 18px; position: relative; }
+.sync-action::before { content: ""; position: absolute; inset: 6px; border: 1px solid var(--line); border-radius: 50%; background: var(--card); box-shadow: 0 1px 3px #343d3210; transition: border-color 160ms ease; }
+.sync-action:hover::before { border-color: var(--olive); }
+.sync-action svg { width: 18px; height: 18px; position: relative; stroke-width: 1.6; }
 .sync-action.is-working svg { animation: spin 1s linear infinite; }
-.feedback { min-height: 20px; margin: 8px 0 0 26px; font: inherit; color: var(--muted); }
+.feedback { min-height: 44px; padding: 12px 0; margin: 0 0 0 26px; font: inherit; color: var(--muted); }
+.feedback:empty { min-height: 0; padding: 0; }
 .stage[data-state="conflict"] #sync-state, .stage[data-state="offline"] #sync-state { color: var(--danger); }
 .foreground { position: absolute; inset: 0; transform: translateX(min(82%, 330px)); border-radius: 20px 0 0 20px; background: var(--paper); box-shadow: -18px 0 40px #3035250d; overflow: hidden; pointer-events: none; }
 .foreground::after { content: ""; position: absolute; inset: 72px 0 0; background: #343d3215; }
@@ -77,5 +79,5 @@ body[data-theme="dark"] .import-content article > svg:first-child { background: 
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 960px) { .design-notes { display: none; } .presentation { padding: 24px; } }
 @media (max-width: 600px) { .presentation { padding: 0; min-height: 100svh; } .stage { width: 100%; height: 100svh; border-radius: 0; box-shadow: none; } }
-@media (max-height: 690px) { .drawer { gap: 10px; } .drawer-brand { padding-bottom: 10px; } nav { gap: 3px; } nav button { min-height: 44px; } .settings { margin-bottom: 6px; } .drawer-footer { margin-top: 16px; } }
+@media (max-height: 690px) { .drawer { gap: 10px; } .drawer-brand { padding-bottom: 10px; } nav { gap: 3px; } nav button { min-height: 44px; } .drawer-footer { margin-top: 16px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
