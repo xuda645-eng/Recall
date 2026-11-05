@@ -17,7 +17,7 @@ function download(path, redirects = 0) {
   const url = new URL(path, origin);
   if (url.origin !== origin.origin || redirects > 5) throw new Error('Unexpected asset redirect');
   return new Promise((resolveDownload, reject) => {
-    const connection = request(url, { method: 'GET', family: 4, lookup, headers: { 'Cache-Control': 'no-cache' } }, response => {
+    const connection = request(url, { signal: AbortSignal.timeout(30000), method: 'GET', family: 4, lookup, headers: { 'Cache-Control': 'no-cache' } }, response => {
       if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
         response.resume();
         resolveDownload(download(new URL(response.headers.location, url).href, redirects + 1));

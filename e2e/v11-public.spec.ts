@@ -13,14 +13,14 @@ test('V1.1 公网缓存完整与持久化，Chromium 断网重开；WebKit 公�
     initial.decks.forEach((deck, index) => { deck.name = `公开验收合成卡组 ${index + 1}`; });
     initial.cards.forEach(card => { card.front = '合成问题，用于验证离线缓存。'; card.back = '合成答案，不是真实用户数据。'; });
     initial.settings = { ...initial.settings, onboardingComplete: true, syncEnabled: false, syncCode: null };
-    await context.route('**/*', async route => {
-      const request = route.request();
+    context.on('console', message => { if (message.type() === 'error') console.log('Public cache console', message.text()); });
+    context.on('requestfailed', request => console.log('Public cache request failed', new URL(request.url()).pathname, request.failure()?.errorText));
+    context.on('request', request => {
       const url = new URL(request.url());
       expect(url.origin).toBe('https://recall-memory.pages.dev');
-      if (url.pathname.startsWith('/api/')) { await route.fulfill({ status: 503, json: { error: 'synthetic-offline-acceptance' } }); return; }
-      expect(request.method()).toBe('GET');
-      await route.continue();
+      if (!url.pathname.startsWith('/api/')) expect(request.method()).toBe('GET');
     });
+    await context.route('**/api/**', route => route.fulfill({ status: 503, json: { error: 'synthetic-offline-acceptance' } }));
     const page = await context.newPage();
     await page.addInitScript(data => { if (!localStorage.getItem('recall.snapshot.v1')) localStorage.setItem('recall.snapshot.v1', JSON.stringify(data)); }, initial);
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 120000 });
@@ -35,7 +35,12 @@ test('V1.1 公网缓存完整与持久化，Chromium 断网重开；WebKit 公�
     await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))));
     await page.screenshot({ path: test.info().outputPath('drawer-sync-update.png'), scale: 'css' });
     await page.keyboard.press('Escape');
-    await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller?.state), { timeout: 120000 }).toBe('activated');
+    try {
+      await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller?.state), { timeout: 120000 }).toBe('activated');
+    } catch (error) {
+      console.log('Public SW activation diagnostic', await page.evaluate(async () => { const registration = await navigator.serviceWorker.getRegistration(); return { controller: navigator.serviceWorker.controller?.state, active: registration?.active?.state, waiting: registration?.waiting?.state, installing: registration?.installing?.state, scope: registration?.scope, cacheNames: await caches.keys() }; }));
+      throw error;
+    }
     const before = await page.evaluate(() => localStorage.getItem('recall.snapshot.v1'));
     const cache = await page.evaluate(async () => { const names = await caches.keys(); const cacheName = names.find(name => name.includes('precache')); if (!cacheName) return []; return (await (await caches.open(cacheName)).keys()).map(request => request.url); });
     expect(cache.some(url => new URL(url).pathname === '/index.html')).toBe(true);
