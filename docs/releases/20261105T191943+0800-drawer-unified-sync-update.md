@@ -1,7 +1,8 @@
 # Drawer Unified Sync And Update
 
 Start: 2026-11-05T19:19:43+08:00 (Asia/Shanghai).
-Status: implementation validated; source commit and production publication pending.
+Status: published and verified; later compact-layout feedback will be prototyped
+separately rather than silently replacing this deployment.
 Frozen PWA identity: `1.1-20261105-1919`.
 
 ## Request And Implementation
@@ -124,3 +125,71 @@ clear storage, restore earlier private snapshots or reset D1 for rollback.
 
 Related: [V1.1 release](./20261105T180104+0800-v1-1-paper-editorial.md),
 [PWA contract](../PWA.md).
+
+## Actual Publication And Public Checks
+
+Application source: `7e55bc939eaaf35f372dba26f339fd8d88a5211b`, committed
+`2026-11-05T19:36:42+08:00`. Normal push succeeded:
+`7e3bd2e9..7e55bc93 HEAD -> main`, and remote read-back matched before publishing.
+The clean ordinary root-path bundle was deployed without a dirty override:
+
+```sh
+CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2 npx --yes wrangler@4.156.0 pages deploy dist --project-name recall-memory --branch main
+```
+
+CLI exited 0: 28 static files uploaded / 177 reused, unchanged-contract Functions
+bundle compiled, existing headers/routes uploaded. Production deployment list
+confirmed `8c11afc0-2e41-4515-8598-bc9210e031e4`, main, source `7e55bc9`, immutable
+`https://8c11afc0.recall-memory.pages.dev/`. Stable origin is unchanged. Exact
+deployment wall time was not separately exported; asset verification completed
+at `2026-11-05T19:39:06.920+08:00`. Final record checkpoint:
+`2026-11-05T19:49:20+08:00`.
+
+- 205/205 production static asset digests matched the committed build, including
+  icons/fonts/manifest/version; no asset retry needed. PWA actual identity is
+  `1.1-20261105-1919`; legacy wire alias remains `1.0-20261105-1919`.
+- First public browser attempt failed at guarded WebKit blank-page startup
+  `setContent`, 5000ms timeout, before any tests. The same guarded command was
+  retried unchanged outside Seatbelt: full 8/8 passed in 1.0 minute.
+- Both engines checked the single combined button, no status-row actions,
+  actual version, all 161 unique precache paths/165 worker entries, refresh
+  persistence and no overflow. Chromium rejected an uncached offline probe and
+  reopened the cached app. Public WebKit remained online/cache-only as explicitly
+  labelled; no claim of physical iPhone or public WebKit offline acceptance.
+- Synthetic book/concurrency flows passed in both engines, with real model/card
+  calls intercepted. Eleven selected public resource digests and five anonymous
+  WeRead 401/no-store gates passed. Additional credential-free GET checks for
+  `/api/auth/session` and `/api/sync?since=0` returned 401/no-store. No real
+  synchronization mutation or private content was sent by these tests.
+- Screenshot timing was aligned with drawer animation completion, then both
+  public cache cases reran: 2/2 passed in 1.5 minutes. This is screenshot/test
+  evidence only, no app change or second deployment.
+- Taking control of the existing in-app owner tab failed in the browser binding
+  surface (`browser.user is unavailable`). No UI click/update/import/rating or
+  private-storage access was performed through that failed binding. Anonymous
+  isolated tests and screenshots provide the public evidence instead; the user
+  separately annotated the displayed new version afterward.
+
+Public command, with installed Chromium/WebKit paths and the DNS A record
+`172.66.47.169` rechecked against both current production A records:
+
+```sh
+node scripts/verify-pwa-assets.mjs dist quality/sync-button/public/assets.json
+RECALL_PRODUCTION_IPV4=172.66.47.169 RECALL_VERIFY_DIST=/private/tmp/recall-v11-release/dist node scripts/run-playwright.mjs --config=e2e/v11-public.config.ts --workers=1 --output=quality/sync-button/public/browser-recovery
+RECALL_PRODUCTION_IPV4=172.66.47.169 RECALL_VERIFY_DIST=/private/tmp/recall-v11-release/dist node scripts/run-playwright.mjs --config=e2e/v11-public.config.ts --workers=1 --grep '公网缓存完整' --output=quality/sync-button/public/final-frame
+```
+
+Logs: `/private/tmp/recall-sync-button-deploy.log`,
+`/private/tmp/recall-sync-button-published.log`,
+`/private/tmp/recall-sync-button-public-assets.log`,
+`/private/tmp/recall-sync-button-public.log`,
+`/private/tmp/recall-sync-button-public-recovery.log`,
+`/private/tmp/recall-sync-button-public-frame.log`.
+Follow-up only records outcomes and waits for the final screenshot frame in the
+test; no runtime code, database, origin, credential or private copy changed.
+The follow-up commit is locatable with `git log -1 --` and this record path.
+
+The user subsequently requested a smaller right-aligned icon and unified
+status/version typography as a local prototype. That feedback is not an
+incident or rollback: retain this verified deployment while comparing the new
+local design. No data restore or device clearing occurred.

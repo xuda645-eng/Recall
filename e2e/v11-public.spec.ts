@@ -29,6 +29,7 @@ test('V1.1 公网缓存完整与持久化，Chromium 断网重开；WebKit 公�
     await expect(page.locator('[data-app-version]')).toHaveText(build.releaseVersion ?? build.version);
     await expect(page.locator('#memory-drawer').getByRole('button', { name: '同步并检查更新', exact: true })).toBeVisible();
     await expect(page.locator('.m-drawer-sync').getByRole('button')).toHaveCount(0);
+    await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))));
     await page.screenshot({ path: test.info().outputPath('drawer-sync-update.png'), scale: 'css' });
     await page.keyboard.press('Escape');
     await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller?.state), { timeout: 120000 }).toBe('activated');
