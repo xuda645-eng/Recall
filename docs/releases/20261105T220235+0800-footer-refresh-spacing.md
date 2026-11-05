@@ -75,3 +75,15 @@ Formal application integration still waits for prototype review.
 
 Related: [previous typography correction](./20261105T215501+0800-footer-uniform-typography.md),
 [prototype instructions](../../prototypes/drawer-footer/README.md).
+
+## Source Outcome And Rejected Review
+
+At 2026-11-05T22:04:52+08:00, prototype source
+`0bd41a3b2e33bb733ef8d680caad48fe1a525a9e` was committed and pushed normally
+to main (`d29bcb58..0bd41a3b`). No app deployment occurred. During delivery,
+the user rejected the piecemeal layout and explicitly identified the refresh
+button's misalignment, then requested reconsidering the whole design rather
+than patching this version. The 6/6 checks were not design acceptance and did
+not cover the missing version-row pairing. This attempt is preserved as
+rejected, not accepted, and superseded by the
+[holistic revision](./20261105T220933+0800-drawer-holistic-reconsideration.md).

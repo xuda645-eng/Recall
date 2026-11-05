@@ -98,7 +98,8 @@ retroactively marked verified just because a deployment still exists.
 
 | Release | Scope | Result | Record |
 |---|---|---|---|
-| `20261105T220235+0800-footer-refresh-spacing` | Local open-ring refresh icon / equal footer row spacing | Revised for review; 6/6 browser checks; production unchanged | [Refresh and spacing](./releases/20261105T220235+0800-footer-refresh-spacing.md) |
+| `20261105T220933+0800-drawer-holistic-reconsideration` | Reconsider whole drawer / grouping / actual text axis / version-paired action | New local proposal; final 6/6 browser checks; pending review, production unchanged | [Holistic drawer proposal](./releases/20261105T220933+0800-drawer-holistic-reconsideration.md) |
+| `20261105T220235+0800-footer-refresh-spacing` | Local open-ring refresh icon / equal footer row spacing | Source `0bd41a3b`; user rejected floating/misaligned layout despite 6 checks, superseded; no deployment | [Refresh and spacing](./releases/20261105T220235+0800-footer-refresh-spacing.md) |
 | `20261105T215501+0800-footer-uniform-typography` | Correct all footer text to one font size/weight/family/line height | Local prototype revised; 6/6 browser checks; production unchanged | [Uniform footer typography](./releases/20261105T215501+0800-footer-uniform-typography.md) |
 | `20261105T203926+0800-drawer-footer-prototype` | Local compact footer / unified typography / small right-side refresh icon | Delivered for review; final 6/6 browser checks; production unchanged | [Compact footer prototype](./releases/20261105T203926+0800-drawer-footer-prototype.md) |
 | `20261105T191943+0800-drawer-unified-sync-update` | V1.1 drawer bottom single sync/update action / protected ordering | Published `8c11afc0`, source `7e55bc93`; 1683 units / 160 distinct mobile with recovery / 205 assets / public 8 passes; compact follow-up prototype requested | [Combined drawer action](./releases/20261105T191943+0800-drawer-unified-sync-update.md) |

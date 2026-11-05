@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('底部所有文字同字号和字重，右侧只有一个小图标，原型不请求真实服务', async ({ page }) => {
+test('整体文字和图标对齐，信息行距一致，刷新与版本行配对', async ({ page }) => {
   const requests: string[] = [];
   page.on('request', request => { requests.push(request.url()); expect(request.method()).toBe('GET'); expect(new URL(request.url()).origin).toBe('http://127.0.0.1:4424'); });
   await page.goto('/');
@@ -10,21 +10,26 @@ test('底部所有文字同字号和字重，右侧只有一个小图标，原�
     await expect(action).toBeInViewport();
     expect(await page.locator('.sync-action').count()).toBe(1);
     const geometry = await action.evaluate(element => { const bounds = element.getBoundingClientRect(); const icon = element.querySelector('svg')!.getBoundingClientRect(); const footer = element.closest('.drawer-footer')!.getBoundingClientRect(); return { width: bounds.width, height: bounds.height, icon: icon.width, rightGap: footer.right - bounds.right, hit: element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)) }; });
-    expect(geometry).toMatchObject({ width: 44, height: 44, icon: 18, rightGap: 12, hit: true });
+    expect(geometry).toMatchObject({ width: 44, height: 44, icon: 18, rightGap: 13, hit: true });
     const typography = await page.evaluate(() => ['.settings', '.sync-line > span', '.sync-time', '.version-line', '.feedback'].map(selector => { const style = getComputedStyle(document.querySelector(selector)!); return { size: style.fontSize, weight: style.fontWeight, family: style.fontFamily, lineHeight: style.lineHeight }; }));
-    for (const style of typography) {
-      expect(style).toEqual(typography[0]);
-      expect(style).toMatchObject({ size: '13px', weight: '400', lineHeight: '20px' });
+    for (const [index, style] of typography.entries()) {
+      expect(style).toMatchObject({ size: '14px', family: typography[0].family, weight: index === 0 ? '600' : '400', lineHeight: '22px' });
     }
-    const rows = await page.locator('.health-copy').evaluate(element => ['.settings', '.sync-line > span', '.sync-time', '.version-line'].map(selector => { const row = element.querySelector(selector)!; const bounds = row.getBoundingClientRect(); const style = getComputedStyle(row); return { top: bounds.top, bottom: bounds.bottom, left: bounds.left, paddingTop: style.paddingTop, paddingBottom: style.paddingBottom, marginTop: style.marginTop, marginBottom: style.marginBottom }; }));
-    for (const [index, row] of rows.entries()) {
-      expect(row).toMatchObject({ left: rows[0].left, paddingTop: '12px', paddingBottom: '12px', marginTop: '0px', marginBottom: '0px' });
-      if (index > 0) expect(row.top).toBe(rows[index - 1].bottom);
-    }
+    expect(await page.getByRole('button', { name: '今日复习', exact: true }).evaluate(element => getComputedStyle(element).fontSize)).toBe('14px');
+    const axes = await page.evaluate(() => ['.settings span', '.sync-line > span:last-child', '.sync-time', '.version-line'].map(selector => document.querySelector(selector)!.getBoundingClientRect().left));
+    expect(axes.every(left => left === axes[0])).toBe(true);
+    const navigationAxis = await page.getByRole('button', { name: '今日复习', exact: true }).evaluate(element => { const text = Array.from(element.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())!; const range = document.createRange(); range.selectNodeContents(text); return range.getBoundingClientRect().left; });
+    expect(axes[0]).toBe(navigationAxis);
+    const rows = await page.locator('.health').evaluate(element => Array.from(element.children).map(row => { const bounds = row.getBoundingClientRect(); return { top: bounds.top, bottom: bounds.bottom }; }));
+    expect(rows[1].top - rows[0].bottom).toBe(8);
+    expect(rows[2].top - rows[1].bottom).toBe(8);
+    const pair = await action.evaluate(element => { const bounds = element.getBoundingClientRect(); const version = element.closest('.version-row')!.querySelector('.version-line')!.getBoundingClientRect(); return { actionCenter: bounds.top + bounds.height / 2, versionCenter: version.top + version.height / 2, textRight: version.right, actionLeft: bounds.left }; });
+    expect(pair.actionCenter).toBeCloseTo(pair.versionCenter, 5);
+    expect(pair.actionLeft - pair.textRight).toBeGreaterThanOrEqual(4);
     await expect(page.getByRole('button', { name: '设置与数据', exact: true })).toBeInViewport();
-    const surface = await action.evaluate(element => { const style = getComputedStyle(element, '::before'); return { inset: style.top, radius: style.borderRadius, background: style.backgroundColor }; });
-    expect(surface).toMatchObject({ inset: '6px', radius: '50%' });
-    expect(surface.background).not.toBe('rgba(0, 0, 0, 0)');
+    expect(await action.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+    expect(['none', 'normal']).toContain(await action.evaluate(element => getComputedStyle(element, '::before').content));
+    expect(await page.evaluate(() => { const control = document.querySelector('.prototype-toggle')!.getBoundingClientRect(); const logo = document.querySelector('.logo')!.getBoundingClientRect(); return control.right <= logo.left || control.left >= logo.right || control.bottom <= logo.top || control.top >= logo.bottom; })).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: test.info().outputPath(`footer-${dimensions.width}.png`), scale: 'css' });
     if (dimensions.width === 525) await page.locator('.drawer-footer').screenshot({ path: test.info().outputPath('footer-detail.png'), scale: 'css' });
@@ -45,6 +50,8 @@ test('离线、冲突、深色和放大文字下信息不盖住唯一按钮', as
     await action.scrollIntoViewIfNeeded();
     await expect(action).toBeInViewport();
     expect(await action.evaluate(element => { const bounds = element.getBoundingClientRect(); return element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)); })).toBe(true);
+    const centers = await action.evaluate(element => { const bounds = element.getBoundingClientRect(); const version = element.closest('.version-row')!.querySelector('.version-line')!.getBoundingClientRect(); return [bounds.top + bounds.height / 2, version.top + version.height / 2]; });
+    expect(centers[0]).toBeCloseTo(centers[1], 5);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: test.info().outputPath(`footer-${state}-dark.png`), scale: 'css' });
     await page.getByRole('button', { name: '局部原型', exact: true }).click();

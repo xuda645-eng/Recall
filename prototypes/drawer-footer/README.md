@@ -3,17 +3,18 @@
 One focused proposal for the user's compact-footer feedback. It is not a new
 application build and does not replace the production UI.
 
-- Settings, cloud status, timestamp, build identity and feedback all inherit
-  one 13px font size, regular weight, font family and 20px line height.
-- Secondary information uses muted color and spacing, not a smaller font.
-  The timestamp remains aligned with the status text.
-- All four persistent rows use 44px minimum height, 20px text line height and
-  12px vertical padding, with no extra inter-row margins. Long text extends the
-  row naturally; settings retains a 44px touch target. Text starts on one axis.
-- A single 18px open circular arrow sits to the right of the information rows.
-  A quiet 32px paper-colored circular surface replaces the squared outline
-  inside the 44px target. It is not a full-row primary action. Existing
-  paper/olive styling and the actual Recall logo are retained.
+- After the user rejected the piecemeal footer, the whole drawer was reconsidered.
+  Navigation, settings, status, timestamp and version now share a 14px font size.
+  Settings follows the navigation's icon/semibold treatment; information stays
+  regular weight with muted secondary text, not tiny mixed-font captions.
+- Settings is an entry above a compact three-row information group. Status,
+  time and version share the navigation text axis and equal 8px row gaps with
+  22px line height. Long text wraps naturally. The redundant Recall prefix is
+  removed from the version because the drawer already identifies the app.
+- The 18px open circular arrow is paired with the version row and vertically
+  centered on that row, including when text wraps. It no longer floats between
+  rows or has an isolated circular backing. The transparent 44px touch target
+  and existing paper/olive styling and actual Recall logo remain.
 - At 393 x 852 and 525 x 824, the drawer uses the existing 82%/330px cap. The
   foreground is separate from the drawer. Synthetic import content provides
   context; this is not an interactive reconstruction of the whole app.
