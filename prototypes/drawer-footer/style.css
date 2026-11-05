@@ -19,21 +19,21 @@ nav button > svg { margin: 2px 4px; }
 nav button[aria-current="page"] { background: var(--card); }
 .nav-selected { width: 30px; height: 30px; display: grid; place-items: center; background: var(--olive); color: #fff; border-radius: 9px; }
 .nav-selected svg { width: 21px; height: 21px; }
-.drawer-footer { margin-top: auto; border-top: 1px solid var(--line); padding: 16px 12px 0; }
-.settings { min-height: 44px; padding: 8px 0; margin-bottom: 13px; border: 0; background: none; font-size: 14px; font-weight: 600; }
+.drawer-footer { --footer-font-size: 13px; margin-top: auto; border-top: 1px solid var(--line); padding: 16px 12px 0; font-size: var(--footer-font-size); font-weight: 400; line-height: 20px; }
+.settings { min-height: 44px; padding: 8px 0; margin-bottom: 13px; border: 0; background: none; font: inherit; }
 .health { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; gap: 10px; }
 .health-copy { min-width: 0; display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 8px; row-gap: 6px; }
-.sync-line { display: contents; font-size: 13px; font-weight: 400; line-height: 20px; }
+.sync-line { display: contents; font: inherit; }
 .sync-line svg { width: 18px; height: 18px; align-self: center; }
 .sync-line > span { overflow-wrap: anywhere; }
-.sync-time { grid-column: 2; font-size: 11px; line-height: 18px; color: var(--muted); overflow-wrap: anywhere; }
-.version-line { grid-column: 2; margin: 3px 0 0; font-size: 13px; font-weight: 400; line-height: 20px; color: var(--muted); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.sync-time { grid-column: 2; font: inherit; color: var(--muted); overflow-wrap: anywhere; }
+.version-line { grid-column: 2; margin: 3px 0 0; font: inherit; color: var(--muted); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .sync-action { width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 14px; background: transparent; color: var(--olive); padding: 0; position: relative; align-self: center; }
 .sync-action::before { content: ""; position: absolute; inset: 7px; border: 1px solid #a6b09b80; border-radius: 9px; transition: background-color 160ms ease; }
 .sync-action:hover::before { background: #fffcf660; }
 .sync-action svg { width: 18px; height: 18px; position: relative; }
 .sync-action.is-working svg { animation: spin 1s linear infinite; }
-.feedback { min-height: 18px; margin: 8px 0 0 26px; font-size: 11px; line-height: 18px; color: var(--muted); }
+.feedback { min-height: 20px; margin: 8px 0 0 26px; font: inherit; color: var(--muted); }
 .stage[data-state="conflict"] #sync-state, .stage[data-state="offline"] #sync-state { color: var(--danger); }
 .foreground { position: absolute; inset: 0; transform: translateX(min(82%, 330px)); border-radius: 20px 0 0 20px; background: var(--paper); box-shadow: -18px 0 40px #3035250d; overflow: hidden; pointer-events: none; }
 .foreground::after { content: ""; position: absolute; inset: 72px 0 0; background: #343d3215; }

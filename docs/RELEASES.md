@@ -98,6 +98,7 @@ retroactively marked verified just because a deployment still exists.
 
 | Release | Scope | Result | Record |
 |---|---|---|---|
+| `20261105T215501+0800-footer-uniform-typography` | Correct all footer text to one font size/weight/family/line height | Local prototype revised; 6/6 browser checks; production unchanged | [Uniform footer typography](./releases/20261105T215501+0800-footer-uniform-typography.md) |
 | `20261105T203926+0800-drawer-footer-prototype` | Local compact footer / unified typography / small right-side refresh icon | Delivered for review; final 6/6 browser checks; production unchanged | [Compact footer prototype](./releases/20261105T203926+0800-drawer-footer-prototype.md) |
 | `20261105T191943+0800-drawer-unified-sync-update` | V1.1 drawer bottom single sync/update action / protected ordering | Published `8c11afc0`, source `7e55bc93`; 1683 units / 160 distinct mobile with recovery / 205 assets / public 8 passes; compact follow-up prototype requested | [Combined drawer action](./releases/20261105T191943+0800-drawer-unified-sync-update.md) |
 | `20261105T180104+0800-v1-1-paper-editorial` | V1.1 / paper UI / card shape and nine comments / compatible PWA update | Published `aff714f3`, source `a276ca87`; 1664 units / mobile recovery / 205 assets; physical phone and public WebKit offline pending | [V1.1 paper editorial](./releases/20261105T180104+0800-v1-1-paper-editorial.md) |

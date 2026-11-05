@@ -3,8 +3,10 @@
 One focused proposal for the user's compact-footer feedback. It is not a new
 application build and does not replace the production UI.
 
-- Cloud status and build identity use the same 13px font size and regular weight.
-- The 11px success timestamp is secondary, aligned with the status text.
+- Settings, cloud status, timestamp, build identity and feedback all inherit
+  one 13px font size, regular weight, font family and 20px line height.
+- Secondary information uses muted color and spacing, not a smaller font.
+  The timestamp remains aligned with the status text.
 - A single 18px refresh glyph sits to the right of the status/version cluster.
   The quiet 30px outline is inside a 44px target; it is not a full-row primary
   action. Existing paper/olive styling and the actual Recall logo are retained.

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('状态和版本同字号，右侧只有一个小图标，原型不请求真实服务', async ({ page }) => {
+test('底部所有文字同字号和字重，右侧只有一个小图标，原型不请求真实服务', async ({ page }) => {
   const requests: string[] = [];
   page.on('request', request => { requests.push(request.url()); expect(request.method()).toBe('GET'); expect(new URL(request.url()).origin).toBe('http://127.0.0.1:4424'); });
   await page.goto('/');
@@ -11,10 +11,14 @@ test('状态和版本同字号，右侧只有一个小图标，原型不请求�
     expect(await page.locator('.health button').count()).toBe(1);
     const geometry = await action.evaluate(element => { const bounds = element.getBoundingClientRect(); const icon = element.querySelector('svg')!.getBoundingClientRect(); const footer = element.closest('.drawer-footer')!.getBoundingClientRect(); return { width: bounds.width, height: bounds.height, icon: icon.width, rightGap: footer.right - bounds.right, hit: element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)) }; });
     expect(geometry).toMatchObject({ width: 44, height: 44, icon: 18, rightGap: 12, hit: true });
-    const typography = await page.evaluate(() => ['.sync-line > span', '.version-line'].map(selector => getComputedStyle(document.querySelector(selector)!).fontSize));
-    expect(typography).toEqual(['13px', '13px']);
+    const typography = await page.evaluate(() => ['.settings', '.sync-line > span', '.sync-time', '.version-line', '.feedback'].map(selector => { const style = getComputedStyle(document.querySelector(selector)!); return { size: style.fontSize, weight: style.fontWeight, family: style.fontFamily, lineHeight: style.lineHeight }; }));
+    for (const style of typography) {
+      expect(style).toEqual(typography[0]);
+      expect(style).toMatchObject({ size: '13px', weight: '400', lineHeight: '20px' });
+    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: test.info().outputPath(`footer-${dimensions.width}.png`), scale: 'css' });
+    if (dimensions.width === 525) await page.locator('.drawer-footer').screenshot({ path: test.info().outputPath('footer-detail.png'), scale: 'css' });
   }
   expect(requests.every(url => ['/', '/style.css', '/preview.js', '/favicon.ico'].includes(new URL(url).pathname))).toBe(true);
 });
@@ -26,7 +30,8 @@ test('离线、冲突、深色和放大文字下信息不盖住唯一按钮', as
     await page.getByLabel('预览状态').selectOption(state);
     await page.getByLabel('外观').selectOption('dark');
     await page.getByRole('button', { name: '局部原型', exact: true }).click();
-    await page.evaluate(() => { const stage = document.querySelector<HTMLElement>('.stage')!; stage.style.setProperty('--safe-top', '59px'); stage.style.setProperty('--safe-bottom', '34px'); for (const element of document.querySelectorAll<HTMLElement>('.sync-line > span,.version-line')) element.style.fontSize = '20px'; });
+    await page.evaluate(() => { const stage = document.querySelector<HTMLElement>('.stage')!; stage.style.setProperty('--safe-top', '59px'); stage.style.setProperty('--safe-bottom', '34px'); document.querySelector<HTMLElement>('.drawer-footer')!.style.setProperty('--footer-font-size', '20px'); });
+    expect(await page.locator('.drawer-footer').evaluate(element => ['.settings', '.sync-line > span', '.sync-time', '.version-line', '.feedback'].map(selector => getComputedStyle(element.querySelector(selector)!).fontSize))).toEqual(Array(5).fill('20px'));
     const action = page.getByRole('button', { name: '同步并检查更新', exact: true });
     await action.scrollIntoViewIfNeeded();
     await expect(action).toBeInViewport();
