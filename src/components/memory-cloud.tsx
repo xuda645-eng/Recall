@@ -103,18 +103,16 @@ function CloudSummary({ onManage }: Pick<MemoryCloudProps, 'onManage'>) {
   </div>;
 }
 
-export function MemoryCloudDrawerStatus({ onManage }: { onManage: () => void }): JSX.Element {
+export function MemoryCloudDrawerStatus(): JSX.Element {
   const status = useCloudSync();
   const media = useMediaSync();
-  const action = useCloudAction();
   const conflicts = status.conflicts > 0 || status.phase === 'conflict';
-  const syncing = action.busy || status.phase === 'syncing';
   return <section className="m-drawer-sync" aria-label="云同步状态">
-    <div className="m-drawer-sync-controls"><button type="button" className="m-drawer-sync-status" onClick={onManage} aria-label={`管理云同步：${statusLabel(status)}`}><Cloud size={18} aria-hidden="true"/><span role="status" aria-live="polite">云同步 · {statusLabel(status)}</span></button><button type="button" className={`m-drawer-sync-action ${syncing ? 'is-syncing' : ''}`} aria-label={syncing ? '正在同步' : '立即同步'} title={conflicts ? '请先处理同步冲突' : !authorized(status) ? '请先授权设备' : '立即同步'} disabled={!authorized(status) || syncing || conflicts} onClick={() => void action.run(synchronizeCloud)}><RefreshCw size={17} aria-hidden="true"/></button></div>
+    <div className="m-drawer-sync-status"><Cloud size={18} aria-hidden="true"/><span role="status" aria-live="polite">云同步 · {statusLabel(status)}</span></div>
     <small>最近同步：{formatTime(status.lastSyncedAt)}</small>
     {(status.pending > 0 || conflicts) && <small>待同步 {status.pending} 项{conflicts ? ` · 冲突 ${status.conflicts} 项，请先处理` : ''}</small>}
     {(media.pending > 0 || media.running || media.error) && <small role="status">来源图片：{media.running ? '正在同步' : media.error ? '同步未完成，请查看云同步设置' : `待传 ${media.pending} 张`}</small>}
-    {(status.error || action.error) && <p className="m-drawer-sync-error" role="alert">{action.error || status.error}</p>}
+    {status.error && <p className="m-drawer-sync-error" role="alert">{status.error}</p>}
   </section>;
 }
 

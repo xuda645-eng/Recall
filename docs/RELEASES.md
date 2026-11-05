@@ -98,6 +98,7 @@ retroactively marked verified just because a deployment still exists.
 
 | Release | Scope | Result | Record |
 |---|---|---|---|
+| `20261105T191943+0800-drawer-unified-sync-update` | V1.1 drawer bottom single sync/update action / protected ordering | 1683 units; 160 distinct mobile cases with setup recovery / focused 12 passes; publication pending | [Combined drawer action](./releases/20261105T191943+0800-drawer-unified-sync-update.md) |
 | `20261105T180104+0800-v1-1-paper-editorial` | V1.1 / paper UI / card shape and nine comments / compatible PWA update | Published `aff714f3`, source `a276ca87`; 1664 units / mobile recovery / 205 assets; physical phone and public WebKit offline pending | [V1.1 paper editorial](./releases/20261105T180104+0800-v1-1-paper-editorial.md) |
 | `20261105T173213+0800-paper-browser-comments` | Nine local annotations / reader / chips / import dock / local WeRead | Local phase: 1657 units / 14 paper checks; product 159 passed / 1 deadline, retained | [Browser corrections](./releases/20261105T173213+0800-paper-browser-comments.md) |
 | `20261105T154950+0800-paper-card-shape` | Restore visible card containers | Local phase: 1651 units / 8 card checks; product 158 passed / 2 timeouts, recovery 2/2 | [Card shape](./releases/20261105T154950+0800-paper-card-shape.md) |

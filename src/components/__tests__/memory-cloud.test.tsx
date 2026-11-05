@@ -102,23 +102,18 @@ describe('mobile cloud components', () => {
   });
   afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-  it('shows drawer status and the latest successful sync time without automatic requests', async () => {
+  it('shows read-only drawer status and the latest successful sync time without automatic requests', () => {
     useCloudSync.setState({ phase: 'synced', session: currentSession, pending: 0, conflicts: 0, lastSyncedAt: '2026-11-05T01:00:00.000Z' });
-    const manage = vi.fn();
-    render(<MemoryCloudDrawerStatus onManage={manage}/>);
+    render(<MemoryCloudDrawerStatus/>);
     expect(screen.getByRole('region', { name: '云同步状态' })).toHaveTextContent('云同步 · 已同步');
     expect(screen.getByText(/最近同步：/)).not.toHaveTextContent('尚无成功同步记录');
     expect(api.sync).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: '管理云同步：已同步' }));
-    expect(manage).toHaveBeenCalledOnce();
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '立即同步' })); });
-    expect(api.sync).toHaveBeenCalledOnce();
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
-  it.each(['local', 'unauthorized', 'conflict'] as const)('keeps drawer sync disabled for %s while allowing management', phase => {
+  it.each(['local', 'unauthorized', 'conflict'] as const)('keeps drawer status read-only for %s', phase => {
     useCloudSync.setState({ phase, session: phase === 'conflict' ? currentSession : null, conflicts: phase === 'conflict' ? 1 : 0 });
-    render(<MemoryCloudDrawerStatus onManage={vi.fn()}/>);
-    expect(screen.getByRole('button', { name: '立即同步' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /管理云同步：/ })).toBeEnabled();
+    render(<MemoryCloudDrawerStatus/>);
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
     expect(api.sync).not.toHaveBeenCalled();
   });
   it.each(['checking', 'local', 'unauthorized', 'syncing', 'synced', 'offline', 'pending', 'conflict', 'error'] as const)('shows %s without a local-use gate or automatic sync', phase => {

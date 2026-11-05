@@ -44,6 +44,8 @@
 .m-app-version small { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .memory-drawer .m-version-refresh { flex-shrink: 0; justify-content: center; padding: 0; min-width: 44px; min-height: 44px; opacity: .55; }
 .memory-drawer .m-version-refresh:hover, .memory-drawer .m-version-refresh:focus-visible { opacity: 1; }
+.m-app-version.is-combined { display: grid; gap: 8px; }
+.memory-drawer .m-app-version.is-combined .m-version-refresh { width: 100%; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--card-paper); color: var(--ink); opacity: 1; font-size: 12px; }
 .m-version-message { line-height: 1.6; }
 .memory-bar { height: 48px; top: var(--safe-top); left: var(--safe-left); right: var(--safe-right); gap: 8px; }
 .memory-bar > button, .memory-bar .m-context { height: 48px; background: var(--card-paper); border-radius: 14px; box-shadow: 0 5px 16px #3d362d12; }

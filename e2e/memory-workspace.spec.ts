@@ -213,7 +213,7 @@ test('iPhone系统安全框首帧、抽屉、缩短视口和原版更新离线�
     oldOverrides.set('index.html', originalHtml);
     oldOverrides.set('sw.js', currentWorker);
     await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
-    await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), page.getByRole('button', { name: '检查更新并刷新', exact: true }).click()]);
+    await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), page.getByRole('button', { name: '同步并检查更新', exact: true }).click()]);
     await waitForAppReady(page);
     await expect(page.locator('meta[name="viewport"]')).toHaveAttribute('content', /viewport-fit=auto/);
     await expect(page.locator('html')).toHaveAttribute('data-first-viewport', /viewport-fit=auto/);
@@ -452,7 +452,7 @@ test('原安装方案保持控件几何、触摸和滚动，切换不读写存�
   expect(await snapshot(page)).toEqual(before);
 });
 
-test('抽屉显示固定构建版本，刷新图标在移动窄屏与桌面均可触达', async ({ page }) => {
+test('抽屉显示固定构建版本，底部唯一同步更新按钮在移动窄屏与桌面均可触达', async ({ page }) => {
   await seedPage(page);
   await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
   const version = page.locator('[data-app-version]');
@@ -463,18 +463,35 @@ test('抽屉显示固定构建版本，刷新图标在移动窄屏与桌面均�
   expect(metadata.version).toMatch(/^1\.0-\d{8}-\d{4}$/);
   expect(metadata.timezone).toBe('Asia/Shanghai');
   await saveShot(page, 'drawer-version');
-  for (const width of [393, 320, 760, 761, 1280]) {
+  for (const width of [393, 320, 525, 760, 761, 1280]) {
     await page.setViewportSize({ width, height: 852 });
     await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))));
     await expect(version).toHaveText(text);
-    const refresh = page.getByRole('button', { name: '检查更新并刷新', exact: true });
+    const refresh = page.getByRole('button', { name: '同步并检查更新', exact: true });
+    await expect(page.locator('.m-drawer-sync button')).toHaveCount(0);
+    await expect(page.locator('.m-drawer-footer .m-version-refresh')).toHaveCount(1);
     await expect(refresh).toBeInViewport();
     const box = (await refresh.boundingBox())!;
     expect(Math.round(box.width * 1000) / 1000).toBeGreaterThanOrEqual(44);
     expect(Math.round(box.height * 1000) / 1000).toBeGreaterThanOrEqual(44);
+    const settings = (await page.locator('#memory-drawer').getByRole('button', { name: '设置与数据', exact: true }).boundingBox())!;
+    expect(box.y).toBeGreaterThan(settings.y + settings.height);
+    expect(await refresh.evaluate(element => { const bounds = element.getBoundingClientRect(); return element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)); })).toBe(true);
     const geometry = await page.evaluate(() => ({ width: innerWidth, scroll: document.documentElement.scrollWidth }));
     expect(geometry.scroll, `${width}px viewport: ${JSON.stringify(geometry)}`).toBeLessThanOrEqual(geometry.width + 1);
   }
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.evaluate(() => { const app = document.querySelector<HTMLElement>('.memory-app')!; app.style.setProperty('--safe-top', '59px'); app.style.setProperty('--safe-bottom', '34px'); document.querySelector<HTMLElement>('.m-version-refresh')!.style.fontSize = '20px'; });
+  await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
+  const combined = page.getByRole('button', { name: '同步并检查更新', exact: true });
+  await combined.scrollIntoViewIfNeeded();
+  await expect(combined).toBeInViewport();
+  const enlargedBox = (await combined.boundingBox())!;
+  expect(enlargedBox.width).toBeGreaterThanOrEqual(44);
+  expect(enlargedBox.height).toBeGreaterThanOrEqual(44);
+  expect(enlargedBox.y + enlargedBox.height).toBeLessThanOrEqual(852 - 34);
+  await noOverflow(page);
+  await saveShot(page, 'drawer-combined-sync');
 });
 
 test('版本刷新检查后重新加载，离线失败不误报最新也不改变本机数据', async ({ page, context }) => {
@@ -483,12 +500,12 @@ test('版本刷新检查后重新加载，离线失败不误报最新也不改�
   await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
   const version = await page.locator('[data-app-version]').textContent();
   await context.setOffline(true);
-  await page.getByRole('button', { name: '检查更新并刷新', exact: true }).click();
+  await page.getByRole('button', { name: '同步并检查更新', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: '无法检查更新' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '检查更新并刷新', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '同步并检查更新', exact: true })).toBeEnabled();
   expect(await snapshot(page)).toEqual(before);
   await context.setOffline(false);
-  await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), page.getByRole('button', { name: '检查更新并刷新', exact: true }).click()]);
+  await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), page.getByRole('button', { name: '同步并检查更新', exact: true }).click()]);
   await waitForAppReady(page);
   await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
   await expect(page.locator('[data-app-version]')).toHaveText(version!);
@@ -505,7 +522,7 @@ test('版本刷新激活新发现的Service Worker后重开且保留归档和复
     await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
     let reloads = 0;
     page.on('request', request => { if (request.isNavigationRequest() && request.frame() === page.mainFrame()) reloads++; });
-    await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), page.getByRole('button', { name: '检查更新并刷新', exact: true }).click()]);
+    await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), page.getByRole('button', { name: '同步并检查更新', exact: true }).click()]);
     await waitForAppReady(page);
     const active = await page.evaluate(() => new Promise<string>(resolve => {
       const channel = new MessageChannel();
@@ -1770,9 +1787,12 @@ test('本轮批注：同步状态仅在抽屉显示，保留管理同步时间�
   const drawer = page.locator('#memory-drawer');
   await expect(drawer.getByRole('region', { name: '云同步状态' })).toBeVisible();
   await expect(drawer).toContainText('最近同步：');
-  await expect(drawer.getByRole('button', { name: '立即同步' })).toBeDisabled();
+  await expect(drawer.getByRole('button', { name: '立即同步' })).toHaveCount(0);
+  await expect(drawer.getByRole('region', { name: '云同步状态' }).getByRole('button')).toHaveCount(0);
+  await expect(drawer.getByRole('button', { name: '同步并检查更新', exact: true })).toBeVisible();
   await expect(drawer.getByRole('button', { name: '添加卡片', exact: true })).toHaveCount(0);
-  await drawer.getByRole('button', { name: /管理云同步：/ }).click();
+  await drawer.getByRole('button', { name: '设置与数据', exact: true }).click();
+  await page.getByRole('button', { name: '管理云同步', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   const close = page.getByRole('button', { name: '关闭面板', exact: true });
   await expect(close).toBeFocused();
@@ -1781,7 +1801,7 @@ test('本轮批注：同步状态仅在抽屉显示，保留管理同步时间�
   expect(box.height).toBeGreaterThanOrEqual(44);
   expect(box.width).toBeGreaterThanOrEqual(44);
   await close.click();
-  await expect(page.getByRole('button', { name: '打开项目菜单', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: '管理云同步', exact: true })).toBeFocused();
   await navigate(page, '设置与数据');
   await expect(page.locator('.m-main .m-cloud')).toHaveCount(0);
   await noOverflow(page);

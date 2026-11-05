@@ -21,6 +21,7 @@ import { MemoryStatusEdge } from '@/components/memory-status-edge';
 import { MemoryDisplayDiagnostics } from '@/components/memory-display-diagnostics';
 import { MemoryCloudDrawerStatus, MemoryCloudSettings } from '@/components/memory-cloud';
 import { PWAAppVersion, PWAUpdatePrompt } from '@/components/pwa-update-prompt';
+import { synchronizeBeforePWARefresh } from '@/services/pwa-cloud-refresh';
 import { MediaEditor } from '@/components/media-editor';
 import { MediaBackupControls } from '@/components/media-backup-controls';
 import { MediaPackagePreview } from '@/components/media-package-preview';
@@ -596,7 +597,7 @@ export function MemoryWorkspace(): JSX.Element {
     <aside id="memory-drawer" className="memory-drawer" ref={drawerRef} data-visible={drawer || drawerVisible} aria-label="项目菜单" aria-hidden={mobile && !drawer}>
       <div className="m-drawer-brand"><strong>Recall</strong><span>记忆卡片</span><small>{titles[navRoute as keyof typeof titles]}</small></div>
       <nav>{navEntries.map(([target, label, Icon]) => <button key={target} aria-current={navRoute === target ? 'page' : undefined} onClick={() => { if (target === 'folders') setFolder(null); navigate(target); }}><span className="m-nav-icon"><Icon size={20}/></span>{target === 'folders' ? label : t(`memory.routes.${target}`, label)}</button>)}</nav>
-      <div className="m-drawer-footer">{isLocalPreview() ? <p className="m-paper-preview-label" role="status">本地验收副本 · 云同步已关闭</p> : <MemoryCloudDrawerStatus onManage={() => { if (mobile) { setDrawer(false); brand.current?.focus(); } setSheet({ kind: 'cloud' }); }}/>}<button onClick={() => navigate('settings')}>设置与数据</button><PWAAppVersion disabled={busy}/></div>
+      <div className="m-drawer-footer"><button onClick={() => navigate('settings')}>设置与数据</button>{isLocalPreview() ? <p className="m-paper-preview-label" role="status">本地验收副本 · 云同步已关闭</p> : <MemoryCloudDrawerStatus/>}<PWAAppVersion disabled={busy} combined={!isLocalPreview()} beforeRefresh={synchronizeBeforePWARefresh}/></div>
     </aside>
     <div ref={shellRef} className={`memory-shell ${drawer ? 'is-open' : ''} ${route === 'read' ? 'is-reading' : ''} ${archiveUndo ? 'has-archive-undo' : ''}`}>
       <header className="memory-bar"><button ref={brand} className="m-brand" aria-expanded={drawer} aria-controls="memory-drawer" aria-label={drawer ? '关闭项目菜单' : '打开项目菜单'} disabled={busy} onClick={() => { if (sheet) { closeSheet(); return; } setDrawer(value => !value); }}><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M23 15h32c27 0 34 32 12 45l19 25H64L43 57v28H23z" fill="white"/><path d="M54 23c-1 10-4 14-14 15 10 1 13 5 14 15 1-10 4-14 14-15-10-1-13-5-14-15" fill="currentColor"/></svg></button>{route === 'folders' && folder ? <button className="m-context" onClick={() => setSheet({ kind: 'path' })} aria-label={`查看卡组路径：${shellTitle}`}>{shellTitle}</button> : <div className="m-context">{shellTitle}</div>}{hasTopAction ? <button className="m-top-action" aria-label={topLabel} disabled={busy || drawer || !!sheet} onClick={topAction}>{route === 'read' ? '退出' : topBack ? <ArrowLeft size={20}/> : route === 'settings' ? <MoreHorizontal size={20}/> : <Plus size={22}/>}</button> : <span className="m-top-action-placeholder" aria-hidden="true"/>}</header>

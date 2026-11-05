@@ -6,6 +6,9 @@ import { createSeedSnapshot } from '../src/data/seed';
 test('V1.1 公网缓存完整与持久化，Chromium 断网重开；WebKit 公网断网仍待验证', async ({ browser, browserName }) => {
   const context = await browser.newContext({ baseURL: 'https://recall-memory.pages.dev/', viewport: { width: 393, height: 852 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, serviceWorkers: 'allow', locale: 'zh-CN' });
   try {
+    const directory = process.env.RECALL_VERIFY_DIST;
+    if (!directory) throw new Error('RECALL_VERIFY_DIST must point to the committed production bundle');
+    const build = JSON.parse(await readFile(resolve(directory, 'version.json'), 'utf8')) as { version: string; releaseVersion?: string };
     const initial = createSeedSnapshot();
     initial.decks.forEach((deck, index) => { deck.name = `公开验收合成卡组 ${index + 1}`; });
     initial.cards.forEach(card => { card.front = '合成问题，用于验证离线缓存。'; card.back = '合成答案，不是真实用户数据。'; });
@@ -23,15 +26,16 @@ test('V1.1 公网缓存完整与持久化，Chromium 断网重开；WebKit 公�
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 120000 });
     await expect(page.locator('.m-paper-review-card')).toBeVisible();
     await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
-    await expect(page.locator('[data-app-version]')).toHaveText('1.1-20261105-1801');
+    await expect(page.locator('[data-app-version]')).toHaveText(build.releaseVersion ?? build.version);
+    await expect(page.locator('#memory-drawer').getByRole('button', { name: '同步并检查更新', exact: true })).toBeVisible();
+    await expect(page.locator('.m-drawer-sync').getByRole('button')).toHaveCount(0);
+    await page.screenshot({ path: test.info().outputPath('drawer-sync-update.png'), scale: 'css' });
     await page.keyboard.press('Escape');
     await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller?.state), { timeout: 120000 }).toBe('activated');
     const before = await page.evaluate(() => localStorage.getItem('recall.snapshot.v1'));
     const cache = await page.evaluate(async () => { const names = await caches.keys(); const cacheName = names.find(name => name.includes('precache')); if (!cacheName) return []; return (await (await caches.open(cacheName)).keys()).map(request => request.url); });
     expect(cache.some(url => new URL(url).pathname === '/index.html')).toBe(true);
     expect(cache.some(url => new URL(url).pathname.includes('memory-workspace'))).toBe(true);
-    const directory = process.env.RECALL_VERIFY_DIST;
-    if (!directory) throw new Error('RECALL_VERIFY_DIST must point to the committed production bundle');
     const workerSource = await readFile(resolve(directory, 'sw.js'), 'utf8');
     const expectedPaths = [...new Set([...workerSource.matchAll(/\{url:"([^"]+)"/g)].map(match => new URL(match[1], 'https://recall-memory.pages.dev/').pathname))].sort();
     expect(expectedPaths.length).toBeGreaterThan(0);

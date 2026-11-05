@@ -46,4 +46,30 @@ describe('drawer build identity and refresh', () => {
     fireEvent.click(screen.getByRole('button', { name: '检查更新并刷新' }));
     expect(refresh).not.toHaveBeenCalled();
   });
+  it('combines sync and update into one labelled action and waits for sync', async () => {
+    let complete!: () => void;
+    const pending = new Promise<void>(resolve => { complete = resolve; });
+    const before = vi.fn(() => pending);
+    render(<PWAAppVersion combined beforeRefresh={before}/>, { wrapper: PWAUpdateProvider });
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    const button = screen.getByRole('button', { name: '同步并检查更新' });
+    act(() => { fireEvent.click(button); fireEvent.click(button); });
+    expect(before).toHaveBeenCalledOnce();
+    expect(refresh).not.toHaveBeenCalled();
+    expect((screen.getByRole('button', { name: '正在同步并检查更新' }) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => { complete(); await pending; });
+    expect(refresh).toHaveBeenCalledExactlyOnceWith(update, '1.0-20261101-0200', expect.any(Function));
+  });
+  it('does not check or reload the app after sync fails and offers a safe retry', async () => {
+    const before = vi.fn().mockRejectedValueOnce(new Error('同步有冲突，本次暂不刷新')).mockResolvedValue(undefined);
+    const clear = vi.spyOn(Storage.prototype, 'clear');
+    render(<PWAAppVersion combined beforeRefresh={before}/>, { wrapper: PWAUpdateProvider });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '同步并检查更新' })); });
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByRole('status').textContent).toContain('本次暂不刷新');
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '同步并检查更新' })); });
+    expect(before).toHaveBeenCalledTimes(2);
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(clear).not.toHaveBeenCalled();
+  });
 });
