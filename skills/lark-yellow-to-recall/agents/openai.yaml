@@ -1,4 +1,4 @@
 interface:
   display_name: "飞书材料转 Recall"
   short_description: "整合同主题标黄与截图红框，按学习逻辑生成 QA，一个带图包容纳有图和无图卡片"
-  default_prompt: "使用 $lark-yellow-to-recall 将同一主题的标黄云文档和截图红框学习文档按学习逻辑整合去重，保留来源证据，确认卡组后交付一个含有图和无图 QA 的带图包并独立归档。"
+  default_prompt: "使用 $lark-yellow-to-recall 将同主题标黄和截图红框按学习逻辑整合去重，保留证据并确认卡组，独立归档后把带图包放在项目待导入目录，文件使用主题加日期的短名称，给出完整本地路径。"

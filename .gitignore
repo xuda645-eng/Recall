@@ -23,6 +23,7 @@ coverage/
 .dev.vars
 handoffs/
 /card-imports/
+/待导入/
 /quality/
 
 # Temporary files

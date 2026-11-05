@@ -87,6 +87,39 @@ try {
     return { state, totals };
   }
 
+  let mediaResult;
+  if (request.media_file) {
+    request.documents.forEach(checkedDocument);
+    const { parseMediaPackage } = await server.ssrLoadModule('/src/services/media-package.ts');
+    const parsed = await parseMediaPackage(await readFile(request.media_file, 'utf8'));
+    assert.ok(parsed.package.markdown, 'Use an import package, not a backup');
+    const document = parseMemoryMarkdown(parsed.package.markdown, generationTime);
+    const originals = request.documents.flatMap(file => file.expected);
+    assert.equal(document.entries.length, originals.length, 'Package and archive counts differ');
+    const assets = new Set(parsed.assets.map(asset => asset.id));
+    const packagedCards = document.entries.map((entry, index) => {
+      const original = originals[index];
+      assert.deepEqual({ id: entry.id, path: entry.path, front: entry.front },
+        { id: original.id, path: original.path, front: original.front }, 'Package must preserve archive identity and questions');
+      assert.ok(entry.back.startsWith(original.back), 'Package must preserve the archived answer');
+      let suffix = entry.back.slice(original.back.length);
+      if (request.media_source_url) {
+        const sourceLink = '\n\n[来源文档](' + request.media_source_url + ')';
+        assert.ok(suffix.endsWith(sourceLink), 'Screenshot package must preserve its source link');
+        suffix = suffix.slice(0, -sourceLink.length);
+      }
+      const references = [...suffix.matchAll(/\n\n!\[来源截图\]\(recall:\/\/([a-f0-9]{64}\.webp)\)/g)];
+      assert.equal(references.map(match => match[0]).join(''), suffix, 'Only verified image references may be appended');
+      assert.ok(references.every(match => assets.has(match[1])), 'Attached image must exist in the package');
+      const evidence = request.media_cards[index].evidence;
+      const imageKeys = new Set(evidence.filter(item => item.screenshot || !item.source).map(item =>
+        item.screenshot ? JSON.stringify([item.source?.source_document_id, item.screenshot.block_key]) : item.block_key.split(':')[0]));
+      assert.equal(Boolean(references.length), Boolean(imageKeys.size), 'Text and image card classification must be preserved');
+      return { ...original, back: entry.back };
+    });
+    request.documents = [{ name: path.basename(request.media_file), text: parsed.package.markdown, expected: packagedCards }];
+    mediaResult = { images: parsed.assets.length, attachment_bytes: parsed.assets.reduce((total, asset) => total + asset.bytes.byteLength, 0) };
+  }
   const expectedCount = request.documents.reduce((total, file) => total + file.expected.length, 0);
   const first = importFiles(seed, request.documents, request.import_parent);
   assert.equal(first.totals.added, expectedCount);
@@ -121,6 +154,7 @@ try {
     confirmed_history_updates: confirmedImport.totals, explicit_update_verified: true,
     old_cards_preserved: true, review_progress_preserved: true, database_accessed: false,
     physical_iphone_tested: false,
+    ...(mediaResult ? { media: mediaResult } : {}),
   }));
 } finally {
   await server.close();

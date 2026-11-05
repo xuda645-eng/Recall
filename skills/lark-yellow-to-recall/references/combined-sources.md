@@ -101,6 +101,7 @@ python3 <skill>/scripts/combined_batch.py extract --sources <临时sources.json>
 python3 <skill>/scripts/combined_batch.py archive --project <project> --sources <sources.json> --plan <plan.json> --confirm
 python3 <skill>/scripts/media_package.py pack --batch <返回的整合批次> --selections <第一份截图selections.json> --output <整合批次>/cards-<批次号>.recall-media.json
 node scripts/verify-media-package.mjs <生成的带图包>
+python3 <skill>/scripts/deliver.py --project <project> --batch <整合批次> --topic <简短主题> --confirm
 python3 <skill>/scripts/recall_batch.py index --project <project> --confirm
 ```
 
@@ -112,4 +113,4 @@ python3 <skill>/scripts/recall_batch.py index --project <project> --confirm
 
 默认仅归档新/变更卡；需要直接首次导入的完整修订版用 `--include-unchanged`，避免把增量包当全量。旧文件及 manifest 不改，汇总只登记独立文件，仍遵循已有索引授权。真实材料与包不发布 GitHub，不自动导入 APP。
 
-交付清楚标出主要导入文件、有图/无图卡数、整合去重结果、学习顺序、来源/待确认缺口，以及同批 Markdown 和索引入口。APP 选择“带图包”导入这个 JSON，一次预览确认所有卡；不要把“JSON”误解为只可装图片卡。不宣称已在物理 iPhone 导入或已跨设备同步图片。
+按 [浅层交付](recall-format.md#浅层交付) 把最终文件放在 `<项目>/待导入/`，以 `主题-YYYY-MM-DD` 短名称交付，不改内部批次号。最终回复先给主要导入文件绝对路径链接和完整浅层目录，再标出有图/无图卡数、整合去重结果及待确认缺口。APP 选择“带图包”导入这个 JSON，一次预览确认所有卡；不要把“JSON”误解为只可装图片卡。不宣称已在物理 iPhone 导入或已跨设备同步图片。

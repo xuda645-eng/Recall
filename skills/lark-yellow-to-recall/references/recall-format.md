@@ -12,6 +12,7 @@ Python 3.10+（标准库）、Node.js 22+，以及目标 Recall 项目已安装�
 python3 scripts/recall_batch.py configure --project <project> --timezone Asia/Shanghai
 python3 scripts/recall_batch.py extract --source <source> --url <用户指定URL> --output /tmp/recall-highlights.json
 python3 scripts/recall_batch.py archive --project <project> --source <source> --plan <plan> --confirm
+python3 scripts/deliver.py --project <project> --batch <批次目录> --topic <简短主题> --confirm
 python3 scripts/recall_batch.py index --project <project> --confirm
 python3 scripts/recall_batch.py verify --project <project> --batch <批次目录>
 python3 -m unittest discover -s scripts/tests -v
@@ -81,20 +82,37 @@ python3 -m unittest discover -s scripts/tests -v
 
 文件不预填 `importedAt`。每文件 1-1000 张、最多 5 MiB；问题最多 10000 UTF-16 单元、答案最多 20000，卡组名称最多 80，标题不跳级。原文中的卡片标记必须用实际解析器验证，不能自行转义并改变知识文本；不兼容时停止。
 
-归档结构：
+内部归档与用户交付分开：
 
 ```text
-card-imports/
-  config.json
-  index.md
-  batches/<真实时间和唯一批次号>/
-    cards-<批次号>-001.md
-    manifest.json
-    review-notes.md
+<项目>/
+  待导入/
+    主交互-2026-11-05.md
+    主交互-2026-11-05.recall-media.json
+  card-imports/
+    config.json
+    index.md
+    batches/<真实时间和唯一批次号>/
+      cards-<批次号>-001.md
+      manifest.json
+      review-notes.md
+      delivery.json
 ```
 
-文件名包含批次号，避免 iPhone 下载后全叫 `cards-001.md`。文件超过限额自动拆分，单卡超限则拒绝。全部重复不创建空批次；`--include-unchanged` 可显式生成完整修订版，原文件仍不动。
+内部归档文件名保留批次号以供回查，不作为用户默认入口。文件超过限额自动拆分，单卡超限则拒绝。全部重复不创建空批次；`--include-unchanged` 可显式生成完整修订版，原文件仍不动。
 
 manifest 记录源 document_id/URL/版本、真实生成时间、用户确认的路径、证据、稳定 ID、跳过原因、待确认和本地校验结果。`status: generated` 始终不是已导入。脚本兼容当前历史 manifest，用原文定位复用旧 ID；定位变化可显式确认，绝不只靠问题措辞匹配。
 
 归档会先在临时目录运行实际 PWA 解析器，比较数量、ID、路径、front/back，再用纯内存快照验证首次新增、重复跳过、历史内容变更默认不覆盖、选中才更新、旧卡和复习字段保留。只通过后发布批次；独立 `index --confirm` 从已发布 manifest 重建链接汇总。Skill 测试与结构校验不替代真实 iPhone Safari 安装和手动导入验证。
+
+## 浅层交付
+
+所有选材模式完成归档与打包后，都运行 `scripts/deliver.py`。它不重新制卡、不修改旧批次正文或 manifest、不接数据库，仅把已验证的最终文件复制到 `<项目>/待导入/`，目录下不再嵌套日期或批次文件夹。截图来源必须先完成带图包，不静默只交付无图 Markdown。
+
+- `--topic` 使用简短学习主题，优先采用已确认的子卡组名称，例如 `主交互`，最多20个字符。文件名不放培训长标题、Docx token、微秒、时区、UUID或批次号。必要的主题缩写由代理整理，不能借此改变卡组归属。
+- 日期取批次实际生成日期并按项目时区表示，格式为 `YYYY-MM-DD`。例如 `主交互-2026-11-05.recall-media.json`，不是内部的 `cards-<批次号>`。
+- 带图包为主要导入文件，同名 `.md` 仅供核对/无图导入。同日同主题已有文件时增加短序号 `-2`、`-3`，绝不覆盖；Markdown超过限额时使用短分片序号 `-01.md`、`-02.md`。
+- 重复交付同批次且文件哈希未变时返回已有文件，不产生另一套副本。已交付文件被改动、来源包与归档不符或实际解析器不兼容时停止，不修补校验值。
+- 项目的 Git 仓库必须忽略 `/待导入/` 后才能写私人文件；现有无 Git 的本地项目可直接使用。临时响应、原始PNG、计划JSON、manifest和检查说明不塞进待导入目录，仍各在临时区或内部归档。
+- 交付先检查原归档已通过历史校验及 Markdown 哈希，再重新运行当前 APP 的首次、重复与显式更新/进度校验；带图包另核对真实 `parseMediaPackage`、卡片与归档一致性、附件及重复导入。此次交付校验不重新扫描无关历史，也不声称修复历史归档。新 `delivery.json` 仅记录交付文件映射、哈希和结果。
+- 最终回复先给主要文件的绝对路径链接、完整浅层目录和数量，不以 `/private/tmp/` 或深层批次路径作为默认下载入口。Finder 找不到时说明在本机，使用 `Command + Shift + G` 粘贴该目录。卡片没有自动导入，生成不等于物理 iPhone/PWA验收。
