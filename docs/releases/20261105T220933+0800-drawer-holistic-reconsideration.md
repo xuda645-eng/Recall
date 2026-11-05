@@ -80,3 +80,13 @@ The new design is a proposal, not user acceptance or permission to deploy it.
 
 Related: [rejected prior attempt](./20261105T220235+0800-footer-refresh-spacing.md),
 [prototype instructions](../../prototypes/drawer-footer/README.md).
+
+## Actual Source Outcome
+
+At 2026-11-05T22:13:50+08:00, source
+`1705a59f41eaad42f119cf6f6297840dec9c0f5e` was committed and pushed normally
+to `xuda645-eng/Recall` main (`0bd41a3b..1705a59f`). Only the seven reviewed
+prototype/test/documentation files were included. Documentation checks, final
+scoped lint and whitespace passed. Private files and generated screenshots
+were excluded. This append is documentation-only. No application deployment
+or user design acceptance is implied by source delivery.
