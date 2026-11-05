@@ -98,7 +98,7 @@ retroactively marked verified just because a deployment still exists.
 
 | Release | Scope | Result | Record |
 |---|---|---|---|
-| `20261105T223050+0800-drawer-approved-implementation` | Approved whole drawer / compact version refresh / safe scrolling | Validated 1684 units / 164 distinct mobile with local skip recovery; source/deployment pending | [Approved drawer implementation](./releases/20261105T223050+0800-drawer-approved-implementation.md) |
+| `20261105T223050+0800-drawer-approved-implementation` | Approved whole drawer / compact version refresh / safe scrolling | Published V1.1-2224 / `fe91e8da` / `bd069dc9`; 1684 units, 164 distinct mobile and 8 distinct public with recovery; 204/205 hashes, unchanged ICO read and physical-phone limits recorded | [Approved drawer implementation](./releases/20261105T223050+0800-drawer-approved-implementation.md) |
 | `20261105T220933+0800-drawer-holistic-reconsideration` | Reconsider whole drawer / grouping / actual text axis / version-paired action | New local proposal; final 6/6 browser checks; pending review, production unchanged | [Holistic drawer proposal](./releases/20261105T220933+0800-drawer-holistic-reconsideration.md) |
 | `20261105T220235+0800-footer-refresh-spacing` | Local open-ring refresh icon / equal footer row spacing | Source `0bd41a3b`; user rejected floating/misaligned layout despite 6 checks, superseded; no deployment | [Refresh and spacing](./releases/20261105T220235+0800-footer-refresh-spacing.md) |
 | `20261105T215501+0800-footer-uniform-typography` | Correct all footer text to one font size/weight/family/line height | Local prototype revised; 6/6 browser checks; production unchanged | [Uniform footer typography](./releases/20261105T215501+0800-footer-uniform-typography.md) |

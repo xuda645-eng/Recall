@@ -2,7 +2,9 @@
 
 Checkpoint: 2026-11-05T22:30:50+08:00 (Asia/Shanghai).
 First focused unit checkpoint: 2026-11-05T22:20:06+08:00.
-Status: validated implementation; source publication and deployment pending.
+Status: published V1.1-20261105-2224; post-publication checks completed with
+recorded recoveries and limitations. Publication confirmed at
+2026-11-05T22:34:30+08:00. Record checkpoint: 2026-11-05T22:59:28+08:00.
 
 ## Accepted Scope
 
@@ -109,8 +111,34 @@ origin change. Syntax and scoped lint passed. Public runtime checks follow uploa
 Source base: `33763c41fe132fdb5bf2619baeaeeddf89575c62` in the clean delivery
 worktree. Only requested implementation/tests/verification and this record/index
 are committed; the original dirty trial, unrelated style-lab and all private
-files remain excluded. Actual source SHA, normal push and deployment outcomes
-are appended after publication.
+files remain excluded.
+
+- Application source: `fe91e8daaa23d54c15a12dd3765bab90c5a95ee1`, committed at
+  2026-11-05T22:32:34+08:00. Normal push succeeded: `33763c41..fe91e8da`,
+  `HEAD -> main` on xuda645-eng/Recall.
+- Production deployment: `bd069dc9-4aa9-4058-81b4-871d42e6509e`, confirmed by
+  the existing project's deployment list at 2026-11-05T22:34:30+08:00. Stable
+  URL: https://recall-memory.pages.dev/. Immutable deployment:
+  https://bd069dc9.recall-memory.pages.dev/.
+- Uploaded the frozen validated build using the exact application source SHA:
+  205 assets, 28 new / 177 reused, with Functions, headers and routes. No dirty
+  deployment flag, new resources or production-origin changes.
+- User-facing `releaseVersion` is `1.1-20261105-2224`. The legacy `version`
+  field remains `1.0-20261105-2224` for existing update identity compatibility;
+  this is not a downgrade of the displayed V1.1 release.
+- Verification-only follow-up: `276e43af697ff28470d85739e2f3189a991750e1`,
+  committed at 2026-11-05T22:57:57+08:00. Native static requests are retained in
+  public PWA tests, API interception remains isolated, failure diagnostics were
+  added and raw HTTPS reads have a 30-second total abort deadline. Scoped lint,
+  syntax and staged diff checks passed. Initial sandboxed push failed because
+  the GitHub credential helper was unavailable; the approved outside-sandbox
+  retry succeeded normally: `fe91e8da..276e43af`, `HEAD -> main`.
+- This verification-only change and the documentation closeout do not alter
+  the deployed app bundle or trigger another app deployment.
+
+```sh
+CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2 npx --yes wrangler@4.156.0 pages deploy /private/tmp/recall-drawer-approved-final-dist --project-name recall-memory --branch main --commit-hash fe91e8daaa23d54c15a12dd3765bab90c5a95ee1 --commit-message 'feat: implement approved compact drawer design for V1.1'
+```
 
 Target: existing https://recall-memory.pages.dev/ and recall-memory main. Publish
 the exact frozen root-path bundle, not dirty source or a Pages-base preview.
@@ -126,6 +154,66 @@ that deployment using recall-memory's Pages deployment rollback in the existing
 dashboard/API and verify public recovery. Asset rollback does not undo device
 reviews/imports or caches. Never clear owner storage, restore private snapshots,
 reset D1, rewrite history or force-push as rollback.
+
+No rollback was performed. The final critical activation/cache checks passed;
+the unresolved ICO read below is an unchanged noncritical-resource verification
+limitation, not evidence of a new app regression.
+
+## Public Verification And Retained Failures
+
+- Initial public run: 6/8 passed in 5.6 minutes. Both cache cases timed out
+  waiting for an activated controller. The six successes include intercepted
+  synthetic WeRead UI/generation, eleven key committed resource digests and
+  five anonymous API gates returning 401/no-store, across both engines. These
+  do not establish authenticated owner sync or a real model call.
+- Cache recovery using the current DNS IPv4 `172.66.44.87`: 1/2 passed in
+  4.4 minutes. Chromium verified all 161 unique precache paths (165 manifest
+  entries), activated controller, rejection of a genuinely uncached offline
+  probe, offline reload and synthetic snapshot persistence. WebKit still failed.
+- Another WebKit diagnostic attempt with whole-site routing failed. The final
+  recovery intercepted only API requests, leaving static resources native;
+  same-origin/GET guards and all cache/persistence/layout assertions remain.
+  Final WebKit recovery: 1/1 passed in 1.7 minutes, with all 161 unique paths
+  cached, controller activated and online refresh persistence confirmed.
+- Combined: all eight distinct public cases passed across initial/recovery
+  runs, not a clean single 8/8 run. No product Service Worker code changed to
+  obtain these results. Public WebKit actual-offline simulation remains
+  unverified; local WebKit stopped-server offline checks passed separately.
+- Full asset scan: raw Node/curl reads were unstable across both current DNS
+  addresses. An earlier unbounded Node scan was cancelled; a bounded retry
+  failed. Chromium browser scan aborted; the WebKit scan collected all 205
+  resource results but failed to load `favicon.ico`. Offline comparison of the
+  saved browser digests against the frozen deployed build verified 204/205
+  exact SHA-256 hashes, with no other mismatches. No 205/205 pass is claimed.
+- The legacy ICO is byte-identical before/after this app release, SHA-256
+  `15e5f91a3cabfa007b57f9c25226a099f31aad0cefbb9e1ac201a90fb8460582`.
+  Dedicated ICO retries against both DNS addresses also timed out. It is not
+  a primary manifest icon and is not precached. Manifest PNG icons, SVG icon,
+  app resources and Service Worker were verified. ICO availability remains a
+  recorded noncritical network-read limitation; unrelated icon changes were
+  not made to hide it.
+- Physical iPhone Safari home-screen installation/launch, actual device safe
+  areas and updates have not been tested in this task. Browser simulations are
+  not physical phone acceptance. No owner-library data was cleared, imported,
+  rated or otherwise mutated by the acceptance tests.
+
+Public commands from the clean delivery worktree, with installed browser paths
+in RECALL_CHROMIUM / RECALL_WEBKIT and RECALL_VERIFY_DIST set to the frozen build:
+
+```sh
+node scripts/run-playwright.mjs --config=e2e/v11-public.config.ts --workers=2 --output=quality/drawer-approved/public
+RECALL_PRODUCTION_IPV4=172.66.44.87 node scripts/run-playwright.mjs --config=e2e/v11-public.config.ts --grep '公网缓存' --workers=2 --output=quality/drawer-approved/public-cache-recovery
+node scripts/run-playwright.mjs --config=e2e/v11-public.config.ts --project=v11-public-webkit --grep '公网缓存' --workers=1 --output=quality/drawer-approved/public-webkit-native
+RECALL_PRODUCTION_IPV4=172.66.44.87 node scripts/verify-pwa-assets.mjs /private/tmp/recall-drawer-approved-final-dist quality/drawer-approved/public-assets.json
+node scripts/run-playwright.mjs --config=quality/drawer-approved/assets.config.ts --workers=1 --output=quality/drawer-approved/public-browser-assets
+```
+
+Retained evidence: ignored `quality/drawer-approved/public-browser-assets.json`
+contains all 205 browser results. An offline replay during closeout confirmed
+204 matches and the single ICO read failure. Logs remain local at
+`/private/tmp/recall-drawer-implementation-{public,public-cache-recovery,public-webkit-final,public-webkit-native}.log`;
+hosting confirmation is `/private/tmp/recall-drawer-production-deployments.log`.
+No private input or owner screenshots are included in the public source record.
 
 Related: [approved prototype](./20261105T220933+0800-drawer-holistic-reconsideration.md),
 [previous production](./20261105T191943+0800-drawer-unified-sync-update.md).
