@@ -2,17 +2,22 @@ import { createHash } from 'node:crypto';
 import { request } from 'node:https';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { isIP } from 'node:net';
+import { resolve4 } from 'node:dns/promises';
 
 const directory = resolve(process.argv[2] || 'dist');
 const output = process.argv[3];
 const origin = new URL('https://recall-memory.pages.dev/');
+const ipv4 = process.env.RECALL_PRODUCTION_IPV4;
+if (ipv4 && (isIP(ipv4) !== 4 || !(await resolve4(origin.hostname)).includes(ipv4))) throw new Error('RECALL_PRODUCTION_IPV4 must match a current production DNS A record');
+const lookup = ipv4 ? (_hostname, options, done) => options.all ? done(null, [{ address: ipv4, family: 4 }]) : done(null, ipv4, 4) : undefined;
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 
 function download(path, redirects = 0) {
   const url = new URL(path, origin);
   if (url.origin !== origin.origin || redirects > 5) throw new Error('Unexpected asset redirect');
   return new Promise((resolveDownload, reject) => {
-    const connection = request(url, { method: 'GET', family: 4, headers: { 'Cache-Control': 'no-cache' } }, response => {
+    const connection = request(url, { method: 'GET', family: 4, lookup, headers: { 'Cache-Control': 'no-cache' } }, response => {
       if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
         response.resume();
         resolveDownload(download(new URL(response.headers.location, url).href, redirects + 1));

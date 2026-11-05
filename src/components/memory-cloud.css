@@ -33,12 +33,12 @@
 .m-cloud .m-cloud-note { color: var(--muted, #737368); font-size: 13px; line-height: 1.8; }
 .m-cloud-counts { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; }
 .m-cloud .m-error { margin: 0; }
-.m-drawer-sync { display: grid; gap: 4px; padding: 8px 10px; min-width: 0; }
-.m-drawer-sync-status { display: flex; align-items: center; min-width: 0; gap: 8px; font-size: 12px; font-weight: 400; }
-.m-drawer-sync-status > svg { flex-shrink: 0; }
+.m-drawer-sync { display: grid; gap: 8px; padding: 0; min-width: 0; }
+.m-drawer-sync-status { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: start; min-width: 0; gap: 14px; font-size: inherit; font-weight: 400; }
+.m-drawer-sync-icon { display: grid; place-items: center; width: 30px; height: 22px; }
 .m-drawer-sync-status > span { overflow-wrap: anywhere; }
-.m-drawer-footer .m-drawer-sync small { padding: 0; font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
-.m-drawer-sync-error { color: #963e49; font-size: 12px; line-height: 1.6; }
+.m-drawer-footer .m-drawer-sync small { margin-left: 44px; padding: 0; font: inherit; font-weight: 400; overflow-wrap: anywhere; }
+.m-drawer-sync-error { margin-left: 44px !important; color: #963e49; font: inherit; }
 
 .m-cloud-warning {
   border-left: 3px solid var(--muted, #737368);

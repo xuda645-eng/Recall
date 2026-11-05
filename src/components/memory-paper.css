@@ -33,6 +33,8 @@
 .memory-drawer button[aria-current="page"] { background: var(--card-paper); }
 .memory-drawer button[aria-current="page"] .m-nav-icon { background: var(--paper-brand); color: var(--paper-on-brand); }
 .m-nav-icon { background: var(--soft); color: var(--paper-brand); }
+.memory-drawer .m-nav-icon { background: transparent; }
+.memory-drawer button[aria-current="page"] .m-nav-icon { background: var(--paper-brand); }
 .m-nav-icon svg { stroke-width: 1.65; }
 .m-paper-intro { margin: 5px 0 4px; }
 .m-paper-intro p { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: .03em; color: var(--muted); }

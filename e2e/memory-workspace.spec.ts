@@ -452,7 +452,7 @@ test('原安装方案保持控件几何、触摸和滚动，切换不读写存�
   expect(await snapshot(page)).toEqual(before);
 });
 
-test('抽屉显示固定构建版本，底部唯一同步更新按钮在移动窄屏与桌面均可触达', async ({ page }) => {
+test('抽屉采用确认的整版设计，文字同轴同行距，版本与唯一刷新图标对齐', async ({ page }) => {
   await seedPage(page);
   await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
   const version = page.locator('[data-app-version]');
@@ -476,12 +476,30 @@ test('抽屉显示固定构建版本，底部唯一同步更新按钮在移动�
     expect(Math.round(box.height * 1000) / 1000).toBeGreaterThanOrEqual(44);
     const settings = (await page.locator('#memory-drawer').getByRole('button', { name: '设置与数据', exact: true }).boundingBox())!;
     expect(box.y).toBeGreaterThan(settings.y + settings.height);
+    const layout = await page.locator('#memory-drawer').evaluate(element => {
+      const selectors = ['.m-drawer-settings > span:last-child', '.m-drawer-sync-status > span:last-child', '.m-drawer-sync > small', '.m-app-version > small'];
+      const fields = selectors.map(selector => { const field = element.querySelector(selector)!; const bounds = field.getBoundingClientRect(); return { left: bounds.left, font: getComputedStyle(field).fontSize }; });
+      const status = element.querySelector('.m-drawer-sync-status')!.getBoundingClientRect();
+      const time = element.querySelector('.m-drawer-sync > small')!.getBoundingClientRect();
+      const sync = element.querySelector('.m-drawer-sync')!.getBoundingClientRect();
+      const row = element.querySelector('.m-app-version')!.getBoundingClientRect();
+      const label = element.querySelector('.m-app-version > small')!.getBoundingClientRect();
+      const action = element.querySelector('.m-version-refresh')!;
+      const button = action.getBoundingClientRect();
+      const icon = action.querySelector('svg')!.getBoundingClientRect();
+      return { fields, statusGap: time.top - status.bottom, versionGap: row.top - sync.bottom, versionCenter: label.top + label.height / 2, actionCenter: button.top + button.height / 2, icon: icon.width, text: action.textContent, background: getComputedStyle(action).backgroundColor };
+    });
+    expect(layout.fields.every(field => field.left === layout.fields[0].left && field.font === '14px')).toBe(true);
+    expect(layout.statusGap).toBe(8);
+    expect(layout.versionGap).toBe(8);
+    expect(layout.actionCenter).toBeCloseTo(layout.versionCenter, 4);
+    expect(layout).toMatchObject({ icon: 18, text: '', background: 'rgba(0, 0, 0, 0)' });
     expect(await refresh.evaluate(element => { const bounds = element.getBoundingClientRect(); return element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)); })).toBe(true);
     const geometry = await page.evaluate(() => ({ width: innerWidth, scroll: document.documentElement.scrollWidth }));
     expect(geometry.scroll, `${width}px viewport: ${JSON.stringify(geometry)}`).toBeLessThanOrEqual(geometry.width + 1);
   }
   await page.setViewportSize({ width: 393, height: 852 });
-  await page.evaluate(() => { const app = document.querySelector<HTMLElement>('.memory-app')!; app.style.setProperty('--safe-top', '59px'); app.style.setProperty('--safe-bottom', '34px'); document.querySelector<HTMLElement>('.m-version-refresh')!.style.fontSize = '20px'; });
+  await page.evaluate(() => { const app = document.querySelector<HTMLElement>('.memory-app')!; app.style.setProperty('--safe-top', '59px'); app.style.setProperty('--safe-bottom', '34px'); document.querySelector<HTMLElement>('.m-drawer-footer')!.style.setProperty('--drawer-font-size', '20px'); document.querySelector('.m-drawer-sync > small')!.textContent = '最近同步：2026/11/05 22:00:00'; });
   await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
   const combined = page.getByRole('button', { name: '同步并检查更新', exact: true });
   await combined.scrollIntoViewIfNeeded();
@@ -490,6 +508,10 @@ test('抽屉显示固定构建版本，底部唯一同步更新按钮在移动�
   expect(enlargedBox.width).toBeGreaterThanOrEqual(44);
   expect(enlargedBox.height).toBeGreaterThanOrEqual(44);
   expect(enlargedBox.y + enlargedBox.height).toBeLessThanOrEqual(852 - 34);
+  const versionBox = (await page.locator('.m-app-version > small').boundingBox())!;
+  expect(enlargedBox.y + enlargedBox.height / 2).toBeCloseTo(versionBox.y + versionBox.height / 2, 4);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.locator('html').evaluate(element => element.classList.add('dark'));
   await noOverflow(page);
   await saveShot(page, 'drawer-combined-sync');
 });

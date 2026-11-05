@@ -21,7 +21,7 @@ interface PWAUpdateState {
 
 const PWAUpdateContext = createContext<PWAUpdateState | null>(null);
 
-export function PWAAppVersion({ disabled = false, combined = false, beforeRefresh }: { disabled?: boolean; combined?: boolean; beforeRefresh?: () => Promise<void> }): JSX.Element {
+export function PWAAppVersion({ disabled = false, combined = false, compact = false, beforeRefresh }: { disabled?: boolean; combined?: boolean; compact?: boolean; beforeRefresh?: () => Promise<void> }): JSX.Element {
   const state = useContext(PWAUpdateContext);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -45,8 +45,8 @@ export function PWAAppVersion({ disabled = false, combined = false, beforeRefres
       setError(failure instanceof Error && /[\u4e00-\u9fff]/.test(failure.message) ? failure.message : '无法检查更新，请联网后重试。本机数据未改动。');
     }
   }
-  const message = error ? <small className="m-version-message" role="status">{error}</small> : needRefresh && <small className="m-version-message" role="status">{combined ? '有新版本，点击下方按钮同步并更新。' : '有新版本，点击右侧图标刷新。'}</small>;
-  return <><div className={`m-app-version ${combined ? 'is-combined' : ''}`}><small aria-label="当前版本" title="构建时间使用北京时间，精确到分钟">Recall · V<span data-app-version={APP_BUILD.version}>{APP_BUILD.version}</span></small>{combined && message}<button className="m-version-refresh" type="button" aria-label={refreshing ? busyLabel : actionLabel} title={actionLabel} disabled={disabled || refreshing} onClick={() => void refresh()}>{refreshing ? <Loader2 size={15} className="animate-spin" aria-hidden="true"/> : <RefreshCw size={15} aria-hidden="true"/>}{combined && <span>{refreshing ? busyLabel : actionLabel}</span>}</button></div>{!combined && message}</>;
+  const message = error ? <small className="m-version-message" role="status">{error}</small> : needRefresh && <small className="m-version-message" role="status">{combined ? compact ? '有新版本，点击右侧图标同步并更新。' : '有新版本，点击下方按钮同步并更新。' : '有新版本，点击右侧图标刷新。'}</small>;
+  return <><div className={`m-app-version ${combined ? 'is-combined' : ''} ${compact ? 'is-compact' : ''}`}><small aria-label="当前版本" title="构建时间使用北京时间，精确到分钟">{!compact && 'Recall · '}V<span data-app-version={APP_BUILD.version}>{APP_BUILD.version}</span></small>{combined && !compact && message}<button className="m-version-refresh" type="button" aria-label={refreshing ? busyLabel : actionLabel} title={actionLabel} disabled={disabled || refreshing} onClick={() => void refresh()}>{refreshing ? <Loader2 size={compact ? 18 : 15} className="animate-spin" aria-hidden="true"/> : compact ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19.5 8A8 8 0 1 0 20 14M19.5 3.5V8H15"/></svg> : <RefreshCw size={15} aria-hidden="true"/>}{combined && !compact && <span>{refreshing ? busyLabel : actionLabel}</span>}</button></div>{(!combined || compact) && message}</>;
 }
 
 export function PWAUpdateProvider({ children }: { children: ReactNode }): JSX.Element {

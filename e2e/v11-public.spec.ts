@@ -29,6 +29,9 @@ test('V1.1 公网缓存完整与持久化，Chromium 断网重开；WebKit 公�
     await expect(page.locator('[data-app-version]')).toHaveText(build.releaseVersion ?? build.version);
     await expect(page.locator('#memory-drawer').getByRole('button', { name: '同步并检查更新', exact: true })).toBeVisible();
     await expect(page.locator('.m-drawer-sync').getByRole('button')).toHaveCount(0);
+    const geometry = await page.locator('.m-app-version.is-compact').evaluate(element => { const version = element.querySelector('small')!.getBoundingClientRect(); const action = element.querySelector('button')!.getBoundingClientRect(); return { versionCenter: version.top + version.height / 2, actionCenter: action.top + action.height / 2, width: action.width, height: action.height, text: element.querySelector('button')!.textContent }; });
+    expect(geometry.actionCenter).toBeCloseTo(geometry.versionCenter, 4);
+    expect(geometry).toMatchObject({ width: 44, height: 44, text: '' });
     await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))));
     await page.screenshot({ path: test.info().outputPath('drawer-sync-update.png'), scale: 'css' });
     await page.keyboard.press('Escape');

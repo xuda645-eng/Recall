@@ -108,7 +108,7 @@ export function MemoryCloudDrawerStatus(): JSX.Element {
   const media = useMediaSync();
   const conflicts = status.conflicts > 0 || status.phase === 'conflict';
   return <section className="m-drawer-sync" aria-label="云同步状态">
-    <div className="m-drawer-sync-status"><Cloud size={18} aria-hidden="true"/><span role="status" aria-live="polite">云同步 · {statusLabel(status)}</span></div>
+    <div className="m-drawer-sync-status"><span className="m-drawer-sync-icon" aria-hidden="true"><Cloud size={22}/></span><span role="status" aria-live="polite">云同步 · {statusLabel(status)}</span></div>
     <small>最近同步：{formatTime(status.lastSyncedAt)}</small>
     {(status.pending > 0 || conflicts) && <small>待同步 {status.pending} 项{conflicts ? ` · 冲突 ${status.conflicts} 项，请先处理` : ''}</small>}
     {(media.pending > 0 || media.running || media.error) && <small role="status">来源图片：{media.running ? '正在同步' : media.error ? '同步未完成，请查看云同步设置' : `待传 ${media.pending} 张`}</small>}
