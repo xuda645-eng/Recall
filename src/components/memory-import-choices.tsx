@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { MemoryPaperArt } from '@/components/memory-paper-art';
 import { BookOpen, ChevronDown, ChevronRight, FileText, Images, Plus, Upload } from 'lucide-react';
 import './memory-import-choices.css';
 
@@ -24,15 +25,16 @@ export function MemoryImportChoices({ busy, onFile, onWeread, onManual, onOther,
       <h1 id="memory-import-heading">把知识，收进卡片。</h1>
       <p>选择一种来源，先预览，再确认导入。</p>
     </header>
+    <MemoryPaperArt compact/>
     <div className="m-import-sources" role="group" aria-label="常用导入">
       <button type="button" className="m-import-source" disabled={busy} aria-label="选择 Markdown 文件" onClick={() => chooseFile('.md,.markdown')}>
         <span className="m-import-source-icon" aria-hidden="true"><FileText size={23}/></span>
         <span className="m-import-source-copy"><strong>Markdown 文件</strong><small>文字卡片 · .md</small></span>
         <ChevronRight size={18} aria-hidden="true"/>
       </button>
-      <button type="button" className="m-import-source" disabled={busy} aria-label="选择带图包" onClick={() => chooseFile('.json')}>
+      <button type="button" className="m-import-source" disabled={busy} aria-label="选择带图卡片文件" onClick={() => chooseFile('.json')}>
         <span className="m-import-source-icon" aria-hidden="true"><Images size={23}/></span>
-        <span className="m-import-source-copy"><strong>带图包</strong><small>卡片与来源截图 · .recall-media.json</small></span>
+        <span className="m-import-source-copy"><strong>带图卡片文件</strong><small>卡片与来源截图 · .recall-media.json</small></span>
         <ChevronRight size={18} aria-hidden="true"/>
       </button>
       <button type="button" className="m-import-source" disabled={busy} aria-label="导入划线" onClick={onWeread}>
@@ -42,7 +44,7 @@ export function MemoryImportChoices({ busy, onFile, onWeread, onManual, onOther,
       </button>
     </div>
     <div className="m-import-help"><button type="button" disabled={busy} onClick={onHelp}>格式说明</button><button type="button" disabled={busy} onClick={onExample}>下载 Markdown 示例</button></div>
-    <p className="m-import-package-note">带图包将卡片与来源图片放在一个文件里，可由制卡工具生成；不是单张图片，也不是完整数据备份。</p>
+    <p className="m-import-package-note">带图卡片文件包含卡片与来源图片，可由制卡工具生成；不是单张图片，也不是完整数据备份。</p>
     <input ref={files} type="file" accept=".md,.markdown,.json" hidden aria-label="导入文件" onChange={event => { onFile(event.currentTarget.files?.[0]); event.currentTarget.value = ''; }}/>
     <details className="m-import-more">
       <summary>其他方式<ChevronDown size={18} aria-hidden="true"/></summary>

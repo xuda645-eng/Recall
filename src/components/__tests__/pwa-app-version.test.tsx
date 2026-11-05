@@ -13,7 +13,7 @@ describe('drawer build identity and refresh', () => {
   afterEach(() => { cleanup(); vi.restoreAllMocks(); });
   it('shows the running build version and an accessible icon-only refresh button', () => {
     render(<PWAAppVersion />, { wrapper: PWAUpdateProvider });
-    expect(screen.getByLabelText('当前版本').textContent).toBe('Recall · 1.0-20261101-0200');
+    expect(screen.getByLabelText('当前版本').textContent).toBe('Recall · V1.0-20261101-0200');
     const button = screen.getByRole('button', { name: '检查更新并刷新' });
     expect(button.textContent).toBe('');
     expect(button.getAttribute('type')).toBe('button');

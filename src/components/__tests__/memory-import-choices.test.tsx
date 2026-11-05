@@ -11,7 +11,7 @@ it('presents exactly three equal primary sources and collapses infrequent action
   render(<MemoryImportChoices {...actions()}/>);
   expect(screen.getByRole('group', { name: '常用导入' }).querySelectorAll('button')).toHaveLength(3);
   expect(screen.getByRole('button', { name: '选择 Markdown 文件' })).toBeDefined();
-  expect(screen.getByRole('button', { name: '选择带图包' })).toBeDefined();
+  expect(screen.getByRole('button', { name: '选择带图卡片文件' })).toBeDefined();
   expect(screen.getByRole('button', { name: '导入划线' })).toBeDefined();
   expect(screen.getByText('手动添加卡片').closest('details')?.open).toBe(false);
   expect(screen.getByText('CSV / Anki / Recall').closest('details')?.open).toBe(false);
@@ -26,7 +26,7 @@ it('uses the correct file filter and passes a selected file without importing au
   const clicked = vi.spyOn(picker, 'click').mockImplementation(() => {});
   fireEvent.click(screen.getByRole('button', { name: '选择 Markdown 文件' }));
   expect(picker.accept).toBe('.md,.markdown');
-  fireEvent.click(screen.getByRole('button', { name: '选择带图包' }));
+  fireEvent.click(screen.getByRole('button', { name: '选择带图卡片文件' }));
   expect(picker.accept).toBe('.json');
   expect(clicked).toHaveBeenCalledTimes(2);
   const file = new File(['# Cards'], 'cards.md', { type: 'text/markdown' });

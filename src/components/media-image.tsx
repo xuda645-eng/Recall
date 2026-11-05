@@ -57,7 +57,7 @@ export function MediaImage({ id, alt }: { id: string; alt: string }): JSX.Elemen
   return <span className="recall-media" data-media-id={id} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
     {error ? <span className="recall-media-error" role="status">{error}<button type="button" onClick={() => setRetry(value => value + 1)}>重试来源图片</button></span>
       : !src ? <span role="status">正在读取来源图片…</span> : <Dialog.Root open={open} onOpenChange={changeOpen}>
-        <Dialog.Trigger asChild><button type="button" className="recall-media-preview" ref={trigger} aria-label={`放大来源图片：${alt || '截图'}`}><img src={src} alt={alt} loading="lazy" onError={() => setError('图片无法解码，请检查来源附件')}/><span><ZoomIn size={16}/>来源截图 · 点击放大</span></button></Dialog.Trigger>
+        <Dialog.Trigger asChild><button type="button" className="recall-media-preview" ref={trigger} aria-label={`放大来源图片：${alt || '截图'}`}><img src={src} alt={alt} loading="lazy" onError={() => setError('图片无法解码，请检查来源附件')}/></button></Dialog.Trigger>
         <Dialog.Portal><Dialog.Overlay className="recall-media-overlay"/><Dialog.Content className="recall-media-viewer" aria-describedby={description} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} onEscapeKeyDown={event => { event.preventDefault(); changeOpen(false); }} onCloseAutoFocus={event => { event.preventDefault(); trigger.current?.focus({ preventScroll: true }); }}>
           <header><Dialog.Title>{alt || '来源截图'}</Dialog.Title><Dialog.Close asChild><button type="button" aria-label="关闭来源图片"><X size={22}/></button></Dialog.Close></header>
           <Dialog.Description id={description}>双指缩放、拖动查看；图片操作不会评分。</Dialog.Description>

@@ -27,7 +27,9 @@ export async function refreshMemoryPWA(updateServiceWorker: (reloadPage?: boolea
   const response = await fetch(`${import.meta.env.BASE_URL}version.json`, { cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw new Error('无法检查最新版本，请稍后重试。');
   const latest: unknown = await response.json();
-  if (!latest || typeof latest !== 'object' || !('version' in latest) || typeof latest.version !== 'string' || !/^1\.0-\d{8}-\d{4}$/.test(latest.version)) throw new Error('版本信息无效，请稍后重试。');
+  if (!latest || typeof latest !== 'object' || !('version' in latest) || typeof latest.version !== 'string' || !/^1\.(?:0|1)-\d{8}-\d{4}$/.test(latest.version)) throw new Error('版本信息无效，请稍后重试。');
+  const latestVersion = 'releaseVersion' in latest ? latest.releaseVersion : latest.version;
+  if (typeof latestVersion !== 'string' || !/^1\.(?:0|1)-\d{8}-\d{4}$/.test(latestVersion)) throw new Error('版本信息无效，请稍后重试。');
   const registration = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL) : undefined;
   if (registration) {
     await withTimeout(registration.update(), 20000);
@@ -37,7 +39,7 @@ export async function refreshMemoryPWA(updateServiceWorker: (reloadPage?: boolea
       reloadPage();
       return;
     }
-    if (latest.version !== currentVersion) throw new Error('新版尚未就绪，请稍后再次刷新。');
+    if (latestVersion !== currentVersion) throw new Error('新版尚未就绪，请稍后再次刷新。');
   }
   reloadPage();
 }

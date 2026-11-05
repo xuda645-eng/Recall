@@ -13,6 +13,9 @@ import { createId } from '@/lib/utils';
 import { normalizeMemoryReviewPlan } from '@/services/memory-review';
 import { isMemoryNewCard, normalizeMemoryStudyPreferences, selectMemoryStudyCards } from '@/services/memory-study';
 import { MemoryFolderRows } from '@/components/memory-folder-rows';
+import { MemoryPaperHome, MemoryPaperHomeDock } from '@/components/memory-paper-home';
+import { MemoryLocalPreview } from '@/components/memory-local-preview';
+import { isLocalPreview } from '@/lib/local-preview';
 import { MemoryReviewDeckPicker } from '@/components/memory-review-deck-picker';
 import { MemoryStatusEdge } from '@/components/memory-status-edge';
 import { MemoryDisplayDiagnostics } from '@/components/memory-display-diagnostics';
@@ -24,6 +27,7 @@ import { MediaPackagePreview } from '@/components/media-package-preview';
 import { MemoryImportChoices } from '@/components/memory-import-choices';
 import { parseMediaPackage } from '@/services/media-package';
 import { MemoryImportCompletion } from '@/components/memory-import-completion';
+import { MemoryImportFooter } from '@/components/memory-import-footer';
 import { MemoryFolderSelector } from '@/components/memory-folder-selector';
 import { organizeExistingWereadFolders } from '@/services/weread-folder-organization';
 import { parseWereadExport } from '@/lib/memory-weread';
@@ -33,6 +37,7 @@ import type { Card, Deck } from '@/types';
 import './memory-workspace.css';
 import './memory-appearance.css';
 import './memory-study.css';
+import './memory-paper.css';
 
 const MemoryReader = lazy(() => import('@/components/memory-reader').then(module => ({ default: module.MemoryReader })));
 const MemoryStats = lazy(() => import('@/components/memory-stats').then(module => ({ default: module.MemoryStats })));
@@ -75,7 +80,7 @@ export function MemoryWorkspace(): JSX.Element {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; deckIds: string[]; cardIds: string[]; archivedAt?: string } | null>(null);
   const [plan, setPlan] = useState<MarkdownPlan | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [receipt, setReceipt] = useState<{ text: string; added: number; updated: number; skipped: number; deckIds: string[]; parentId: string | null } | null>(null);
+  const [receipt, setReceipt] = useState<{ added: number; updated: number; skipped: number; deckIds: string[]; parentId: string | null } | null>(null);
   const [importFormat, setImportFormat] = useState('Markdown');
   const [organizationError, setOrganizationError] = useState('');
   const [localWereadFile, setLocalWereadFile] = useState<File | null>(null);
@@ -181,7 +186,7 @@ export function MemoryWorkspace(): JSX.Element {
   }, [route]);
   useEffect(() => {
     const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-    if (meta) meta.content = '#353532';
+    if (meta) meta.content = '#4f604a';
   }, []);
   useEffect(() => {
     if (!archiveUndo) return;
@@ -318,7 +323,7 @@ export function MemoryWorkspace(): JSX.Element {
   }
   async function loadFile(file?: File): Promise<void> {
     if (!file) return;
-    if (file.size > (file.name.endsWith('.json') ? 16 : 5) * 1024 * 1024) { setError('Markdown 最大 5 MB，带图包最大 16 MB'); return; }
+    if (file.size > (file.name.endsWith('.json') ? 16 : 5) * 1024 * 1024) { setError('Markdown 最大 5 MB，带图卡片文件最大 16 MB'); return; }
     const generation = ++fileGeneration.current;
     setBusy(true);
     setError('');
@@ -358,7 +363,7 @@ export function MemoryWorkspace(): JSX.Element {
       if (!mounted.current || !result) return;
       const importedIds = new Set(plan.rows.map(row => row.existing?.id || row.entry.id));
       const deckIds = [...new Set(result.snapshot.cards.filter(card => importedIds.has(card.id)).map(card => card.deckId))];
-      setReceipt({ text: result.text, added: result.added, updated: result.updated, skipped: result.skipped, deckIds, parentId: plan.parentId });
+      setReceipt({ added: result.added, updated: result.updated, skipped: result.skipped, deckIds, parentId: plan.parentId });
       setPlan(null);
       setImportAssets([]);
     });
@@ -550,7 +555,7 @@ export function MemoryWorkspace(): JSX.Element {
       return <form onSubmit={event => { event.preventDefault(); void run(() => restoreArchiveFolder(sheet.id!)); }}><p>将“{deck?.name}”及所有子卡组中的 {count} 张归档卡片移出归档，重新进入在学卡片库。</p><p className="m-note">保留卡组层级、原文、已有排期和复习历史，不重新评分。包括之前已归档的卡片；其他卡组不受影响。</p><button className="m-secondary" type="button" disabled={busy} onClick={closeSheet}>取消</button><button className="m-primary" type="submit" disabled={busy || !deck || !count}>确认移出归档 {count} 张卡片</button></form>;
     }
     if (sheet.kind === 'review-plan') return <MemoryReviewPlanEditor onClose={() => setSheet(null)} onBusy={setBusy}/>;
-    if (sheet.kind === 'help') return <div className="m-about"><p>#、##、### 是卡组；卡片块里的标题仍是正文。编号和时间可以先留空，导入后保存带编号文件继续维护。</p><pre>{template}</pre><button onClick={() => downloadMemoryText(template, 'Recall-知识卡片示例.md')}>下载完整示例</button></div>;
+    if (sheet.kind === 'help') return <div className="m-about"><p>#、##、### 是卡组；卡片块里的标题仍是正文。编号和时间可以先留空，导入时会校验重复与变化。</p><pre>{template}</pre><button onClick={() => downloadMemoryText(template, 'Recall-知识卡片示例.md')}>下载完整示例</button></div>;
     if (sheet.kind === 'path') return <div className="m-sheet-list"><button onClick={() => openFolder(null)}>全部卡组</button>{folderPath(store.decks, folder).map(deck => <button key={deck.id} onClick={() => openFolder(deck.id)}>{deck.name}<ChevronRight size={16}/></button>)}</div>;
     if (sheet.kind === 'filter') return <form onSubmit={event => { event.preventDefault(); const values = new FormData(event.currentTarget); setContentType(String(values.get('content'))); setStatus(String(values.get('status'))); setSort(String(values.get('sort'))); setSheet(null); }}><label>内容<select name="content" aria-label="内容" defaultValue={contentType}>{['全部', '仅卡组', '仅卡片'].map(value => <option key={value}>{value}</option>)}</select></label><label>复习状态<select name="status" aria-label="复习状态" defaultValue={status}>{['全部', '待复习', '待学习', '学习中', '长期复习'].map(value => <option key={value}>{value}</option>)}</select></label><label>排序<select name="sort" aria-label="排序" defaultValue={sort}><option value="new">{route === 'archived' ? '归档时间' : '导入时间'}：新到旧</option><option value="old">{route === 'archived' ? '归档时间' : '导入时间'}：旧到新</option><option value="name">名称</option><option value="updated">最近修改</option></select></label><p className="m-note">{route === 'archived' ? '默认整组显示，单独归档的卡片单列。仅卡片会展开全部归档卡片；卡组按其中最近一次归档时间排序。复习状态按保留的进度和排期筛选，不会安排归档卡片复习。' : '搜索和复习状态覆盖当前卡组及下级内容。待学习是从未评分的新卡，长期复习不代表永久掌握。'}</p><button className="m-primary" type="submit">应用</button></form>;
     if (sheet.kind === 'font') return <label>正文字号<select aria-label="正文字号" value={font} onChange={event => { const value = Number(event.target.value); setFont(value); localStorage.setItem('recall.reading.font', String(value)); }}>{[16, 18, 20, 22].map(value => <option key={value}>{value}</option>)}</select></label>;
@@ -587,31 +592,24 @@ export function MemoryWorkspace(): JSX.Element {
     }
   }}>
     <MemoryStatusEdge/>
+    {isLocalPreview() && <span className="sr-only">纸感编辑本地预览，数据仅保存在当前浏览器，未发布线上。</span>}
     <aside id="memory-drawer" className="memory-drawer" ref={drawerRef} data-visible={drawer || drawerVisible} aria-label="项目菜单" aria-hidden={mobile && !drawer}>
       <div className="m-drawer-brand"><strong>Recall</strong><span>记忆卡片</span><small>{titles[navRoute as keyof typeof titles]}</small></div>
       <nav>{navEntries.map(([target, label, Icon]) => <button key={target} aria-current={navRoute === target ? 'page' : undefined} onClick={() => { if (target === 'folders') setFolder(null); navigate(target); }}><span className="m-nav-icon"><Icon size={20}/></span>{target === 'folders' ? label : t(`memory.routes.${target}`, label)}</button>)}</nav>
-      <div className="m-drawer-footer"><MemoryCloudDrawerStatus onManage={() => { if (mobile) { setDrawer(false); brand.current?.focus(); } setSheet({ kind: 'cloud' }); }}/><button onClick={() => navigate('settings')}>设置与数据</button><PWAAppVersion disabled={busy}/></div>
+      <div className="m-drawer-footer">{isLocalPreview() ? <p className="m-paper-preview-label" role="status">本地验收副本 · 云同步已关闭</p> : <MemoryCloudDrawerStatus onManage={() => { if (mobile) { setDrawer(false); brand.current?.focus(); } setSheet({ kind: 'cloud' }); }}/>}<button onClick={() => navigate('settings')}>设置与数据</button><PWAAppVersion disabled={busy}/></div>
     </aside>
     <div ref={shellRef} className={`memory-shell ${drawer ? 'is-open' : ''} ${route === 'read' ? 'is-reading' : ''} ${archiveUndo ? 'has-archive-undo' : ''}`}>
       <header className="memory-bar"><button ref={brand} className="m-brand" aria-expanded={drawer} aria-controls="memory-drawer" aria-label={drawer ? '关闭项目菜单' : '打开项目菜单'} disabled={busy} onClick={() => { if (sheet) { closeSheet(); return; } setDrawer(value => !value); }}><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M23 15h32c27 0 34 32 12 45l19 25H64L43 57v28H23z" fill="white"/><path d="M54 23c-1 10-4 14-14 15 10 1 13 5 14 15 1-10 4-14 14-15-10-1-13-5-14-15" fill="currentColor"/></svg></button>{route === 'folders' && folder ? <button className="m-context" onClick={() => setSheet({ kind: 'path' })} aria-label={`查看卡组路径：${shellTitle}`}>{shellTitle}</button> : <div className="m-context">{shellTitle}</div>}{hasTopAction ? <button className="m-top-action" aria-label={topLabel} disabled={busy || drawer || !!sheet} onClick={topAction}>{route === 'read' ? '退出' : topBack ? <ArrowLeft size={20}/> : route === 'settings' ? <MoreHorizontal size={20}/> : <Plus size={22}/>}</button> : <span className="m-top-action-placeholder" aria-hidden="true"/>}</header>
-      <div ref={contentRef} className="memory-content" data-route={route}>
+      <div ref={contentRef} className="memory-content" data-route={route} data-import-preview={route === 'import' && !!plan}>
         <header className="m-desktop-header"><span>{shellTitle}</span>{hasTopAction && <button className="m-secondary" disabled={busy} onClick={topAction}>{topLabel}</button>}</header>
         <main className="m-main" tabIndex={-1}>
           {organizationError && <p className="m-error" role="alert">{organizationError}</p>}
           <PWAUpdatePrompt className="m-pwa-update" hidden={route === 'read'}/>
           <Suspense fallback={loadingView}>
           {error && !sheet && <p role="alert" className="m-error">{error}</p>}
-          {route === 'home' && <><header className="m-intro"><p>{new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date())}</p><h1>今天，温习一点。</h1></header><div className="m-home-columns"><div>
-            <section className="m-hero" aria-label="开始按卡组复习" data-illustration={illustration}>
-              <p className="m-hero-label"><i/>从一个卡组开始</p>
-              <h2 className="m-hero-title">慢慢读，<br/>认真记。</h2>
-              <p className="m-hero-copy">每次一小轮，按自己的节奏来。</p>
-              <div className="m-card-stack" aria-hidden="true"><div/><div/><div><span>{['Q.', 'Aa', '*'][illustration]}</span><i/><i/><i/><small>{['从回忆开始', '让知识生长', '温习一点点'][illustration]}</small></div></div>
-              <button className="m-primary" disabled={busy} onClick={() => { setDrawer(false); setSheet({ kind: 'review-deck' }); }}>开始复习<ChevronRight size={18}/></button>
-            </section>
-            <div className="m-study-backlog"><small>{lastStudyDeck ? `上次选择 · ${lastStudyDeck.name}` : studyDeck === '__all' ? '上次选择 · 混合全部卡组' : '选好卡组，再开始这一轮'}</small><button className="m-text" onClick={() => setSheet({ kind: 'review-plan' })}>复习计划</button></div>
-            <div className="m-home-summary"><div><b>{today}</b><small>今日总复习次数</small></div><div><b>{progress.review}</b><small>全部长期复习</small></div><div><b>{available.length}</b><small>全部在学卡片</small></div></div><div className="m-home-shortcuts"><button onClick={() => navigate('import')}><Upload size={18}/>导入知识</button><button onClick={() => navigate('stats')}><BarChart3 size={18}/>查看统计</button></div></div><div><div className="m-section-head"><h2>我的卡组</h2><button className="m-text" onClick={() => openFolder(null)}>查看全部<ChevronRight size={15}/></button></div><MemoryFolderRows home list={arranged(activeDecks.filter(deck => !deck.parentId))} decks={activeDecks} cards={store.cards} onOpen={openFolder} onManage={id => setSheet({ kind: 'folder', id })}/>{!activeDecks.length && <div className="m-empty"><p>从一个卡组，收好你的知识。</p><button className="m-secondary" onClick={() => setSheet({ kind: 'folder' })}>新建卡组</button></div>}{recent.length > 0 && <section className="m-recent"><div className="m-section-head"><h2>{recentIds.length ? '最近温习' : '随手读一张'}</h2><small>自由浏览</small></div>{recent.map((card, position) => <button key={card.id} onClick={() => read(arranged(available.filter(candidate => candidate.deckId === card.deckId)), false, card.id)}><span className="m-recent-index">{String(position + 1).padStart(2, '0')}</span><span><small>{folderPath(store.decks, card.deckId).map(deck => deck.name).join(' / ')}</small><strong>{card.front || card.bookTitle || '阅读摘录'}</strong></span><ChevronRight size={17}/></button>)}</section>}</div></div></>}
+          {route === 'home' && <MemoryPaperHome decks={activeDecks} allDecks={store.decks} roots={arranged(activeDecks.filter(deck => !deck.parentId))} cards={store.cards} recent={recent} recentReviewed={recentIds.length > 0} today={today} longTerm={progress.review} variant={illustration} onFolder={openFolder} onManage={id => setSheet({ kind: 'folder', id })} onCreate={() => setSheet({ kind: 'folder' })} onRead={card => read(arranged(available.filter(candidate => candidate.deckId === card.deckId)), false, card.id)} onImport={() => navigate('import')} onStats={() => navigate('stats')}/>}
           {['folders', 'cards', 'archived'].includes(route) && <>
+            <header className="m-library-heading"><p>{route === 'archived' ? '暂时放下，随时回来' : folder ? '我的知识 / 当前卡组' : '我的知识，慢慢生长'}</p><h1>{shellTitle}</h1></header>
             {route === 'archived' && <p className="m-note">不再安排复习。整组归档保留层级，单独归档的卡片单列；随时可以整组或逐张移出归档。</p>}
             {route === 'archived' && archivedFolder && <><button className="m-parent-link" onClick={() => openArchivedFolder(null)}><ArrowLeft size={16}/>全部归档</button><button className="m-secondary" disabled={busy || !libraryPool.length} onClick={() => setSheet({ kind: 'folder-restore', id: archivedFolder })}><Undo2 size={18}/>整组移出归档</button></>}
             {route === 'folders' && folder && <button className="m-parent-link" onClick={() => openFolder(currentFolder?.parentId || null)}><ArrowLeft size={16}/>{currentFolder?.parentId ? store.decks.find(deck => deck.id === currentFolder.parentId)?.name : '全部卡组'}</button>}
@@ -623,9 +621,10 @@ export function MemoryWorkspace(): JSX.Element {
             {visibleCards.length > 0 && <><p className="m-result-heading">{expanded ? `${visibleCards.length} 张匹配卡片` : '本层卡片'}</p>{visibleCards.map(itemCard)}</>}
             {!children.length && !visibleCards.length && <div className="m-empty"><Archive size={34}/><strong>{keyword || hasFilters ? '没有匹配的内容' : route === 'archived' ? '还没有归档卡片' : '从第一张卡片开始'}</strong><p>{route === 'archived' ? '阅读时点击归档，就可以暂时放下这张卡。' : keyword || hasFilters ? '试试其他关键词，或清除筛选。' : '新建卡组，或导入你想温习的知识。'}</p>{route !== 'archived' && !keyword && !hasFilters && <button className="m-secondary" onClick={() => setSheet({ kind: 'add' })}>添加知识</button>}</div>}
           </>}
-          {route === 'stats' && <MemoryStats/>}
+          {route === 'stats' && <><header className="m-stats-intro"><p>每一次回忆，都有意义</p><h1>看见自己的积累。</h1></header><MemoryStats/></>}
           {route === 'settings' && <div className="m-settings"><p className="m-note">按照你的节奏，安排下一次温习。</p><div><span><strong>复习计划</strong><small>{reviewPlan.mode === 'smart' ? `智能调度 · ${Math.round(store.settings.desiredRetention * 100)}% 目标记忆率` : '固定间隔 · 自定义四档'}</small></span><button className="m-secondary" onClick={() => setSheet({ kind: 'review-plan' })}>配置</button></div><div><strong>阅读字号</strong><button className="m-secondary" onClick={() => setSheet({ kind: 'font' })}>{font}</button></div><div><span><strong>数据备份与恢复</strong><small>推荐完整带图备份；仅文字备份不包含图片文件。</small></span><button className="m-secondary" onClick={() => setSheet({ kind: 'backup' })}>备份</button></div><div><span><strong>已归档</strong><small>保留原文和进度，不安排复习。</small></span><button className="m-secondary" onClick={() => navigate('archived')}>查看 {store.cards.length - available.length}</button></div><div><strong>导入知识</strong><button className="m-secondary" onClick={() => navigate('import')}>打开</button></div><div><span><strong>云同步与设备</strong><small>授权与设备管理，同步状态显示在抽屉下方。</small></span><button className="m-secondary" onClick={() => setSheet({ kind: 'cloud' })}>管理云同步</button></div><div><span><strong>更多设置</strong><small>主题和其他选项。</small></span><button className="m-secondary" onClick={() => navigate('advanced')}>查看</button></div></div>}
           {route === 'advanced' && <><details className="m-panel"><summary>显示诊断（高级）</summary><MemoryDisplayDiagnostics/></details><Settings/></>}
+          {route === 'settings' && isLocalPreview() && <MemoryLocalPreview/>}
           {route === 'compat' && (compatReceipt ? <MemoryImportCompletion source={compatReceipt.source} added={compatReceipt.added} updated={compatReceipt.updated} skipped={compatReceipt.skipped} locations={memoryImportLocations(store.decks, compatReceipt.deckIds)} onView={() => { const destination = compatReceipt.deckIds.length === 1 ? compatReceipt.deckIds[0] : null; setCompatReceipt(null); openFolder(store.decks.some(deck => deck.id === destination) ? destination : null); }} onContinue={() => setCompatReceipt(null)}/> : <ImportHub onClose={() => navigate('import')} onComplete={setCompatReceipt}/>)}
           {route === 'weread' && (localWereadFile ? <MemoryWereadLocalImport initialFile={localWereadFile} onClose={() => { setLocalWereadFile(null); navigate('import'); }} onComplete={deckIds => { setLocalWereadFile(null); setDrawer(false); setSheet(null); setFolder(deckIds.find(id => useRecallStore.getState().decks.some(deck => deck.id === id)) || null); setRoute('folders'); setQuery(''); setSort('old'); setError(''); }} onBusy={setBusy}/> : <MemoryWereadImport onClose={() => navigate('import')} onComplete={deckIds => { setDrawer(false); setSheet(null); setFolder(deckIds.find(id => useRecallStore.getState().decks.some(deck => deck.id === id)) || null); setRoute('folders'); setQuery(''); setSort('old'); setError(''); }} onBusy={setBusy} onBackChange={registerWereadBack}/>)}
           {route === 'import' && <>
@@ -636,14 +635,15 @@ export function MemoryWorkspace(): JSX.Element {
               <section className="m-panel"><strong>{filename}</strong><MemoryFolderSelector decks={store.decks} value={plan.parentId || ''} label="导入到" rootLabel="根目录" disabled={busy} onChange={id => { try { setPlan(planMemoryImport(useRecallStore.getState(), plan.document, id || null)); setSelected(new Set()); setError(''); } catch (failure) { setError(String(failure)); } }}/></section>
               <p className="m-counts">新增 {plan.rows.filter(row => row.status === 'new').length} · 重复 {plan.rows.filter(row => row.status === 'duplicate').length} · 变更 {plan.rows.filter(row => row.status === 'change').length}</p>
               {plan.rows.map(row => <article key={row.entry.id} className="m-panel"><div className="m-spread"><strong>{row.status === 'new' ? '新增' : row.status === 'duplicate' ? '跳过重复' : '检测到变化'}</strong>{row.status === 'change' && <label className="m-check"><input type="checkbox" checked={selected.has(row.entry.id)} onChange={event => setSelected(previous => { const next = new Set(previous); if (event.target.checked) next.add(row.entry.id); else next.delete(row.entry.id); return next; })}/>更新</label>}</div><small>{row.entry.path.join(' / ')}</small><h3>{row.entry.front || row.entry.bookTitle || '阅读摘录'}</h3><p>{row.entry.back.slice(0, 240)}</p>{row.existing && row.status === 'change' && <details><summary>查看差异</summary><p>当前：</p><pre>{row.existing.front + '\n' + row.existing.back}</pre><p>文件：</p><pre>{row.entry.front + '\n' + row.entry.back}</pre><small>保留首次导入时间、归档状态与复习进度。</small></details>}</article>)}
-              <div className="m-import-footer"><button className="m-secondary" disabled={busy} onClick={() => { setPlan(null); setImportAssets([]); }}>取消</button><button className="m-primary" disabled={busy} onClick={() => void confirmImport()}>确认导入</button></div>
               {error.includes('重新校验') && <button className="m-secondary" onClick={() => { setPlan(planMemoryImport(useRecallStore.getState(), plan.document, plan.parentId)); setSelected(new Set()); setError(''); }}>重新校验</button>}
             </>}
-            {receipt && <MemoryImportCompletion source={`${importFormat} · ${filename}`} added={receipt.added} updated={receipt.updated} skipped={receipt.skipped} locations={memoryImportLocations(store.decks, receipt.deckIds)} onView={() => { const destination = receipt.deckIds.length === 1 ? receipt.deckIds[0] : receipt.parentId; setReceipt(null); openFolder(store.decks.some(deck => deck.id === destination) ? destination : null); }} onContinue={() => setReceipt(null)}><button className="m-secondary" type="button" onClick={() => downloadMemoryText(receipt.text, filename.replace(/\.(?:md|json)$/i, '').replace(/\.recall-media$/i, '').replace(/-带编号$/, '') + '-带编号.md')}>保存带编号的 Markdown</button></MemoryImportCompletion>}
+            {receipt && <MemoryImportCompletion source={`${importFormat} · ${filename}`} added={receipt.added} updated={receipt.updated} skipped={receipt.skipped} locations={memoryImportLocations(store.decks, receipt.deckIds)} onView={() => { const destination = receipt.deckIds.length === 1 ? receipt.deckIds[0] : receipt.parentId; setReceipt(null); openFolder(store.decks.some(deck => deck.id === destination) ? destination : null); }} onContinue={() => setReceipt(null)}/>}
           </>}
           {route === 'read' && <MemoryReader key={readerKey} ids={queue} scopeIds={reviewScope} onQueueChange={setQueue} onContinue={completedIds => read(store.cards.filter(card => reviewScope.includes(card.id) && !completedIds.includes(card.id)), true)} initialIndex={index} reviewMode={reviewMode} onEdit={id => setSheet({ kind: 'card', id })} onOptions={id => setSheet({ kind: 'reader-options', id })} onArchive={archiveCard} restoreRequest={restoreRequest} archiveNotice={archiveNotice} fontSize={font} onIndex={setIndex} onExit={exitReading} onBusy={setBusy}/>}
           </Suspense>
         </main>
+        {route === 'import' && plan && <MemoryImportFooter busy={busy} onCancel={() => { setPlan(null); setImportAssets([]); }} onConfirm={() => void confirmImport()}/>}
+        {route === 'home' && <MemoryPaperHomeDock busy={busy} caption={lastStudyDeck ? `上次选择 · ${lastStudyDeck.name}` : studyDeck === '__all' ? '上次选择 · 混合全部卡组' : '选好卡组，再开始这一轮'} onStart={() => { setDrawer(false); setSheet({ kind: 'review-deck' }); }} onPlan={() => setSheet({ kind: 'review-plan' })}/>}
         {['folders', 'cards'].includes(route) && libraryPool.length > 0 && <div className="m-library-dock"><button className="m-secondary" disabled={!matching.length || busy} onClick={() => read(matching, false)}>浏览<span>{matching.length}</span></button><button className="m-primary" disabled={!libraryRecommendation.cards.length || busy} onClick={() => read(matching, true)}>本轮温习<span>{libraryRecommendation.cards.length}</span><ChevronRight size={16}/></button></div>}
       </div>
       {route !== 'read' && archiveNotice}

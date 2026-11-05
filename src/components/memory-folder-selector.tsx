@@ -23,10 +23,16 @@ export function MemoryFolderSelector({ decks, value, onChange, label, rootLabel,
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const items = useRef(new Map<string, HTMLLIElement>());
+  const path = useMemo(() => {
+    try { return folderPath(decks, value || null); }
+    catch { return []; }
+  }, [decks, value]);
   const children = useMemo(() => {
     const result = new Map<string, Deck[]>();
+    const preferred = new Set(path.map(deck => deck.id));
     const sorted = [...decks].sort((first, second) =>
-      (timestamp(second.importedAt) ?? timestamp(second.createdAt) ?? 0) - (timestamp(first.importedAt) ?? timestamp(first.createdAt) ?? 0)
+      Number(preferred.has(second.id)) - Number(preferred.has(first.id))
+      || (timestamp(second.importedAt) ?? timestamp(second.createdAt) ?? 0) - (timestamp(first.importedAt) ?? timestamp(first.createdAt) ?? 0)
       || (timestamp(second.createdAt) ?? 0) - (timestamp(first.createdAt) ?? 0)
       || (first.id < second.id ? -1 : first.id > second.id ? 1 : 0));
     for (const deck of sorted) {
@@ -36,11 +42,7 @@ export function MemoryFolderSelector({ decks, value, onChange, label, rootLabel,
       result.set(parent, siblings);
     }
     return result;
-  }, [decks]);
-  const path = useMemo(() => {
-    try { return folderPath(decks, value || null); }
-    catch { return []; }
-  }, [decks, value]);
+  }, [decks, path]);
   const selectedId = path.length ? value : '';
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(() => new Set(path.slice(0, -1).map(deck => deck.id)));

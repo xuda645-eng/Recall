@@ -45,7 +45,7 @@ test('默认按单一卡组复习，选择与刷新保留偏好，不改变卡�
   await page.getByRole('button', { name: '开始复习', exact: true }).click();
   await expect(page.getByRole('button', { name: '选择卡组：主题甲' })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: '选择卡组：主题乙' }).click();
-  await expect(page.locator('.m-picker-selection')).toContainText('本轮 9 张');
+  await expect(page.getByRole('button', { name: '确认开始复习（9）', exact: true })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('recall.snapshot.v1'))).toBe(before);
   await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))));
   await page.screenshot({ path: test.info().outputPath('review-picker.png'), scale: 'css' });

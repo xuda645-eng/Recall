@@ -142,8 +142,8 @@ test('公网已提交资源逐字节校验，匿名微信读书端点不授权�
   const names = await readdir(resolve(directory, 'assets'));
   const manifest = JSON.parse(await readFile(resolve(directory, 'manifest.webmanifest'), 'utf8')) as { start_url: string; scope: string; icons: { src: string }[] };
   expect(manifest.start_url).toBe('/'); expect(manifest.scope).toBe('/');
-  const build = JSON.parse(await readFile(resolve(directory, 'version.json'), 'utf8')) as { version: string };
-  await expect(page.locator('[data-app-version]')).toHaveText(build.version);
+  const build = JSON.parse(await readFile(resolve(directory, 'version.json'), 'utf8')) as { version: string; releaseVersion?: string };
+  await expect(page.locator('[data-app-version]')).toHaveText(build.releaseVersion ?? build.version);
   const paths = ['index.html', 'manifest.webmanifest', 'version.json', 'sw.js', ...names.filter(name => /^(memory-weread-import|memory-workspace)-.*\.(js|css)$/.test(name)).map(name => `assets/${name}`), ...manifest.icons.map(icon => icon.src.replace(/^\//, ''))];
   const expected = await Promise.all(paths.map(async path => ({ path, digest: createHash('sha256').update(await readFile(resolve(directory, path))).digest('hex') })));
   const actual = await page.evaluate(async files => Promise.all(files.map(async ({ path }) => {

@@ -13,7 +13,29 @@ function reply(value: unknown) {
   return fetcher;
 }
 
-afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
+
+describe('online WeRead request safety', () => {
+  it('does not request an API in a loopback isolated preview', async () => {
+    vi.stubEnv('VITE_RECALL_LOCAL_PREVIEW', '1');
+    vi.stubGlobal('window', { location: { hostname: '127.0.0.1' } });
+    const fetcher = reply({ books: [], cursor: null });
+    await expect(loadOnlineBooks(null, signal)).rejects.toThrow('本地隔离预览不连接在线服务');
+    await expect(loadOnlineProgress(book.bookId, signal)).rejects.toThrow('本地隔离预览不连接在线服务');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('explains network failures without displaying raw fetch errors', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    await expect(loadOnlineBooks(null, signal)).rejects.toThrow('网络连接失败，请检查网络后重试');
+  });
+  it('preserves cancellation rather than reporting an aborted request as a network failure', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const failure = new DOMException('Cancelled', 'AbortError');
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(failure));
+    await expect(loadOnlineBooks(null, controller.signal)).rejects.toBe(failure);
+  });
+});
 
 describe('online WeRead book selection metadata', () => {
   it('accepts validated metadata, distinguishes counts and only projects public selection fields', async () => {

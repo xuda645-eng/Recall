@@ -3,16 +3,17 @@ import { readFileSync } from "node:fs";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig } from "vite";
-import { createBuildInfo } from "./src/lib/build-version";
+import { createBuildInfo, createVersionMetadata } from "./src/lib/build-version";
 
 const buildInfo = createBuildInfo(new Date(), process.env.RECALL_BUILD_VERSION);
-const versionJSON = JSON.stringify(buildInfo);
+const buildJSON = JSON.stringify(buildInfo);
+const versionJSON = JSON.stringify(createVersionMetadata(buildInfo));
 
 export default defineConfig(({ mode }) => {
   const base = mode === "pages" ? "/Recall/" : "/";
   return {
     base,
-    define: { __RECALL_BUILD_INFO__: versionJSON },
+    define: { __RECALL_BUILD_INFO__: buildJSON },
     plugins: [{
       name: "recall-build-version",
       generateBundle() {
@@ -38,7 +39,7 @@ export default defineConfig(({ mode }) => {
       manifest: {
         name: "Recall - 记忆卡片与间隔复习", short_name: "Recall",
         description: "个人记忆卡片，多级整理与间隔复习，内容保存在本机。",
-        theme_color: "#353532", background_color: "#f5f4ee",
+        theme_color: "#4f604a", background_color: "#f5f1e9",
         display: "standalone", orientation: "portrait", scope: base, start_url: base,
         lang: "zh-CN", categories: ["education", "productivity"],
         icons: [

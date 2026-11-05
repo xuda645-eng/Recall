@@ -48,6 +48,24 @@ describe('manual PWA refresh', () => {
     expect(applyUpdate).toHaveBeenCalledExactlyOnceWith(true);
     expect(reload).toHaveBeenCalledOnce();
   });
+  it('compares the actual V1.1 release identity rather than its legacy metadata alias', async () => {
+    fetchVersion.mockResolvedValue(new Response(JSON.stringify({ version: '1.0-20261105-1801', releaseVersion: '1.1-20261105-1801' }), { status: 200 }));
+    await refreshMemoryPWA(applyUpdate, '1.1-20261105-1801');
+    expect(reload).toHaveBeenCalledOnce();
+    expect(applyUpdate).not.toHaveBeenCalled();
+  });
+  it('activates V1.1 from a V1.0 installation without changing its stored cards', async () => {
+    fetchVersion.mockResolvedValue(new Response(JSON.stringify({ version: '1.0-20261105-1801', releaseVersion: '1.1-20261105-1801' }), { status: 200 }));
+    registration.waiting = new InstallingWorker();
+    await refreshMemoryPWA(applyUpdate, version);
+    expect(applyUpdate).toHaveBeenCalledExactlyOnceWith(true);
+    expect(reload).toHaveBeenCalledOnce();
+  });
+  it('rejects a malformed release identity instead of trusting a valid legacy alias', async () => {
+    fetchVersion.mockResolvedValue(new Response(JSON.stringify({ version, releaseVersion: 'invalid' }), { status: 200 }));
+    await expect(refreshMemoryPWA(applyUpdate, version)).rejects.toThrow('版本信息无效');
+    expect(reload).not.toHaveBeenCalled();
+  });
   it('waits for a newly discovered worker to finish downloading before applying it', async () => {
     const worker = new InstallingWorker();
     registration.installing = worker;

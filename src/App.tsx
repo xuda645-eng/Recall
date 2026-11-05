@@ -11,6 +11,7 @@ const QuickAddDialog = lazy(() => import("@/components/quick-add").then(module =
 import { useRecallStore } from "@/stores/recall-store";
 import { toast } from "sonner";
 import { startCloudSync } from '@/services/cloud-sync';
+import { isLocalPreview } from '@/lib/local-preview';
 
 const DeckBrowser = lazy(() => import("@/components/deck-browser").then(m => ({ default: m.DeckBrowser })));
 const DeckDetail = lazy(() => import("@/components/deck-detail").then(m => ({ default: m.DeckDetail })));
@@ -47,7 +48,7 @@ function Application(): JSX.Element {
   }, [initialize]);
 
   useEffect(() => {
-    if (isTauriRuntime() || isLoading || error) return;
+    if (isTauriRuntime() || isLoading || error || isLocalPreview()) return;
     return startCloudSync();
   }, [isLoading, error]);
 

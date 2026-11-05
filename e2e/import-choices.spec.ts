@@ -55,14 +55,16 @@ test('文字和带图入口分别筛选文件，并保留预览、取消与确�
   await page.getByRole('button', { name: '取消', exact: true }).click();
   await expect(page.getByRole('group', { name: '常用导入' })).toBeVisible();
   const mediaPicker = page.waitForEvent('filechooser');
-  await page.getByRole('button', { name: '选择带图包' }).click();
+  await page.getByRole('button', { name: '选择带图卡片文件' }).click();
   const mediaChooser = await mediaPicker;
   expect(await mediaChooser.element().getAttribute('accept')).toBe('.json');
   const packed = { format: 'recall-media', version: 1, markdown: markdown.replace('Synthetic evidence.', `Synthetic evidence.\n\n![Source](recall://${id})`), images: [{ id, mime: 'image/png', base64: image.toString('base64') }] };
   await mediaChooser.setFiles({ name: 'synthetic.recall-media.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(packed)) });
   await expect(page.getByText(/^1 张图片 ·/)).toBeVisible();
   await page.getByRole('button', { name: '确认导入', exact: true }).click();
-  await expect(page.getByText('新增 1，更新 0，跳过 0')).toBeVisible();
+  await expect(page.locator('.m-import-completion-counts > div').nth(0)).toHaveText('1新增卡片');
+  await expect(page.locator('.m-import-completion-counts > div').nth(1)).toHaveText('0更新卡片');
+  await expect(page.locator('.m-import-completion-counts > div').nth(2)).toHaveText('0跳过已有');
   await page.getByRole('button', { name: '继续导入', exact: true }).click();
   await page.getByRole('button', { name: '导入划线', exact: true }).click();
   await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'weread');

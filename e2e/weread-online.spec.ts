@@ -163,7 +163,8 @@ async function boot(page: Page, data = snapshotFixture()): Promise<void> {
   await page.goto('/');
   await expect(page.locator('.memory-app')).toBeVisible();
   expect(await page.evaluate(() => ({ width: innerWidth, height: innerHeight, dpr: devicePixelRatio }))).toEqual({ width: 393, height: 852, dpr: 3 });
-  await page.getByRole('button', { name: '导入知识', exact: true }).tap();
+  await page.getByRole('button', { name: '打开项目菜单', exact: true }).tap();
+  await page.locator('#memory-drawer').getByRole('button', { name: '导入', exact: true }).tap();
   await page.getByLabel('导入文件').setInputFiles({ name: 'synthetic-weread.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'recall-weread-export-v1', books: booksFixture() })) });
   await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'weread');
   await expect(page.getByRole('heading', { name: '微信读书 Skill 导出导入', exact: true })).toBeVisible();

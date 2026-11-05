@@ -38,12 +38,16 @@ test('带图包预览取消不保存、确认去重并保留进度，拒绝缺�
   expect(await imageCount(page)).toBe(0);
   await importPackage(page);
   await page.getByRole('button', { name: '确认导入', exact: true }).click();
-  await expect(page.getByText('新增 2，更新 0，跳过 0')).toBeVisible();
+  await expect(page.locator('.m-import-completion-counts > div').nth(0)).toHaveText('2新增卡片');
+  await expect(page.locator('.m-import-completion-counts > div').nth(1)).toHaveText('0更新卡片');
+  await expect(page.locator('.m-import-completion-counts > div').nth(2)).toHaveText('0跳过已有');
   expect(await imageCount(page)).toBe(1);
   await page.evaluate(() => { const snapshot = JSON.parse(localStorage.getItem('recall.snapshot.v1')!); snapshot.cards[0].reps = 8; localStorage.setItem('recall.snapshot.v1', JSON.stringify(snapshot)); });
   await importPackage(page);
   await page.getByRole('button', { name: '确认导入', exact: true }).click();
-  await expect(page.getByText('新增 0，更新 0，跳过 2')).toBeVisible();
+  await expect(page.locator('.m-import-completion-counts > div').nth(0)).toHaveText('0新增卡片');
+  await expect(page.locator('.m-import-completion-counts > div').nth(1)).toHaveText('0更新卡片');
+  await expect(page.locator('.m-import-completion-counts > div').nth(2)).toHaveText('2跳过已有');
   expect(await imageCount(page)).toBe(1);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('recall.snapshot.v1')!).cards[0].reps)).toBe(8);
   await importPackage(page, JSON.stringify({ ...JSON.parse(packageText), images: [] }));
@@ -66,6 +70,8 @@ test('来源图片缩略、放大拖动关闭不评分，离线刷新仍可读�
   await expect(page.getByText('导入完成', { exact: true })).toBeVisible();
   await openAnswer(page);
   const preview = page.locator('.m-reading[data-active=true] .recall-media-preview');
+  await expect(preview).not.toContainText('来源截图 · 点击放大');
+  await expect(preview.locator('img')).toBeVisible();
   expect((await preview.boundingBox())!.height).toBeLessThan(300);
   await preview.click();
   const dialog = page.getByRole('dialog', { name: 'Source red frame' });

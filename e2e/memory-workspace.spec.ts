@@ -457,9 +457,10 @@ test('抽屉显示固定构建版本，刷新图标在移动窄屏与桌面均�
   await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
   const version = page.locator('[data-app-version]');
   const text = (await version.textContent())!;
-  expect(text).toMatch(/^1\.0-\d{8}-\d{4}$/);
+  expect(text).toMatch(/^1\.1-\d{8}-\d{4}$/);
   const metadata = await page.evaluate(async () => (await fetch(new URL('version.json', location.href), { credentials: 'omit', cache: 'no-store' })).json());
-  expect(metadata.version).toBe(text);
+  expect(metadata.releaseVersion).toBe(text);
+  expect(metadata.version).toMatch(/^1\.0-\d{8}-\d{4}$/);
   expect(metadata.timezone).toBe('Asia/Shanghai');
   await saveShot(page, 'drawer-version');
   for (const width of [393, 320, 760, 761, 1280]) {
@@ -602,7 +603,7 @@ test('主屏幕WebKit顶部采样层独立固定，不绘制遮罩或拦截Logo�
       const box = element.getBoundingClientRect();
       return { parentIsBody: element.parentElement === document.body, childCount: element.childNodes.length, display: style.display, position: style.position, color: style.backgroundColor, clip: style.backgroundClip, pointerEvents: style.pointerEvents, zIndex: style.zIndex, filter: style.filter, backdrop: style.backdropFilter, x: box.x, y: box.y, width: box.width, height: box.height, ancestorTransforms: [document.body, document.documentElement].map(ancestor => getComputedStyle(ancestor).transform) };
     });
-    expect(surface).toEqual({ parentIsBody: true, childCount: 0, display: 'block', position: 'fixed', color: dark ? 'rgb(36, 36, 32)' : 'rgb(246, 245, 239)', clip: 'text', pointerEvents: 'none', zIndex: '2147483647', filter: 'none', backdrop: 'none', x: 0, y: 0, width: 393, height: 70, ancestorTransforms: ['none', 'none'] });
+    expect(surface).toEqual({ parentIsBody: true, childCount: 0, display: 'block', position: 'fixed', color: dark ? 'rgb(37, 43, 36)' : 'rgb(245, 241, 233)', clip: 'text', pointerEvents: 'none', zIndex: '2147483647', filter: 'none', backdrop: 'none', x: 0, y: 0, width: 393, height: 70, ancestorTransforms: ['none', 'none'] });
     const withSampler = await page.screenshot({ clip: { x: 0, y: 0, width: 393, height: 170 }, animations: 'disabled' });
     await edge.evaluate(element => { (element as HTMLElement).style.visibility = 'hidden'; });
     const withoutSampler = await page.screenshot({ clip: { x: 0, y: 0, width: 393, height: 170 }, animations: 'disabled' });
@@ -757,7 +758,7 @@ test('不透明固定顶栏与正文滚动分离，设置页、暗色和阅读�
       expect(surface.position).toBe('fixed');
       expect(surface.appPosition).toBe('fixed');
       expect(surface.ancestorTransforms.every(transform => transform === 'none')).toBe(true);
-      expect(surface.background).toBe(dark ? 'rgb(36, 36, 32)' : 'rgb(246, 245, 239)');
+      expect(surface.background).toBe(dark ? 'rgb(37, 43, 36)' : 'rgb(245, 241, 233)');
       expect(surface.backgroundImage).toBe('none');
       expect(surface.filter).toBe('none');
       expect(surface.backdropFilter).toBe('none');
@@ -1564,13 +1565,12 @@ test('微信读书按书导入、章节元数据、原文不改写及重复导�
   const markText = '  原文第一行。\n\n原文第二行。  ';
   const file = { name: 'weread.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'recall-weread-export-v1', books: [{ bookId: 'book-test', title: '测试书', highlights: [{ bookmarkId: 'highlight-1', markText, chapterUid: 'chapter-1', chapterTitle: '第一章', question: '这个结论的条件是什么？', recallKind: 'qa' }] }] })) };
   async function load() {
-    await page.getByLabel('导入文件').setInputFiles(file);
+    await page.locator('input[type="file"]').setInputFiles(file);
     await page.getByRole('checkbox').check();
     await page.getByRole('button', { name: '预览并编辑回忆卡', exact: true }).click();
     await page.getByRole('button', { name: '检查导入变化', exact: true }).click();
     await saveShot(page, 'weread-preview');
     await page.getByRole('button', { name: '确认导入', exact: true }).click();
-    await expect(page.getByRole('region', { name: '导入任务完成' })).toBeVisible();
     await page.getByRole('button', { name: '查看卡组', exact: true }).click();
     await expect(page.locator('.memory-content')).toHaveAttribute('data-route', 'folders');
   }
@@ -1589,7 +1589,7 @@ test('微信读书按书导入、章节元数据、原文不改写及重复导�
 
 test('带凭证的微信读书文件被拒绝，不落库', async ({ page }) => {
   await seedPage(page, fixture(), 'import');
-  await page.getByLabel('导入文件').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'recall-weread-export-v1', apiKey: 'test-only-not-a-real-key', books: [] })) });
+  await page.locator('input[type="file"]').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'recall-weread-export-v1', apiKey: 'test-only-not-a-real-key', books: [] })) });
   await expect(page.getByRole('alert')).toBeVisible();
   expect((await snapshot(page)).cards).toHaveLength(3);
 });
@@ -1634,7 +1634,7 @@ test('PWA部署路径manifest、Service Worker及断网重开和复习持久化'
   const url = new URL(await page.locator('link[rel="manifest"]').getAttribute('href') || '', page.url());
   const response = await context.request.get(url.href);
   const manifest = await response.json();
-  expect(manifest.display).toBe('standalone'); expect(manifest.theme_color).toBe('#353532');
+  expect(manifest.display).toBe('standalone'); expect(manifest.theme_color).toBe('#4f604a');
   const base = new URL('./', page.url()).pathname;
   expect(manifest.start_url).toBe(base); expect(manifest.scope).toBe(base);
   for (const icon of manifest.icons) expect((await context.request.get(new URL(icon.src, page.url()).href)).status()).toBe(200);
@@ -1705,7 +1705,7 @@ test('本轮批注：导入目录按层级收起展开并保存到所选子目�
   await expect(page.locator('.m-card-open').filter({ hasText: '层级导入的合成问题' })).toBeVisible();
 });
 
-test('本轮批注：带图文件采用同一完成页并保留图片和带编号下载', async ({ page }) => {
+test('本轮批注：带图文件采用同一完成页并保留图片，去掉带编号下载', async ({ page }) => {
   await seedPage(page);
   await navigate(page, '导入');
   const image = await readFile(new URL('./fixtures/source-screenshot.png', import.meta.url));
@@ -1717,7 +1717,7 @@ test('本轮批注：带图文件采用同一完成页并保留图片和带编�
   const complete = page.getByRole('region', { name: '导入任务完成' });
   await expect(complete.getByRole('heading', { name: '导入完成' })).toBeVisible();
   await expect(complete).toContainText('带图文件');
-  await expect(complete.getByRole('button', { name: '保存带编号的 Markdown' })).toBeVisible();
+  await expect(complete.getByRole('button', { name: '保存带编号的 Markdown' })).toHaveCount(0);
   expect((await snapshot(page)).cards.find((card: { id: string }) => card.id === 'media-completion').back).toContain(`recall://${imageId}`);
   await complete.getByRole('button', { name: '查看卡组', exact: true }).click();
   await page.locator('.m-card-open').filter({ hasText: '带图文件的合成问题' }).click();

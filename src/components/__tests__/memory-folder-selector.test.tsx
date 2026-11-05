@@ -88,6 +88,16 @@ describe('MemoryFolderSelector', () => {
     expect(names()).toEqual(['全部卡片', ...expected, 'parent', ...expected]);
   });
 
+  it('keeps root first, then the selected branch, then recent siblings without moving stored folders', () => {
+    const folders = [...decks, deck('recent', null, { importedAt: '2026-11-05T00:00:00Z' }), deck('recent-child', 'parent', { importedAt: '2026-11-05T00:00:00Z' })];
+    const before = JSON.stringify(folders);
+    selector({ decks: folders, value: 'grandchild', rootLabel: '根目录' });
+    openSelector();
+    const names = screen.getAllByRole('treeitem').map(item => document.getElementById(item.getAttribute('aria-labelledby')!)!.textContent);
+    expect(names).toEqual(['根目录', 'parent', 'child', 'grandchild', 'recent-child', 'recent', 'sibling']);
+    expect(JSON.stringify(folders)).toBe(before);
+  });
+
   it('selects a collapsed parent without expanding it or selecting its first child', () => {
     const { onChange } = selector();
     const trigger = openSelector();

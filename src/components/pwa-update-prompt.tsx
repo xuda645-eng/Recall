@@ -40,7 +40,7 @@ export function PWAAppVersion({ disabled = false }: { disabled?: boolean }): JSX
       setError(failure instanceof Error && /[\u4e00-\u9fff]/.test(failure.message) ? failure.message : '无法检查更新，请联网后重试。本机数据未改动。');
     }
   }
-  return <><div className="m-app-version"><small aria-label="当前版本" title="构建时间使用北京时间，精确到分钟">Recall · <span data-app-version={APP_BUILD.version}>{APP_BUILD.version}</span></small><button className="m-version-refresh" type="button" aria-label={refreshing ? '正在检查更新' : '检查更新并刷新'} title="检查更新并刷新" disabled={disabled || refreshing} onClick={() => void refresh()}>{refreshing ? <Loader2 size={15} className="animate-spin" aria-hidden="true"/> : <RefreshCw size={15} aria-hidden="true"/>}</button></div>{error ? <small className="m-version-message" role="status">{error}</small> : needRefresh && <small className="m-version-message" role="status">有新版本，点击右侧图标刷新。</small>}</>;
+  return <><div className="m-app-version"><small aria-label="当前版本" title="构建时间使用北京时间，精确到分钟">Recall · V<span data-app-version={APP_BUILD.version}>{APP_BUILD.version}</span></small><button className="m-version-refresh" type="button" aria-label={refreshing ? '正在检查更新' : '检查更新并刷新'} title="检查更新并刷新" disabled={disabled || refreshing} onClick={() => void refresh()}>{refreshing ? <Loader2 size={15} className="animate-spin" aria-hidden="true"/> : <RefreshCw size={15} aria-hidden="true"/>}</button></div>{error ? <small className="m-version-message" role="status">{error}</small> : needRefresh && <small className="m-version-message" role="status">有新版本，点击右侧图标刷新。</small>}</>;
 }
 
 export function PWAUpdateProvider({ children }: { children: ReactNode }): JSX.Element {
