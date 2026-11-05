@@ -2,8 +2,9 @@
 
 Record checkpoint: 2026-11-06T00:35:00+08:00 (Asia/Shanghai).
 Audit started: 2026-11-05T23:55:20+08:00. Local validation completed at
-2026-11-06T00:42:54+08:00. Status: validated with retained recovery evidence;
-awaiting commit, push and deployment.
+2026-11-06T00:42:54+08:00. Status: published V1.1-20261106-0036; public
+app/cache/hash verification completed at 2026-11-06T00:59:18+08:00 with retained
+network recovery history and explicit extended-live/physical-phone limits.
 
 ## Scope
 
@@ -70,7 +71,7 @@ snapshot, media storage, cloud schema/API, auth, bindings and origin are unchang
   server/offline image reopening and unchanged review data. All 188 distinct cases
   now passed across the complete run and recovery, not a clean 188/188 command.
   No app or test assertion changes were made for this recovery. Post-deployment
-  public verification is pending.
+  public verification and its incomplete extended-live scope are recorded below.
   Chromium/WebKit use 393 x 852 CSS / DPR 3, synthetic local data and isolated
   browser contexts. Relevant suites include safe-area/narrow/760-breakpoint/
   landscape/desktop, drawer focus/motion, folders, imports, editing, long reading,
@@ -105,8 +106,8 @@ traces and screenshots remain private under `/private/tmp/recall-interaction-fix
 
 - Repository: `xuda645-eng/Recall`, branch `main`; source base
   `c2b62a98dd61b60e44d482960dbdefb977e03157`. Unrelated untracked
-  `prototypes/style-lab/` is excluded. Implementation SHA, commit/push timestamps
-  and results will be appended after successful validation/publication.
+  `prototypes/style-lab/` is excluded. Implementation SHA:
+  `732577116e3693a66285fef159d6a8f175b4514b`.
 - Read-only Wrangler preflight verified account
   `751b9fca4f5173fd70e0dfb69cff81e2`, existing `recall-memory` project and
   previous production `083c047d-cf0c-485e-8dee-e11c5119525d`, source
@@ -115,7 +116,8 @@ traces and screenshots remain private under `/private/tmp/recall-interaction-fix
   succeeded after tool-approved escalation. No cache ownership changes.
 - Stable origin remains https://recall-memory.pages.dev/. No new resources,
   migrations, credentials, plan upgrades, DNS changes or production test data.
-- Deployment ID/immutable URL, source push result and public outcomes are pending.
+- Production deployment ID: `95d991cd-58f3-45de-9fd7-62a477388022`.
+  Immutable URL: https://95d991cd.recall-memory.pages.dev/.
 
 ## Compatible Recovery
 
@@ -134,4 +136,101 @@ Asset rollback does not undo user data or installed Service Worker caches.
 
 ## Publication Outcomes
 
-Pending. Production is unchanged at this checkpoint; no rollback performed.
+- Implementation committed at 2026-11-06T00:43:53+08:00. Normal source push
+  succeeded, `c2b62a98..73257711`, `HEAD -> main`; remote main matched the exact
+  implementation SHA at the 2026-11-06T00:44:22+08:00 push checkpoint.
+- A clean detached delivery worktree at
+  `/private/tmp/recall-interaction-fixes-delivery` contains that exact commit,
+  excluding the owner's untracked prototype. Four owning source-file SHA-256
+  hashes matched the validated workspace. Copied the frozen verified bundle into
+  ignored `dist` without rebuilding; delivery worktree remained clean.
+- Deployment completed at 2026-11-06T00:45:14+08:00: 205 assets, 28 uploaded /
+  177 reused; Functions, headers and routes compiled/uploaded successfully.
+  No dirty-deployment flag was used. A subsequent read-only production list
+  confirmed deployment `95d991cd-58f3-45de-9fd7-62a477388022` maps to source
+  `7325771`. Displayed releaseVersion is `1.1-20261106-0036`; legacy metadata
+  stays `1.0-20261106-0036` for update compatibility.
+- Public app/cache/hash checks completed with the limits below. No rollback
+  performed; no confirmed new application regression was identified. The evidence follow-up
+  is documentation-only and does not rebuild or deploy the app; its Git locator
+  is `git log -1 -- docs/releases/20261106T003500+0800-interaction-recovery.md`.
+
+Publication command from the clean delivery worktree:
+
+```sh
+git push origin HEAD:main
+CLOUDFLARE_ACCOUNT_ID=751b9fca4f5173fd70e0dfb69cff81e2 npx --yes wrangler@4.156.0 pages deploy dist --project-name recall-memory --branch main --commit-hash 732577116e3693a66285fef159d6a8f175b4514b --commit-message 'fix: preserve workspace drafts and navigation context'
+```
+
+## Public Verification And Limits
+
+- Stable-origin version returned HTTP 200 with `releaseVersion`
+  `1.1-20261106-0036`. Read-only hosting confirmation at
+  2026-11-06T00:45:52+08:00 matched the exact implementation/deployment pair.
+- Both initial Node HTTPS asset-hash commands failed with AbortError/timeouts,
+  including the tool-approved retry using current DNS A record 172.66.47.169.
+  Neither is reported as a passing aggregate. A bounded curl HTTP/1.1 verifier
+  checked the same static-file list and committed SHA-256 expectations:
+  204/205 passed; only unchanged `assets/updater-C9fM6nR-.js` timed out after
+  three reads. A same-file retry using verified A record 172.66.44.87 matched
+  its expected digest. All 205 distinct public hashes are verified across the
+  initial curl run and recovery, not a clean original script pass. Failed and
+  recovered JSON reports remain separate and private.
+- Initial eight-case public core run: four WebKit passes, one interrupted
+  Chromium cache case and three not run. WebKit checked all 161 unique precache
+  paths, activated controller, online refresh persistence, the actual version,
+  current home/drawer geometry, twelve committed resource digests and five real
+  anonymous 401/no-store API gates. Two WeRead cases use intercepted synthetic
+  data; they are not real model, owner-library or authenticated-sync acceptance.
+- A single-worker Chromium TCP/TLS recovery on A record 172.66.47.169 passed
+  2/4; the cache and synthetic generation cases failed at initial page navigation
+  with net::ERR_TIMED_OUT. The same assertions on the other verified A record,
+  172.66.44.87, passed both cache/resource cases in 3.0 minutes. An uncached
+  offline fetch failed as expected; the cached app reopened with identical
+  synthetic data. The remaining synthetic-generation case then passed unchanged
+  in 17.1 seconds. All eight distinct core cases passed across these runs, not a
+  clean eight-case command. HTTPS origin and certificate validation were retained;
+  only QUIC was disabled in isolated diagnostic browsers, not in the product.
+- Expanded 26-case live recovery run: 9 passed, 7 failed, 2 interrupted and 8
+  not run. Failures were initial navigation or app-readiness timeouts. It was
+  stopped to avoid competing cold-start downloads while bounded focused recovery
+  continued. A TCP single-worker expansion passed 2 cases, failed initial
+  navigation on the third, interrupted the fourth and did not run 22. Its first
+  temporary config attempt failed import.meta/module loading before any test;
+  moving the config into ignored project-local quality tooling fixed module
+  resolution without changing the app.
+- Final focused WebKit recovery passed 4/4 in 3.9 minutes, including deep-empty
+  search, new-card draft reload/save-once, malformed cache and quota warnings.
+  Only the live diagnostic wait was raised to 120 seconds; interaction/data
+  assertions, source and deployed bundle were unchanged. Together with earlier
+  completed cases, 15 distinct live recovery cases passed. The extended live
+  26-case matrix remains incomplete; local full coverage is separately established
+  by the 188 distinct mobile cases. Unrun/interrupted cases are not counted as
+  passes and transport timeouts are not concealed by changing product code.
+- Public WebKit offline simulation and physical iPhone Safari home-screen launch,
+  safe areas/keyboard/background eviction/update acceptance remain unverified.
+  Public Chromium offline reopening and local stopped-server WebKit image reopening
+  are separate evidence. No owner data was rated, imported, deleted or backed up.
+
+Exact public entry points (the same browser variables as local validation):
+
+```sh
+node scripts/verify-pwa-assets.mjs /private/tmp/recall-interaction-fixes-lifecycle/build /private/tmp/recall-interaction-fixes-public-assets.json
+RECALL_PRODUCTION_IPV4=172.66.47.169 node scripts/verify-pwa-assets.mjs /private/tmp/recall-interaction-fixes-lifecycle/build /private/tmp/recall-interaction-fixes-public-assets-recovery.json
+node /private/tmp/recall-verify-public-curl.mjs
+RECALL_VERIFY_DIST=/private/tmp/recall-interaction-fixes-lifecycle/build node scripts/run-playwright.mjs --config e2e/v11-public.config.ts --output /private/tmp/recall-interaction-fixes-public-core --workers=1
+RECALL_URL=https://recall-memory.pages.dev/ RECALL_RECOVERY_OUTPUT=/private/tmp/recall-interaction-fixes-public-recovery RECALL_E2E_BUILD_DIR=/private/tmp/recall-interaction-fixes-lifecycle/build node scripts/run-playwright.mjs --config e2e/interaction-recovery.config.ts --grep '交互恢复' --workers=2
+RECALL_URL=https://recall-memory.pages.dev/ RECALL_RECOVERY_OUTPUT=/private/tmp/recall-interaction-fixes-public-tcp-recovery RECALL_E2E_BUILD_DIR=/private/tmp/recall-interaction-fixes-lifecycle/build node scripts/run-playwright.mjs --config quality/interaction-recovery/public.config.ts --grep '交互恢复' --workers=1
+RECALL_VERIFY_DIST=/private/tmp/recall-interaction-fixes-lifecycle/build node scripts/run-playwright.mjs --config quality/interaction-recovery/public-core.config.ts --workers=1
+RECALL_VERIFY_DIST=/private/tmp/recall-interaction-fixes-lifecycle/build node scripts/run-playwright.mjs --config quality/interaction-recovery/public-core-dns44.config.ts --grep 'V1.1 公网缓存|公网已提交资源' --workers=1
+RECALL_VERIFY_DIST=/private/tmp/recall-interaction-fixes-lifecycle/build node scripts/run-playwright.mjs --config quality/interaction-recovery/public-core-dns44.config.ts --grep '四并发合成' --workers=1 --output /private/tmp/recall-interaction-fixes-public-generation-recovery
+RECALL_URL=https://recall-memory.pages.dev/ RECALL_RECOVERY_OUTPUT=/private/tmp/recall-interaction-fixes-public-webkit-focus RECALL_E2E_BUILD_DIR=/private/tmp/recall-interaction-fixes-lifecycle/build node scripts/run-playwright.mjs --config quality/interaction-recovery/public.config.ts --grep '深层空卡组|新卡草稿|损坏.*缓存|草稿存储失败' --project iphone15-webkit --workers=1
+```
+
+The curl recovery retained the original failing report and wrote
+`/private/tmp/recall-interaction-fixes-public-curl/report-recovery.json` after
+matching the one re-downloaded updater against the frozen bundle. All logs,
+transport configs, local verification copies and synthetic screenshots stay local;
+diagnostic fixtures and tooling are not uploaded. Production contains only the
+validated application bundle. No second app deployment occurs for this evidence
+update.
