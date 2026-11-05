@@ -6,7 +6,7 @@
 - Started: `2026-11-05T17:22:41+08:00`, Asia/Shanghai.
 - Request: make generated import files easy to find inside the Recall project,
   using a shallow location and short topic-plus-date filenames.
-- Status: validated and installed; normal source publication pending.
+- Status: complete; validated, installed and normally pushed to `main`.
 - Source baseline: `4bd7fa07a54e82989dbc3a1b867ae8f48e411fb6`, fork
   `https://github.com/xuda645-eng/Recall.git`, branch `main`.
 - Skill source, instructions and Git privacy rule only. No app, API, D1,
@@ -78,7 +78,20 @@
 
 ## Publication And Recovery
 
-- Source implementation SHA and normal push outcome: pending.
+- Source implementation SHA: `6a3c51770ec304289cdf9cc50440498fdda27504`, committed
+  at `2026-11-05T17:34:41+08:00`. Normal `git push origin HEAD:main` succeeded
+  (`4bd7fa07..6a3c5177`); `git ls-remote origin refs/heads/main` independently
+  matched the full SHA. Publication observed by `2026-11-05T17:35:05+08:00`.
+- Exactly 11 reviewed source/docs/privacy-rule files committed. Private batches
+  and synthetic artifacts stayed excluded. The existing unrelated
+  `prototypes/style-lab/` remains untouched and uncommitted.
+- Initial staging returned the local ignored-directory warning and exit code 1
+  after staging nine tracked/source-record files. Read-only inspection confirmed
+  `.git/info/exclude` hides the Skill directory. Recovery forced only the two
+  explicitly reviewed new source/test files, then verified the complete staged
+  allowlist, private-source identifier absence and cached whitespace check.
+- This publication-outcome update is a documentation-only follow-up; its final
+  SHA and push result are reported in chat, without another app deployment.
 - Installed target: `/Users/bytedance/.codex/skills/lark-yellow-to-recall`.
   Tool-authorized synchronization succeeded: six affected files backed up and
   updated, two new files installed. Backup:
