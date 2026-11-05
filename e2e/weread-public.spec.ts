@@ -115,7 +115,8 @@ test('公网应用四并发合成生成保持问题对应，不读取真实书�
     await expect.poll(() => calls.length).toBe(4);
     expect(maximum).toBe(4);
     release();
-    await expect(page.getByRole('heading', { name: '让读过的，留得住。' })).toBeVisible();
+    await expect(page.getByRole('region', { name: '导入任务完成', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '导入完成', exact: true })).toBeVisible();
     const data = await page.evaluate(() => JSON.parse(localStorage.getItem('recall.snapshot.v1')!));
     expect(data.cards.map((card: { back: string }) => card.back)).toEqual(highlights.map(highlight => highlight.markText));
     expect(data.cards.map((card: { front: string }) => card.front)).toEqual(highlights.map((_, index) => `第 ${index} 条合成原文提出了什么具体内容？`));

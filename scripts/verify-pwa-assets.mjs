@@ -35,7 +35,7 @@ async function files(folder, prefix = '') {
   for (const entry of entries) {
     const path = `${prefix}${entry.name}`;
     if (entry.isDirectory() && !entry.name.startsWith('_')) paths.push(...await files(resolve(folder, entry.name), `${path}/`));
-    else if (entry.isFile() && /\.(?:html|js|css|svg|png|ico|woff2|webmanifest)$/.test(path)) paths.push(path);
+    else if (entry.isFile() && /\.(?:html|js|css|svg|png|ico|woff2?|ttf|webmanifest)$/.test(path)) paths.push(path);
   }
   return paths;
 }

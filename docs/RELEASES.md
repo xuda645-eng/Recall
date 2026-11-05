@@ -98,7 +98,7 @@ retroactively marked verified just because a deployment still exists.
 
 | Release | Scope | Result | Record |
 |---|---|---|---|
-| `20261105T180104+0800-v1-1-paper-editorial` | Approved V1.1 / paper UI / card shape and nine comments / compatible PWA update | 1664 units; 160 distinct product cases with recovery, 70 WeRead / 24 merge / 14 paper passes; publication pending | [V1.1 paper editorial](./releases/20261105T180104+0800-v1-1-paper-editorial.md) |
+| `20261105T180104+0800-v1-1-paper-editorial` | V1.1 / paper UI / card shape and nine comments / compatible PWA update | Published `aff714f3`, source `a276ca87`; 1664 units / mobile recovery / 205 assets; physical phone and public WebKit offline pending | [V1.1 paper editorial](./releases/20261105T180104+0800-v1-1-paper-editorial.md) |
 | `20261105T173213+0800-paper-browser-comments` | Nine local annotations / reader / chips / import dock / local WeRead | Local phase: 1657 units / 14 paper checks; product 159 passed / 1 deadline, retained | [Browser corrections](./releases/20261105T173213+0800-paper-browser-comments.md) |
 | `20261105T154950+0800-paper-card-shape` | Restore visible card containers | Local phase: 1651 units / 8 card checks; product 158 passed / 2 timeouts, recovery 2/2 | [Card shape](./releases/20261105T154950+0800-paper-card-shape.md) |
 | `20261105T111604+0800-paper-editorial-preview` | Full style A PWA / private parity / isolated acceptance | Initial local phase: 1651 units / 160 product + 6 paper checks; private copy not published | [Paper implementation](./releases/20261105T111604+0800-paper-editorial-preview.md) |
