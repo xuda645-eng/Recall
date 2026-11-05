@@ -129,7 +129,14 @@ test('公网已提交资源逐字节校验，匿名微信读书端点不授权�
   if (!directory) throw new Error('RECALL_VERIFY_DIST must point to the committed production bundle');
   const base = 'https://recall-memory.pages.dev';
   const allowedApi = new Set(['books', 'book', 'progress', 'budget', 'question'].map(path => `/api/weread/${path}`));
-  await context.route('**/*', async route => {
+  context.on('request', request => {
+    const url = new URL(request.url());
+    expect(url.origin).toBe(base);
+    if (!url.pathname.startsWith('/api/')) expect(request.method()).toBe('GET');
+    expect(request.headers().cookie).toBeUndefined();
+    expect(request.headers().authorization).toBeUndefined();
+  });
+  await context.route(url => url.origin !== base || url.pathname.startsWith('/api/'), async route => {
     const request = route.request();
     const url = new URL(request.url());
     if (url.origin !== base) throw new Error('Only the existing production origin may be read');

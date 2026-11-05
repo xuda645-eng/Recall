@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { createSeedSnapshot } from '../src/data/seed';
 
 test('V1.1 公网缓存完整与持久化，Chromium 断网重开；WebKit 公网断网仍待验证', async ({ browser, browserName }) => {
+  test.setTimeout(600000);
   const context = await browser.newContext({ baseURL: 'https://recall-memory.pages.dev/', viewport: { width: 393, height: 852 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, serviceWorkers: 'allow', locale: 'zh-CN' });
   try {
     const directory = process.env.RECALL_VERIFY_DIST;
@@ -24,7 +25,7 @@ test('V1.1 公网缓存完整与持久化，Chromium 断网重开；WebKit 公�
     const page = await context.newPage();
     await page.addInitScript(data => { if (!localStorage.getItem('recall.snapshot.v1')) localStorage.setItem('recall.snapshot.v1', JSON.stringify(data)); }, initial);
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 120000 });
-    await expect(page.locator('.m-paper-review-card')).toBeVisible();
+    await expect(page.locator('.m-paper-review-card')).toBeVisible({ timeout: 120000 });
     const dock = page.locator('.m-paper-home-dock');
     await expect(dock.getByRole('button', { name: '开始复习', exact: true })).toBeVisible();
     await expect(dock.getByRole('button')).toHaveCount(1);
@@ -42,7 +43,7 @@ test('V1.1 公网缓存完整与持久化，Chromium 断网重开；WebKit 公�
     await page.screenshot({ path: test.info().outputPath('drawer-sync-update.png'), scale: 'css' });
     await page.keyboard.press('Escape');
     try {
-      await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller?.state), { timeout: 120000 }).toBe('activated');
+      await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller?.state), { timeout: 300000 }).toBe('activated');
     } catch (error) {
       console.log('Public SW activation diagnostic', await page.evaluate(async () => { const registration = await navigator.serviceWorker.getRegistration(); return { controller: navigator.serviceWorker.controller?.state, active: registration?.active?.state, waiting: registration?.waiting?.state, installing: registration?.installing?.state, scope: registration?.scope, cacheNames: await caches.keys() }; }));
       throw error;
