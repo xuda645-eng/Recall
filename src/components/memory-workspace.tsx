@@ -33,6 +33,7 @@ import { MemoryFolderSelector } from '@/components/memory-folder-selector';
 import { organizeExistingWereadFolders } from '@/services/weread-folder-organization';
 import { parseWereadExport } from '@/lib/memory-weread';
 import { saveMedia } from '@/services/media-storage';
+import { decodeWorkspaceContext, editorBase, editorDraftFields, loadEditorDraft, loadWorkspaceContext, memoryHashRoute, memoryLocation, saveEditorDraft, saveWorkspaceContext, type MemoryEditorDraft, type MemoryLocation, type MemoryReaderResume, type MemoryRoute, type MemoryWorkspaceContext } from '@/services/memory-workspace-state';
 import type { MediaAsset } from '../../shared/media';
 import type { Card, Deck } from '@/types';
 import './memory-workspace.css';
@@ -51,31 +52,31 @@ const RichCard = lazy(() => import('@/components/RichCard').then(module => ({ de
 const loadingView = <p className="m-note" role="status">正在加载，请稍候。</p>;
 
 const titles = { home: '今日复习', folders: '卡组目录', cards: '全部卡片', archived: '已归档', stats: '统计', import: '导入', weread: '微信读书', settings: '设置与数据', advanced: '更多设置', compat: '其他导入' };
-type Route = keyof typeof titles | 'read';
+type Route = MemoryRoute;
 type Sheet = { kind: 'folder' | 'folder-archive' | 'folder-restore' | 'archived-folder-menu' | 'archived-card-menu' | 'archived-folder-delete' | 'archived-card-delete' | 'card' | 'move' | 'help' | 'filter' | 'path' | 'add' | 'card-menu' | 'reader-options' | 'review-plan' | 'review-deck' | 'font' | 'archived-detail' | 'backup' | 'cloud'; id?: string };
 interface ArchiveUndo { ids: string[]; archivedAt: string; expiresAt: number; reading: boolean; }
 const template = '# 知识整理\n\n## 回忆方法\n\n<!-- recall:card {} -->\n问题：怎样确认理解？\n\n合上材料，用自己的话说明结论、依据与适用条件。\n\n<!-- recall:end -->\n\n<!-- recall:card {"type":"excerpt","title":"阅读段落"} -->\n\n没有问题的一段内容也可以是一张卡片。\n\n<!-- recall:end -->\n';
 const date = (value?: string) => value && Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '首次导入时间未知';
 const currentTime = () => Date.now();
-const initialRoute = (): Route => {
-  const hash = window.location.hash.slice(1);
-  return hash === 'decks' ? 'folders' : hash in titles ? hash as keyof typeof titles : 'home';
-};
 
 export function MemoryWorkspace(): JSX.Element {
   const store = useRecallStore();
   const { t } = useTranslation();
-  const [route, setRoute] = useState<Route>(initialRoute);
-  const [folder, setFolder] = useState<string | null>(null);
-  const [archivedFolder, setArchivedFolder] = useState<string | null>(null);
+  const [initialContext] = useState(() => loadWorkspaceContext(store, window.location.hash));
+  const [draft, setDraft] = useState(loadEditorDraft);
+  const [initialSheet] = useState<Sheet | null>(() => draft && (!draft.id || (draft.kind === 'folder' ? store.decks : store.cards).some(item => item.id === draft.id)) ? { kind: draft.kind, id: draft.id } : null);
+  const [route, setRoute] = useState<Route>(initialContext.route);
+  const [folder, setFolder] = useState<string | null>(initialContext.folder);
+  const [archivedFolder, setArchivedFolder] = useState<string | null>(initialContext.archivedFolder);
   const [drawer, setDrawer] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
-  const [sheet, setSheet] = useState<Sheet | null>(null);
-  const [contentType, setContentType] = useState('全部');
-  const [status, setStatus] = useState('全部');
-  const [query, setQuery] = useState('');
-  const [sort, setSort] = useState('new');
+  const [sheet, setSheet] = useState<Sheet | null>(initialSheet);
+  const [contentType, setContentType] = useState(initialContext.contentType);
+  const [status, setStatus] = useState(initialContext.status);
+  const [query, setQuery] = useState(initialContext.query);
+  const [sort, setSort] = useState(initialContext.sort);
   const [error, setError] = useState('');
+  const [persistenceError, setPersistenceError] = useState('');
   const [busy, setBusy] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; deckIds: string[]; cardIds: string[]; archivedAt?: string } | null>(null);
@@ -88,12 +89,13 @@ export function MemoryWorkspace(): JSX.Element {
   const [compatReceipt, setCompatReceipt] = useState<{ source: string; added: number; updated: number; skipped: number; deckIds: string[] } | null>(null);
   const [filename, setFilename] = useState('知识卡片.md');
   const [importAssets, setImportAssets] = useState<MediaAsset[]>([]);
-  const [queue, setQueue] = useState<string[]>([]);
-  const [reviewScope, setReviewScope] = useState<string[]>([]);
+  const [queue, setQueue] = useState<string[]>(initialContext.reader?.ids || []);
+  const [reviewScope, setReviewScope] = useState<string[]>(initialContext.reader?.scopeIds || []);
   const [readerKey, setReaderKey] = useState(0);
-  const [index, setIndex] = useState(0);
-  const [reviewMode, setReviewMode] = useState(false);
-  const [returnRoute, setReturnRoute] = useState<Route>('home');
+  const [index, setIndex] = useState(initialContext.reader?.state?.index || 0);
+  const [reviewMode, setReviewMode] = useState(initialContext.reader?.reviewMode || false);
+  const [returnRoute, setReturnRoute] = useState<Route>(initialContext.reader?.origin.route || 'home');
+  const [resumeState, setResumeState] = useState<MemoryReaderResume | null>(initialContext.reader?.state || null);
   const [studyDeck, setStudyDeck] = useState(() => localStorage.getItem('recall.study.deck') || '');
   const [illustration] = useState(() => new Date().getDate() % 3);
   const [editorPreview, setEditorPreviewState] = useState(false);
@@ -114,13 +116,101 @@ export function MemoryWorkspace(): JSX.Element {
   const lock = useRef(false);
   const fileGeneration = useRef(0);
   const mounted = useRef(true);
-  const sheetDirty = useRef(false);
+  const sheetDirty = useRef(!!initialSheet);
+  const draftBase = useRef(draft?.base || '');
+  const draftRef = useRef(draft);
+  useLayoutEffect(() => { draftRef.current = draft; }, [draft]);
   const restoreFocus = useRef<HTMLElement | null>(null);
   const previousSheet = useRef<Sheet | null>(null);
   const drawerGesture = useRef<{ x: number; y: number; started: number; width: number; active: boolean } | null>(null);
   const dragged = useRef(false);
-  const readingOrigin = useRef<{ route: Route; folder: string | null; contentType: string; status: string; query: string; sort: string; scroll: number; cardId?: string; label: string } | null>(null);
+  const readingOrigin = useRef<MemoryLocation | null>(initialContext.reader?.origin || null);
   const restoreReadingOrigin = useRef(false);
+  const contextRef = useRef<MemoryWorkspaceContext>(initialContext);
+  const readerState = useRef<MemoryReaderResume | null>(initialContext.reader?.state || null);
+  const historyEntry = useRef(createId('navigation'));
+  const historyMounted = useRef(false);
+  const restoringHistory = useRef(true);
+  const restoreScroll = useRef<number | null>(initialContext.scroll);
+  const contextTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingHistory = useRef<MemoryWorkspaceContext | null>(null);
+  const historyHandler = useRef<(context: MemoryWorkspaceContext) => void>(() => {});
+
+  const persistContext = useCallback((updateHistory = true) => {
+    if (contextTimer.current) { clearTimeout(contextTimer.current); contextTimer.current = null; }
+    const context = contextRef.current;
+    const value = { ...context, ...(context.reader ? { reader: { ...context.reader, state: readerState.current } } : {}) };
+    if (updateHistory && !pendingHistory.current && window.history.state?.recallEntry === historyEntry.current) window.history.replaceState({ recallEntry: historyEntry.current, recallWorkspace: value }, '');
+    if (!saveWorkspaceContext(value)) setPersistenceError('本机空间不足或存储不可用，阅读位置未能保留。已保存的卡片不受影响，请先保存编辑。');
+  }, []);
+  const flushContext = useCallback(() => persistContext(false), [persistContext]);
+  const scheduleContext = useCallback(() => {
+    if (!contextTimer.current) contextTimer.current = setTimeout(persistContext, 120);
+  }, [persistContext]);
+  const onReaderResume = useCallback((state: MemoryReaderResume) => { readerState.current = state; scheduleContext(); }, [scheduleContext]);
+
+  function captureDraft(): void {
+    const form = sheetRef.current?.querySelector('form');
+    if (!form || !sheet || !['card', 'folder', 'move'].includes(sheet.kind)) return;
+    const fields = editorDraftFields(form);
+    const value: MemoryEditorDraft = { kind: sheet.kind as MemoryEditorDraft['kind'], id: sheet.id, fields, base: draftBase.current };
+    sheetDirty.current = true; setDraft(value);
+    setEditorContent({ front: fields.front || '', back: fields.back || '' });
+    if (!saveEditorDraft(value)) setPersistenceError('草稿未能写入本机，请保持此页面并先保存修改。刷新或关闭可能丢失未保存内容。');
+  }
+  function clearDraft(): void {
+    if (!saveEditorDraft(null)) { setPersistenceError('未能清理本机草稿，请核对已保存内容后再恢复草稿。'); return; }
+    setDraft(null);
+  }
+  function restoreDraft(): void {
+    if (!draft) return;
+    const exists = !draft.id || (draft.kind === 'folder' ? store.decks : store.cards).some(item => item.id === draft.id);
+    if (!exists && draft.kind === 'move') { setError('原卡片已不存在，无法恢复移动操作。草稿仍保留在本机。'); return; }
+    const value = exists ? draft : { ...draft, id: undefined, base: '' };
+    setDraft(value); saveEditorDraft(value); setSheet({ kind: value.kind, id: value.id });
+  }
+  useLayoutEffect(() => { historyHandler.current = (context: MemoryWorkspaceContext) => {
+    if (busy || lock.current) { pendingHistory.current = context; return; }
+    restoringHistory.current = true; restoreScroll.current = context.scroll;
+    fileGeneration.current++; sheetDirty.current = false; setDrawer(false); setSheet(null); setError('');
+    readerState.current = context.reader?.state || null;
+    setResumeState(context.reader?.state || null);
+    readingOrigin.current = context.reader?.origin || null;
+    setFolder(context.folder); setArchivedFolder(context.archivedFolder);
+    setContentType(context.contentType); setStatus(context.status); setQuery(context.query); setSort(context.sort);
+    setQueue(context.reader?.ids || []); setReviewScope(context.reader?.scopeIds || []);
+    setIndex(context.reader?.state?.index || 0); setReviewMode(context.reader?.reviewMode || false);
+    setReturnRoute(context.reader?.origin.route || 'home'); setReaderKey(value => value + 1); setRoute(context.route);
+  }; });
+  useEffect(() => {
+    if (!busy && pendingHistory.current) { const context = pendingHistory.current; pendingHistory.current = null; historyHandler.current(context); }
+  }, [busy]);
+  useEffect(() => {
+    let lastEvent = '';
+    const change = () => {
+      const stamp = `${window.location.href}:${window.history.state?.recallEntry || ''}`;
+      if (lastEvent === stamp) return;
+      lastEvent = stamp;
+      const target = memoryHashRoute(window.location.hash);
+      const saved = decodeWorkspaceContext(window.history.state?.recallWorkspace, useRecallStore.getState());
+      const context = saved && (saved.route === target || target === 'read') ? saved : memoryLocation(target === 'read' ? 'home' : target);
+      historyEntry.current = window.history.state?.recallEntry || createId('navigation');
+      historyHandler.current(context);
+    };
+    window.addEventListener('popstate', change); window.addEventListener('hashchange', change);
+    window.addEventListener('pagehide', flushContext);
+    const visibility = () => { if (document.visibilityState === 'hidden') flushContext(); };
+    document.addEventListener('visibilitychange', visibility);
+    const scroll = () => { if (window.innerWidth > 760) { contextRef.current.scroll = window.scrollY; scheduleContext(); } };
+    window.addEventListener('scroll', scroll, { passive: true });
+    return () => { window.removeEventListener('popstate', change); window.removeEventListener('hashchange', change); window.removeEventListener('pagehide', flushContext); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('scroll', scroll); if (contextTimer.current) clearTimeout(contextTimer.current); };
+  }, [flushContext, scheduleContext]);
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => { if (sheetDirty.current) { captureDraft(); event.preventDefault(); event.returnValue = ''; } flushContext(); };
+    const hidden = () => { if (document.visibilityState === 'hidden' && sheetDirty.current) captureDraft(); };
+    window.addEventListener('beforeunload', beforeUnload); document.addEventListener('visibilitychange', hidden);
+    return () => { window.removeEventListener('beforeunload', beforeUnload); document.removeEventListener('visibilitychange', hidden); };
+  });
 
   useEffect(() => {
     void organizeExistingWereadFolders().then(() => { if (mounted.current) setOrganizationError(''); }).catch(failure => {
@@ -139,9 +229,12 @@ export function MemoryWorkspace(): JSX.Element {
 
   useEffect(() => {
     const card = useRecallStore.getState().cards.find(candidate => candidate.id === sheet?.id);
+    const savedDraft = draftRef.current;
+    const restored = !!savedDraft && savedDraft.kind === sheet?.kind && savedDraft.id === sheet?.id;
+    draftBase.current = restored ? savedDraft.base : sheet && ['card', 'folder', 'move'].includes(sheet.kind) ? editorBase(sheet.kind as MemoryEditorDraft['kind'], sheet.id, useRecallStore.getState()) : '';
     setEditorPreviewState(false);
     setExpandedAnswer(false);
-    setEditorContent({ front: card?.front || '', back: card?.back || '' });
+    setEditorContent({ front: restored ? savedDraft.fields.front || '' : card?.front || '', back: restored ? savedDraft.fields.back || '' : card?.back || '' });
   }, [sheet]);
 
   useEffect(() => {
@@ -161,7 +254,7 @@ export function MemoryWorkspace(): JSX.Element {
     if (drawerRef.current) drawerRef.current.inert = !!sheet || mobile && !drawer;
     if (brand.current) brand.current.inert = !!sheet;
     if (sheet) {
-      sheetDirty.current = false;
+      if (previousSheet.current !== sheet) sheetDirty.current = draftRef.current?.kind === sheet.kind && draftRef.current.id === sheet.id;
       sheetRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
     } else if (drawer) drawerRef.current?.querySelector<HTMLButtonElement>('[aria-current="page"],button')?.focus();
     else if (restoreFocus.current?.isConnected) restoreFocus.current.focus({ preventScroll: true });
@@ -173,7 +266,18 @@ export function MemoryWorkspace(): JSX.Element {
     return () => { mounted.current = false; generation.current++; };
   }, []);
   useLayoutEffect(() => {
-    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${route}`);
+    const previous = contextRef.current;
+    const changed = previous.route !== route || route === 'folders' && previous.folder !== folder || route === 'archived' && previous.archivedFolder !== archivedFolder;
+    if (changed && historyMounted.current && !restoringHistory.current) {
+      historyEntry.current = createId('navigation');
+      window.history.pushState({ recallEntry: historyEntry.current }, '', `${window.location.pathname}${window.location.search}#${route}`);
+    } else if (window.location.hash !== `#${route}`) window.history.replaceState({ ...window.history.state, recallEntry: historyEntry.current }, '', `${window.location.pathname}${window.location.search}#${route}`);
+    else window.history.replaceState({ ...window.history.state, recallEntry: historyEntry.current }, '');
+    historyMounted.current = true; restoringHistory.current = false;
+    contextRef.current = { route, folder, archivedFolder, contentType, status, query, sort, scroll: previous.scroll, label: previous.label, cardId: previous.cardId, ...(route === 'read' ? { reader: { ids: queue, scopeIds: reviewScope, reviewMode, origin: readingOrigin.current || memoryLocation(returnRoute), state: readerState.current } } : {}) };
+    persistContext();
+  }, [route, folder, archivedFolder, contentType, status, query, sort, queue, reviewScope, reviewMode, index, returnRoute, persistContext]);
+  useLayoutEffect(() => {
     const origin = readingOrigin.current;
     if (restoreReadingOrigin.current && origin?.route === route) {
       restoreReadingOrigin.current = false;
@@ -183,8 +287,19 @@ export function MemoryWorkspace(): JSX.Element {
       target?.focus({ preventScroll: true });
       return;
     }
-    contentRef.current?.scrollTo(0, 0);
-  }, [route]);
+    const scroll = restoreScroll.current ?? 0;
+    const restoring = restoreScroll.current !== null;
+    restoreScroll.current = null;
+    contentRef.current?.scrollTo(0, scroll);
+    if (!mobile) window.scrollTo(0, scroll);
+    if (restoring) {
+      const location = contextRef.current;
+      const controls = Array.from(contentRef.current?.querySelectorAll<HTMLButtonElement>('button') || []);
+      const target = location.cardId ? controls.find(button => button.classList.contains('m-card-open') && button.closest('[data-card-id]')?.getAttribute('data-card-id') === location.cardId) : controls.find(button => (button.getAttribute('aria-label') || button.textContent?.trim()) === location.label);
+      target?.focus({ preventScroll: true });
+    }
+    contextRef.current.scroll = scroll; persistContext();
+  }, [route, folder, archivedFolder, readerKey, mobile, persistContext]);
   useEffect(() => {
     const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
     if (meta) meta.content = '#4f604a';
@@ -237,9 +352,13 @@ export function MemoryWorkspace(): JSX.Element {
     const ids = subtreeIds(store.decks, deck.id);
     return status === '全部' && (!keyword || folderPath(store.decks, deck.id).some(item => item.name.toLowerCase().includes(keyword)) || store.decks.some(child => ids.has(child.id) && child.name.toLowerCase().includes(keyword))) || matching.some(card => ids.has(card.deckId));
   }
+  function matchesFolder(deck: Deck): boolean {
+    const ids = subtreeIds(activeDecks, deck.id);
+    return status === '全部' && (!keyword || activeDecks.some(child => ids.has(child.id) && child.name.toLowerCase().includes(keyword))) || matching.some(card => ids.has(card.deckId));
+  }
   const expanded = route === 'cards' || route === 'archived' || !!keyword || status !== '全部' || contentType === '仅卡片';
   const visibleCards = contentType === '仅卡组' ? [] : route === 'archived' ? matching.filter(card => contentType === '仅卡片' || card.deckId === archivedFolder || !archiveFolders.ids.has(card.deckId)) : matching.filter(card => expanded || card.deckId === folder);
-  const children = contentType === '仅卡片' ? [] : route === 'folders' ? arranged(activeDecks.filter(deck => (deck.parentId || null) === folder && (!keyword && status === '全部' || keyword && deck.name.toLowerCase().includes(keyword) && status === '全部' || matching.some(card => subtreeIds(store.decks, deck.id).has(card.deckId))))) : route === 'archived' ? arranged(store.decks.filter(deck => archiveFolders.ids.has(deck.id) && (!archivedFolder || archivedScope.has(deck.id) && deck.id !== archivedFolder) && (deck.parentId === archivedFolder || !deck.parentId || !archiveFolders.ids.has(deck.parentId)) && matchesArchivedFolder(deck))) : [];
+  const children = contentType === '仅卡片' ? [] : route === 'folders' ? arranged(activeDecks.filter(deck => (deck.parentId || null) === folder && matchesFolder(deck))) : route === 'archived' ? arranged(store.decks.filter(deck => archiveFolders.ids.has(deck.id) && (!archivedFolder || archivedScope.has(deck.id) && deck.id !== archivedFolder) && (deck.parentId === archivedFolder || !deck.parentId || !archiveFolders.ids.has(deck.parentId)) && matchesArchivedFolder(deck))) : [];
   const studyPreferences = normalizeMemoryStudyPreferences(store.settings.studyPreferences);
   const progress = memoryProgressCounts(available);
   const libraryRecommendation = selectMemoryStudyCards(matching, studyPreferences, new Date(), store.settings);
@@ -252,12 +371,16 @@ export function MemoryWorkspace(): JSX.Element {
   function closeSheet(): void {
     if (busy || lock.current) return;
     if (sheetDirty.current && !window.confirm('放弃未保存的修改？')) return;
+    if (draft?.kind === sheet?.kind && draft?.id === sheet?.id) clearDraft();
     sheetDirty.current = false;
     setSheet(null);
     setError('');
   }
   function navigate(next: Route): void {
     if (lock.current || busy) return;
+    if (sheetDirty.current) captureDraft();
+    sheetDirty.current = false;
+    persistContext();
     fileGeneration.current++;
     setDrawer(false);
     setSheet(null);
@@ -311,12 +434,16 @@ export function MemoryWorkspace(): JSX.Element {
     if (route !== 'read') {
       setReturnRoute(route);
       const focused = sheet?.kind === 'review-deck' ? restoreFocus.current : document.activeElement as HTMLElement | null;
-      readingOrigin.current = { route, folder, contentType, status, query, sort, scroll: contentRef.current?.scrollTop || 0, cardId: startId || focused?.closest('[data-card-id]')?.getAttribute('data-card-id') || undefined, label: focused?.getAttribute('aria-label') || focused?.textContent?.trim() || '' };
+      readingOrigin.current = { route, folder, archivedFolder, contentType, status, query, sort, scroll: mobile ? contentRef.current?.scrollTop || 0 : window.scrollY, cardId: startId || focused?.closest('[data-card-id]')?.getAttribute('data-card-id') || undefined, label: focused?.getAttribute('aria-label') || focused?.textContent?.trim() || '' };
+      Object.assign(contextRef.current, { scroll: readingOrigin.current.scroll, cardId: readingOrigin.current.cardId, label: readingOrigin.current.label });
     }
     setReviewScope(cards.map(card => card.id));
+    const startIndex = startId ? Math.max(0, list.findIndex(card => card.id === startId)) : 0;
+    readerState.current = { index: startIndex, views: {}, undo: [], session: { id: createId('session'), startedAt: new Date().toISOString() } };
+    setResumeState(readerState.current);
     setReaderKey(value => value + 1);
     setQueue(list.map(card => card.id));
-    setIndex(startId ? Math.max(0, list.findIndex(card => card.id === startId)) : 0);
+    setIndex(startIndex);
     setReviewMode(mode);
     setRestoreRequest(null);
     navigate('read');
@@ -466,34 +593,40 @@ export function MemoryWorkspace(): JSX.Element {
   }
   function editorSheet(): JSX.Element {
     const editing = store.cards.find(card => card.id === sheet?.id);
+    const field = (name: string, fallback: string) => draft && draft.kind === sheet?.kind && draft.id === sheet?.id ? draft.fields[name] ?? fallback : fallback;
     const archiveFolders = sheet?.kind === 'folder' && sheet.id ? subtreeIds(store.decks, sheet.id) : new Set<string>();
     const archiveCount = available.filter(card => archiveFolders.has(card.deckId)).length;
-    return <form onChange={event => { sheetDirty.current = true; const values = new FormData(event.currentTarget); setEditorContent({ front: String(values.get('front') || ''), back: String(values.get('back') || '') }); }} onSubmit={event => {
+    return <form onChange={captureDraft} onSubmit={event => {
       event.preventDefault();
+      const expectedBase = sheet && ['card', 'folder', 'move'].includes(sheet.kind) ? editorBase(sheet.kind as MemoryEditorDraft['kind'], sheet.id, useRecallStore.getState()) : '';
+      if (expectedBase !== draftBase.current && !window.confirm('原内容在编辑期间已有变化。是否仍应用当前草稿？复习进度保留。')) return;
       setEditorPreview(false);
       const values = new FormData(event.currentTarget);
       void run(async () => {
         await commitMemory(snapshot => {
+          if (sheet && editorBase(sheet.kind as MemoryEditorDraft['kind'], sheet.id, snapshot) !== expectedBase) throw new Error('原内容再次发生变化，草稿已保留，请核对后重新保存');
           if (sheet?.kind === 'folder') return sheet.id ? changeFolder(snapshot, sheet.id, String(values.get('name')), String(values.get('parent')) || null) : createFolder(snapshot, String(values.get('name')), String(values.get('parent')) || null);
           if (sheet?.kind === 'move') return moveMemoryCard(snapshot, sheet.id!, String(values.get('parent')));
           const at = new Date().toISOString();
           const old = snapshot.cards.find(card => card.id === sheet?.id);
+          if (sheet?.id && !old) throw new Error('原卡片已不存在，草稿仍保留，请返回后恢复为新卡');
           const fields = { front: String(values.get('front')).trim(), back: old?.sourceRef?.highlights ? old.back : String(values.get('back')).trim(), deckId: String(values.get('parent')), contentKind: old?.contentKind === 'excerpt' ? 'excerpt' as const : 'qa' as const, bookTitle: String(values.get('bookTitle') || ''), chapter: String(values.get('chapter') || ''), source: String(values.get('source') || ''), updatedAt: at };
           if (!fields.back || !snapshot.decks.some(deck => deck.id === fields.deckId)) throw new Error('请选择卡组并填写正文');
           if (fields.contentKind === 'qa' && !fields.front) throw new Error('问答卡需要问题');
           return { ...snapshot, cards: old ? snapshot.cards.map(card => card.id === old.id ? { ...old, ...fields } : card) : [...snapshot.cards, newMemoryCard(fields, at)] };
         });
         sheetDirty.current = false;
+        clearDraft();
         setSheet(null);
       });
     }}>
-      {sheet?.kind === 'folder' && <label>名称<input name="name" required maxLength={80} defaultValue={store.decks.find(deck => deck.id === sheet.id)?.name || ''}/></label>}
-      <label>{sheet?.kind === 'folder' ? '上级卡组' : '目标卡组'}<select name="parent" required={sheet?.kind !== 'folder'} defaultValue={sheet?.kind === 'folder' ? store.decks.find(deck => deck.id === sheet.id)?.parentId ?? folder ?? '' : editing?.deckId ?? folder ?? store.decks[0]?.id ?? ''}>
+      {sheet?.kind === 'folder' && <label>名称<input name="name" required maxLength={80} defaultValue={field('name', store.decks.find(deck => deck.id === sheet.id)?.name || '')}/></label>}
+      <label>{sheet?.kind === 'folder' ? '上级卡组' : '目标卡组'}<select name="parent" required={sheet?.kind !== 'folder'} defaultValue={field('parent', sheet?.kind === 'folder' ? store.decks.find(deck => deck.id === sheet.id)?.parentId ?? folder ?? '' : editing?.deckId ?? folder ?? store.decks[0]?.id ?? '')}>
         {sheet?.kind === 'folder' && <option value="">根目录</option>}{store.decks.filter(deck => sheet?.kind !== 'folder' || !sheet.id || !subtreeIds(store.decks, sheet.id).has(deck.id)).map(deck => <option key={deck.id} value={deck.id}>{folderPath(store.decks, deck.id).map(item => item.name).join(' / ')}</option>)}
       </select></label>
-      {sheet?.kind === 'card' && <><p className="m-note">{editing?.sourceRef?.highlights ? '合并划线原文只读，可修改问题；来源与复习进度保留。' : editing?.contentKind === 'excerpt' ? '阅读摘录 · 保留原文与复习进度' : '问答卡 · 先回忆问题，再查看答案'}</p><div className="m-editor-tabs"><button type="button" aria-pressed={!editorPreview} onClick={() => setEditorPreview(false)}>编辑</button><button type="button" aria-pressed={editorPreview} onClick={() => setEditorPreview(true)}>预览</button></div><div hidden={editorPreview} className="m-editor-fields"><label>{editing?.contentKind === 'excerpt' ? '段落标题（可选）' : '问题'}<textarea name="front" required={!editorPreview && editing?.contentKind !== 'excerpt'} maxLength={10000} defaultValue={editing?.front || ''}/></label><label>{editing?.contentKind === 'excerpt' ? '划线原文' : '答案'}<textarea className={expandedAnswer ? 'is-expanded' : ''} name="back" required={!editorPreview} readOnly={!!editing?.sourceRef?.highlights} maxLength={20000} defaultValue={editing?.back || ''}/></label><button className="m-text" type="button" aria-pressed={expandedAnswer} onClick={() => setExpandedAnswer(value => !value)}>{expandedAnswer ? '收起答案编辑' : '展开答案编辑'}</button></div>{editorPreview && <section className="m-editor-preview" aria-label="卡片排版预览"><RichCard content={editorContent.front} allowHtml={false}/><hr/><RichCard content={editorContent.back} allowHtml={false} collapseSourceEvidence/></section>}<details className="m-card-source-fields"><summary>来源信息（可选）</summary><label>书名<input name="bookTitle" defaultValue={editing?.bookTitle || ''}/></label><label>章节<input name="chapter" defaultValue={editing?.chapter || ''}/></label><label>来源<input name="source" defaultValue={editing?.source || ''}/></label></details></>}
-      {sheet?.kind === 'folder' && sheet.id && <><button className="m-secondary" type="button" disabled={busy || !archiveCount} onClick={() => { if (sheetDirty.current && !window.confirm('归档前放弃未保存的修改？')) return; setSheet({ kind: 'folder-archive', id: sheet.id }); }}><Archive size={20}/>归档整个卡组</button><small>{archiveCount ? `包含所有子卡组，共 ${archiveCount} 张在学卡片。原文与进度保留。` : '本卡组及子卡组没有在学卡片。'}</small></>}
-      {sheet?.kind === 'card' && !editing?.sourceRef?.highlights && <MediaEditor onBusy={setBusy} onDirty={() => { sheetDirty.current = true; }}/>}
+      {sheet?.kind === 'card' && <><p className="m-note">{editing?.sourceRef?.highlights ? '合并划线原文只读，可修改问题；来源与复习进度保留。' : editing?.contentKind === 'excerpt' ? '阅读摘录 · 保留原文与复习进度' : '问答卡 · 先回忆问题，再查看答案'}</p><div className="m-editor-tabs"><button type="button" aria-pressed={!editorPreview} onClick={() => setEditorPreview(false)}>编辑</button><button type="button" aria-pressed={editorPreview} onClick={() => setEditorPreview(true)}>预览</button></div><div hidden={editorPreview} className="m-editor-fields"><label>{editing?.contentKind === 'excerpt' ? '段落标题（可选）' : '问题'}<textarea name="front" required={!editorPreview && editing?.contentKind !== 'excerpt'} maxLength={10000} defaultValue={field('front', editing?.front || '')}/></label><label>{editing?.contentKind === 'excerpt' ? '划线原文' : '答案'}<textarea className={expandedAnswer ? 'is-expanded' : ''} name="back" required={!editorPreview} readOnly={!!editing?.sourceRef?.highlights} maxLength={20000} defaultValue={field('back', editing?.back || '')}/></label><button className="m-text" type="button" aria-pressed={expandedAnswer} onClick={() => setExpandedAnswer(value => !value)}>{expandedAnswer ? '收起答案编辑' : '展开答案编辑'}</button></div>{editorPreview && <section className="m-editor-preview" aria-label="卡片排版预览"><RichCard content={editorContent.front} allowHtml={false}/><hr/><RichCard content={editorContent.back} allowHtml={false} collapseSourceEvidence/></section>}<details className="m-card-source-fields"><summary>来源信息（可选）</summary><label>书名<input name="bookTitle" defaultValue={field('bookTitle', editing?.bookTitle || '')}/></label><label>章节<input name="chapter" defaultValue={field('chapter', editing?.chapter || '')}/></label><label>来源<input name="source" defaultValue={field('source', editing?.source || '')}/></label></details></>}
+      {sheet?.kind === 'folder' && sheet.id && <><button className="m-secondary" type="button" disabled={busy || !archiveCount} onClick={() => { if (sheetDirty.current && !window.confirm('归档前放弃未保存的修改？')) return; if (sheetDirty.current) clearDraft(); sheetDirty.current = false; setSheet({ kind: 'folder-archive', id: sheet.id }); }}><Archive size={20}/>归档整个卡组</button><small>{archiveCount ? `包含所有子卡组，共 ${archiveCount} 张在学卡片。原文与进度保留。` : '本卡组及子卡组没有在学卡片。'}</small></>}
+      {sheet?.kind === 'card' && !editing?.sourceRef?.highlights && <MediaEditor onBusy={setBusy} onDirty={captureDraft}/>}
       {editing && <small>首次导入：{date(editing.importedAt)} · 最近修改：{date(editing.updatedAt)}</small>}
       <button className="m-primary" disabled={busy} type="submit">{sheet?.kind === 'card' && !editing ? '保存卡片' : '保存修改'}</button>
     </form>;
@@ -600,10 +733,12 @@ export function MemoryWorkspace(): JSX.Element {
     </aside>
     <div ref={shellRef} className={`memory-shell ${drawer ? 'is-open' : ''} ${route === 'read' ? 'is-reading' : ''} ${archiveUndo ? 'has-archive-undo' : ''}`}>
       <header className="memory-bar"><button ref={brand} className="m-brand" aria-expanded={drawer} aria-controls="memory-drawer" aria-label={drawer ? '关闭项目菜单' : '打开项目菜单'} disabled={busy} onClick={() => { if (sheet) { closeSheet(); return; } setDrawer(value => !value); }}><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M23 15h32c27 0 34 32 12 45l19 25H64L43 57v28H23z" fill="white"/><path d="M54 23c-1 10-4 14-14 15 10 1 13 5 14 15 1-10 4-14 14-15-10-1-13-5-14-15" fill="currentColor"/></svg></button>{route === 'folders' && folder ? <button className="m-context" onClick={() => setSheet({ kind: 'path' })} aria-label={`查看卡组路径：${shellTitle}`}>{shellTitle}</button> : <div className="m-context">{shellTitle}</div>}{hasTopAction ? <button className="m-top-action" aria-label={topLabel} disabled={busy || drawer || !!sheet} onClick={topAction}>{route === 'read' ? '退出' : topBack ? <ArrowLeft size={20}/> : route === 'settings' ? <MoreHorizontal size={20}/> : <Plus size={22}/>}</button> : <span className="m-top-action-placeholder" aria-hidden="true"/>}</header>
-      <div ref={contentRef} className="memory-content" data-route={route} data-import-preview={route === 'import' && !!plan}>
+      <div ref={contentRef} className="memory-content" data-route={route} data-import-preview={route === 'import' && !!plan} onScroll={event => { contextRef.current.scroll = event.currentTarget.scrollTop; scheduleContext(); }}>
         <header className="m-desktop-header"><span>{shellTitle}</span>{hasTopAction && <button className="m-secondary" disabled={busy} onClick={topAction}>{topLabel}</button>}</header>
         <main className="m-main" tabIndex={-1}>
           {organizationError && <p className="m-error" role="alert">{organizationError}</p>}
+          {persistenceError && !sheet && <p className="m-error" role="alert">{persistenceError}</p>}
+          {draft && !sheet && <section className="m-panel" aria-label="未保存的本机草稿"><p>有未保存的本机草稿，未上传服务器，也未修改卡库。</p><button className="m-secondary" disabled={busy} onClick={restoreDraft}>恢复草稿</button><button className="m-text" disabled={busy} onClick={() => { if (window.confirm('放弃本机未保存的草稿？')) clearDraft(); }}>放弃草稿</button></section>}
           <PWAUpdatePrompt className="m-pwa-update" hidden={route === 'read'}/>
           <Suspense fallback={loadingView}>
           {error && !sheet && <p role="alert" className="m-error">{error}</p>}
@@ -639,7 +774,7 @@ export function MemoryWorkspace(): JSX.Element {
             </>}
             {receipt && <MemoryImportCompletion source={`${importFormat} · ${filename}`} added={receipt.added} updated={receipt.updated} skipped={receipt.skipped} locations={memoryImportLocations(store.decks, receipt.deckIds)} onView={() => { const destination = receipt.deckIds.length === 1 ? receipt.deckIds[0] : receipt.parentId; setReceipt(null); openFolder(store.decks.some(deck => deck.id === destination) ? destination : null); }} onContinue={() => setReceipt(null)}/>}
           </>}
-          {route === 'read' && <MemoryReader key={readerKey} ids={queue} scopeIds={reviewScope} onQueueChange={setQueue} onContinue={completedIds => read(store.cards.filter(card => reviewScope.includes(card.id) && !completedIds.includes(card.id)), true)} initialIndex={index} reviewMode={reviewMode} onEdit={id => setSheet({ kind: 'card', id })} onOptions={id => setSheet({ kind: 'reader-options', id })} onArchive={archiveCard} restoreRequest={restoreRequest} archiveNotice={archiveNotice} fontSize={font} onIndex={setIndex} onExit={exitReading} onBusy={setBusy}/>}
+          {route === 'read' && <MemoryReader key={readerKey} ids={queue} scopeIds={reviewScope} onQueueChange={setQueue} onContinue={completedIds => read(store.cards.filter(card => reviewScope.includes(card.id) && !completedIds.includes(card.id)), true)} initialIndex={index} reviewMode={reviewMode} onEdit={id => setSheet({ kind: 'card', id })} onOptions={id => setSheet({ kind: 'reader-options', id })} onArchive={archiveCard} restoreRequest={restoreRequest} archiveNotice={archiveNotice} fontSize={font} onIndex={setIndex} onExit={exitReading} onBusy={setBusy} resumeState={resumeState} onResumeChange={onReaderResume}/>}
           </Suspense>
         </main>
         {route === 'import' && plan && <MemoryImportFooter busy={busy} onCancel={() => { setPlan(null); setImportAssets([]); }} onConfirm={() => void confirmImport()}/>}
@@ -648,6 +783,6 @@ export function MemoryWorkspace(): JSX.Element {
       </div>
       {route !== 'read' && archiveNotice}
       {drawer && <button className="m-dismiss" aria-label="关闭菜单" onPointerDown={drawerDown} onPointerMove={drawerMove} onPointerUp={drawerUp} onPointerCancel={() => { drawerGesture.current = null; if (shellRef.current) { shellRef.current.style.transform = ''; shellRef.current.style.transition = ''; } }} onClick={() => { if (!dragged.current) { setDrawer(false); brand.current?.focus(); } }}/>}</div>
-    {sheet && <div className="m-sheet-wrap" onClick={event => { if (event.target === event.currentTarget) closeSheet(); }}><section className={`m-sheet ${sheet.kind === 'review-deck' ? 'm-picker-sheet' : ''}`} ref={sheetRef} role="dialog" aria-modal="true" aria-labelledby="memory-sheet-title"><div className="m-grab"/><header><h2 id="memory-sheet-title">{sheetTitle}</h2><button className="m-sheet-close" disabled={busy} aria-label="关闭面板" onClick={closeSheet}><X size={18} strokeWidth={1.5}/></button></header>{error && <p role="alert" className="m-error">{error}</p>}<Suspense fallback={loadingView}>{renderSheet()}</Suspense></section></div>}
+    {sheet && <div className="m-sheet-wrap" onClick={event => { if (event.target === event.currentTarget) closeSheet(); }}><section className={`m-sheet ${sheet.kind === 'review-deck' ? 'm-picker-sheet' : ''}`} ref={sheetRef} role="dialog" aria-modal="true" aria-labelledby="memory-sheet-title"><div className="m-grab"/><header><h2 id="memory-sheet-title">{sheetTitle}</h2><button className="m-sheet-close" disabled={busy} aria-label="关闭面板" onClick={closeSheet}><X size={18} strokeWidth={1.5}/></button></header>{draft?.kind === sheet.kind && draft.id === sheet.id && <p className="m-note" role="status">本机草稿已保留，尚未保存到卡库。请核对后点保存修改。</p>}{persistenceError && <p role="alert" className="m-error">{persistenceError}</p>}{error && <p role="alert" className="m-error">{error}</p>}<Suspense fallback={loadingView}>{renderSheet()}</Suspense></section></div>}
   </div>;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { Archive, ArrowLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { RichCard } from '@/components/RichCard';
 import { useRecallStore } from '@/stores/recall-store';
@@ -7,13 +7,13 @@ import { previewMemoryReview, reviewFingerprint } from '@/services/memory-review
 import { normalizeMemoryStudyPreferences, selectMemoryStudyCards } from '@/services/memory-study';
 import { replanMemoryStudyQueue } from '@/services/memory-study-session';
 import { createId } from '@/lib/utils';
+import { decodeReaderResume, type MemoryReaderResume, type MemoryReaderUndo } from '@/services/memory-workspace-state';
 import type { Card, ReviewRating } from '@/types';
 
 const labels: Record<ReviewRating, string> = { again: '忘记了', hard: '有点难', good: '记住了', easy: '很熟悉' };
-interface Props { ids: string[]; scopeIds?: string[]; onQueueChange?: (ids: string[]) => void; onContinue?: (completedIds: string[]) => void; initialIndex: number; reviewMode: boolean; onEdit: (id: string) => void; onOptions: (id: string) => void; onArchive: (id: string) => Promise<void>; restoreRequest: { id: string; token: string } | null; archiveNotice: ReactNode; fontSize: number; onIndex: (n: number) => void; onExit: () => void; onBusy: (busy: boolean) => void; }
+interface Props { ids: string[]; scopeIds?: string[]; onQueueChange?: (ids: string[]) => void; onContinue?: (completedIds: string[]) => void; initialIndex: number; reviewMode: boolean; onEdit: (id: string) => void; onOptions: (id: string) => void; onArchive: (id: string) => Promise<void>; restoreRequest: { id: string; token: string } | null; archiveNotice: ReactNode; fontSize: number; onIndex: (n: number) => void; onExit: () => void; onBusy: (busy: boolean) => void; resumeState?: MemoryReaderResume | null; onResumeChange?: (state: MemoryReaderResume) => void; }
 interface ReadingPosition { revealed: boolean; scroll: number; }
-interface Undo { card: Card; logId: string; index: number; rating: ReviewRating; }
-export function MemoryReader({ ids: initialIds, scopeIds = initialIds, onQueueChange, onContinue, initialIndex, reviewMode, onOptions, onArchive, restoreRequest, archiveNotice, fontSize: font, onIndex, onExit, onBusy }: Props): JSX.Element {
+export function MemoryReader({ ids: initialIds, scopeIds = initialIds, onQueueChange, onContinue, initialIndex, reviewMode, onOptions, onArchive, restoreRequest, archiveNotice, fontSize: font, onIndex, onExit, onBusy, resumeState, onResumeChange }: Props): JSX.Element {
   const cards = useRecallStore(s => s.cards), decks = useRecallStore(s => s.decks);
   const settings = useRecallStore(s => s.settings);
   const preferences = useMemo(() => normalizeMemoryStudyPreferences(settings.studyPreferences), [settings.studyPreferences]);
@@ -21,14 +21,22 @@ export function MemoryReader({ ids: initialIds, scopeIds = initialIds, onQueueCh
   const previousPreferences = useRef(preferenceKey);
   const [replanned, setReplanned] = useState(false);
   const ids = useMemo(() => initialIds.filter(id => cards.some(card => card.id === id && !card.archivedAt)), [initialIds, cards]);
-  const [index, setIndex] = useState(initialIndex), [revision, setRevision] = useState(0), [rated, setRated] = useState<Record<string, ReviewRating>>({});
-  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [undo, setUndo] = useState<Undo[]>([]);
+  const [resumed] = useState(() => decodeReaderResume(resumeState, useRecallStore.getState()));
+  const [index, setIndex] = useState(initialIndex), [revision, setRevision] = useState(0), [rated, setRated] = useState<Record<string, ReviewRating>>(() => Object.fromEntries((resumed?.undo || []).map(entry => [entry.card.id, entry.rating])));
+  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [undo, setUndo] = useState<MemoryReaderUndo[]>(resumed?.undo || []);
   const [browseScoring, setBrowseScoring] = useState(false);
-  const viewport = useRef<HTMLDivElement>(null), rail = useRef<HTMLDivElement>(null), indexRef = useRef(initialIndex), views = useRef<Record<string, ReadingPosition>>({});
+  const viewport = useRef<HTMLDivElement>(null), rail = useRef<HTMLDivElement>(null), indexRef = useRef(initialIndex), views = useRef<Record<string, ReadingPosition>>(resumed?.views || {});
   const mountedPanels = useRef(new WeakSet<HTMLElement>()), layoutIndex = useRef<number | null>(null);
-  const ratedRef = useRef<Record<string, ReviewRating>>({}), pending = useRef(false), switching = useRef(false), scheduled = useRef(0), token = useRef(0), timer = useRef<ReturnType<typeof setTimeout>|null>(null);
+  const ratedRef = useRef<Record<string, ReviewRating>>(rated), undoRef = useRef(undo), pending = useRef(false), switching = useRef(false), scheduled = useRef(0), token = useRef(0), timer = useRef<ReturnType<typeof setTimeout>|null>(null);
   const gesture = useRef<{ x: number; y: number; at: number; max: number; scroll: number; axis: 'x'|'y'|null }|null>(null);
-  const session = useRef({ id: createId('session'), startedAt: new Date().toISOString() }), alive = useRef(true);
+  const session = useRef(resumed?.session || { id: createId('session'), startedAt: new Date().toISOString() }), alive = useRef(true);
+  const persistPosition = useCallback(() => onResumeChange?.({ index: indexRef.current, views: views.current, undo: undoRef.current, session: session.current }), [onResumeChange]);
+  useLayoutEffect(() => { persistPosition(); }, [index, revision, undo, persistPosition]);
+  useEffect(() => {
+    window.addEventListener('pagehide', persistPosition);
+    document.addEventListener('visibilitychange', persistPosition);
+    return () => { window.removeEventListener('pagehide', persistPosition); document.removeEventListener('visibilitychange', persistPosition); };
+  }, [persistPosition]);
   const previousIds = useRef(initialIds), restoredToken = useRef<string | null>(null);
   const current = cards.find(c => c.id === ids[index]);
   const previewState = useMemo(() => {
@@ -135,7 +143,9 @@ export function MemoryReader({ ids: initialIds, scopeIds = initialIds, onQueueCh
         return { ...s, cards:s.cards.map(c=>c.id===id?updated:c), reviewLogs:[...s.reviewLogs,{id:logId,cardId:id,rating,reviewDate:now.toISOString(),stability:updated.stability,difficulty:updated.difficulty,elapsedDays:updated.elapsedDays,scheduledDays:updated.scheduledDays}], studySessions:reviewMode?[...s.studySessions.filter(x=>x.id!==session.current.id),{...session.current,deckId:null,endedAt:now.toISOString(),cardsStudied:sessionCount}]:s.studySessions };
       });
       if (!alive.current) return;
-      ratedRef.current={...ratedRef.current,[id]:rating}; setRated(ratedRef.current); setUndo(u=>[...u,{card:before!,logId,index:indexRef.current,rating}]);
+      const { state, lastReviewDate, nextReviewDate, stability, difficulty, elapsedDays, scheduledDays, reps, lapses, learningSteps } = before!;
+      ratedRef.current={...ratedRef.current,[id]:rating}; setRated(ratedRef.current);
+      undoRef.current = [...undoRef.current, { card: { id, state, lastReviewDate, nextReviewDate, stability, difficulty, elapsedDays, scheduledDays, reps, lapses, learningSteps }, logId, index: indexRef.current, rating }]; setUndo(undoRef.current); persistPosition();
       pending.current=false; if(indexRef.current<ids.length-1) move(1); else if (reviewMode && ids.every(cardId => ratedRef.current[cardId])) { indexRef.current = ids.length; setIndex(ids.length); }
     } catch(e) { if(alive.current){setError(e instanceof Error?e.message:'评分保存失败，请重试');setRevision(value=>value+1);} }
     finally { pending.current=false;if(alive.current){setBusy(false);onBusy(false);} }
@@ -144,10 +154,12 @@ export function MemoryReader({ ids: initialIds, scopeIds = initialIds, onQueueCh
     const last=undo.at(-1);if(!last||pending.current)return;cancelTransition();switching.current=false;scheduled.current=0;resetRail();pending.current=true;setBusy(true);onBusy(true);setError('');
     try { await commitMemory(s=>{
       const actual=s.cards.find(c=>c.id===last.card.id);if(!actual)throw new Error('卡片不存在，无法撤销');
+      const log = s.reviewLogs.find(entry => entry.id === last.logId && entry.cardId === actual.id);
+      if (!log || actual.lastReviewDate !== log.reviewDate) throw new Error('此评分之后已有新的复习变化，不能覆盖，请重新查看卡片');
       const {state,lastReviewDate,nextReviewDate,stability,difficulty,elapsedDays,scheduledDays,reps,lapses,learningSteps}=last.card;
       const count=Object.keys(ratedRef.current).length-1;
       return {...s,cards:s.cards.map(c=>c.id===last.card.id?{...actual,state,lastReviewDate,nextReviewDate,stability,difficulty,elapsedDays,scheduledDays,reps,lapses,learningSteps}:c),reviewLogs:s.reviewLogs.filter(l=>l.id!==last.logId),studySessions:s.studySessions.flatMap(x=>x.id!==session.current.id?[x]:count?[{...x,cardsStudied:count}]:[])};
-    });if(!alive.current)return;delete ratedRef.current[last.card.id];setRated({...ratedRef.current});setUndo(u=>u.slice(0,-1));const restoredIndex=ids.indexOf(last.card.id);if(restoredIndex>=0){indexRef.current=restoredIndex;setIndex(restoredIndex);}setRevision(n=>n+1);
+    });if(!alive.current)return;delete ratedRef.current[last.card.id];setRated({...ratedRef.current});undoRef.current=undoRef.current.slice(0,-1);setUndo(undoRef.current);const restoredIndex=ids.indexOf(last.card.id);if(restoredIndex>=0){indexRef.current=restoredIndex;setIndex(restoredIndex);}setRevision(n=>n+1);persistPosition();
     }catch(e){if(alive.current)setError(e instanceof Error?e.message:'撤销失败');}finally{pending.current=false;if(alive.current){setBusy(false);onBusy(false);}}
   }
   async function archiveCurrent(): Promise<void> {
@@ -166,7 +178,7 @@ export function MemoryReader({ ids: initialIds, scopeIds = initialIds, onQueueCh
   function panel(n:number):JSX.Element{
     const card=cards.find(c=>c.id===ids[n]&&!c.archivedAt),active=n===index,shown=card&&(view(card.id).revealed||card.contentKind==='excerpt');
     const source = card?.sourceRef?.provider === 'weread' ? card.chapter : card?.source;
-    return <article key={card ? `${card.id}:${shown ? 'back' : 'front'}` : n} className="m-reading" data-active={active} data-card-id={card?.id} aria-hidden={!active} inert={!active} aria-label={shown?'卡片正文':'回忆问题'} style={{fontSize:font}} onScroll={event => { if (card && event.currentTarget.isConnected) view(card.id).scroll = event.currentTarget.scrollTop; }}>{card?<>
+    return <article key={card ? `${card.id}:${shown ? 'back' : 'front'}` : n} className="m-reading" data-active={active} data-card-id={card?.id} aria-hidden={!active} inert={!active} aria-label={shown?'卡片正文':'回忆问题'} style={{fontSize:font}} onScroll={event => { if (card && event.currentTarget.isConnected) { view(card.id).scroll = event.currentTarget.scrollTop; persistPosition(); } }}>{card?<>
       {card.bookTitle&&<div className="m-reader-source"><span>{card.bookTitle}{card.chapter?' · '+card.chapter:''}</span>{shown&&<small>划线原文</small>}</div>}
       {card.contentKind==='excerpt'?<div className="m-source"><strong>{card.front||card.bookTitle||decks.find(d=>d.id===card.deckId)?.name}</strong>{card.chapter&&<small>{card.chapter}</small>}</div>:shown&&card.cardType==='basic'?<details><summary>{card.front.split('\n')[0].slice(0, 96)}{card.front.length > 96 ? '…' : ''}</summary><RichCard content={card.front} allowHtml={false}/></details>:null}
       {shown?<>{card.cardType!=='basic'&&<RichCard content={card.front} cardType={card.cardType} revealed allowHtml={false}/>} {card.sourceRef?.highlights ? <div className="m-weread-source-segments">{card.sourceRef.highlights.map((segment, index) => <section key={segment.bookmarkId}><small>划线 {index + 1}</small><p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{segment.markText}</p></section>)}</div> : <RichCard content={card.back} allowHtml={false} collapseSourceEvidence/>} {card.aiSummary&&<details className="m-ai-summary"><summary>查看辅助总结 · 非原文</summary><p>{card.aiSummary}</p></details>}</>:<><p className="m-recall-caption">{card.recallKind==='task'?'试着用自己的话复述':'先回忆，再看答案'}</p><div className="m-question"><RichCard content={card.front} cardType={card.cardType} revealed={false} allowHtml={false}/></div>{card.hint&&<p className="m-hint">{card.hint}</p>}</>}

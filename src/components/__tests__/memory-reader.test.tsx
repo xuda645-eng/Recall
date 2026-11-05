@@ -153,4 +153,32 @@ describe('MemoryReader reading position', () => {
     expect(active().scrollTop).toBe(500);
     expect(writes).not.toHaveBeenCalled();
   });
+
+  it('resumes revealed reading without replaying a rating or implicit browse scoring', () => {
+    const onResumeChange = vi.fn();
+    const { active } = reader({ reviewMode: false, initialIndex: 1, onResumeChange, resumeState: { index: 1, views: { 'reader-1': { revealed: true, scroll: 210 } }, undo: [], session: { id: 'existing-session', startedAt: '2026-11-06T00:00:00Z' } } });
+    expect(active()).toHaveAttribute('data-card-id', 'reader-1');
+    expect(active()).toHaveAttribute('aria-label', '卡片正文');
+    expect(active().scrollTop).toBe(210);
+    expect(screen.queryByRole('button', { name: '记住了' })).not.toBeInTheDocument();
+    expect(commitMemory).not.toHaveBeenCalled();
+    expect(onResumeChange).toHaveBeenCalled();
+  });
+
+  it('retains a verified undo through remount and refuses to overwrite a later review', async () => {
+    const onResumeChange = vi.fn();
+    const result = reader({ onResumeChange });
+    fireEvent.click(screen.getByRole('button', { name: '显示答案' }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '记住了' })); });
+    const saved = onResumeChange.mock.calls.at(-1)![0];
+    result.unmount();
+    const resumed = reader({ initialIndex: saved.index, resumeState: saved });
+    expect(useRecallStore.getState().reviewLogs).toHaveLength(1);
+    const actual = useRecallStore.getState().cards.find(card => card.id === saved.undo[0].card.id)!;
+    act(() => useRecallStore.setState({ cards: useRecallStore.getState().cards.map(card => card.id === actual.id ? { ...card, lastReviewDate: '2026-11-07T00:00:00Z' } : card) }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /撤销.*评分/ })); });
+    expect(screen.getByRole('alert')).toHaveTextContent('已有新的复习变化');
+    expect(useRecallStore.getState().reviewLogs).toHaveLength(1);
+    resumed.unmount();
+  });
 });

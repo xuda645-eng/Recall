@@ -59,7 +59,7 @@ test('带图包预览取消不保存、确认去重并保留进度，拒绝缺�
   expect(await imageCount(page)).toBe(1);
 });
 test('来源图片缩略、放大拖动关闭不评分，离线刷新仍可读取', async ({ page: originalPage, context: originalContext, browser, browserName }) => {
-  const server = browserName === 'webkit' ? createTaskPreviewServer({ directory: new URL('../dist', import.meta.url).pathname }) : null;
+  const server = browserName === 'webkit' ? createTaskPreviewServer({ directory: process.env.RECALL_E2E_BUILD_DIR || new URL('../dist', import.meta.url).pathname }) : null;
   if (server) await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server?.address();
   const context = address && typeof address !== 'string' ? await browser.newContext({ baseURL: `http://127.0.0.1:${address.port}/`, viewport: { width: 393, height: 852 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true }) : originalContext;
