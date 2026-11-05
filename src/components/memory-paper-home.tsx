@@ -50,7 +50,7 @@ export function MemoryPaperHome({ decks, allDecks, roots, cards, recent, recentR
 }
 import { useLayoutEffect, useRef } from 'react';
 
-export function MemoryPaperHomeDock({ caption, busy, onStart, onPlan }: { caption: string; busy: boolean; onStart: () => void; onPlan: () => void }): JSX.Element {
+export function MemoryPaperHomeDock({ busy, onStart }: { busy: boolean; onStart: () => void }): JSX.Element {
   const dock = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const element = dock.current;
@@ -59,8 +59,8 @@ export function MemoryPaperHomeDock({ caption, busy, onStart, onPlan }: { captio
     const measure = () => content.style.setProperty('--home-dock-height', `${element.offsetHeight}px`);
     measure();
     const observer = new ResizeObserver(measure);
-    observer.observe(element);
+    observer.observe(element, { box: 'border-box' });
     return () => { observer.disconnect(); content.style.removeProperty('--home-dock-height'); };
   }, []);
-  return <div className="m-paper-home-dock" ref={dock}><div><button className="m-primary" disabled={busy} onClick={onStart}>开始复习<ChevronRight size={18}/></button><div className="m-study-backlog"><small title={caption}>{caption}</small><button className="m-text" onClick={onPlan}>复习计划</button></div></div></div>;
+  return <div className="m-paper-home-dock" ref={dock}><button className="m-primary" disabled={busy} onClick={onStart}>开始复习<ChevronRight size={18}/></button></div>;
 }

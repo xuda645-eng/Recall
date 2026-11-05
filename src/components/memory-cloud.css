@@ -37,7 +37,7 @@
 .m-drawer-sync-status { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: start; min-width: 0; gap: 14px; font-size: inherit; font-weight: 400; }
 .m-drawer-sync-icon { display: grid; place-items: center; width: 30px; height: 22px; }
 .m-drawer-sync-status > span { overflow-wrap: anywhere; }
-.m-drawer-footer .m-drawer-sync small { margin-left: 44px; padding: 0; font: inherit; font-weight: 400; overflow-wrap: anywhere; }
+.m-drawer-footer .m-drawer-sync small { margin-left: 44px; padding: 0; font: inherit; font-size: var(--drawer-meta-font-size); font-weight: 400; overflow-wrap: anywhere; }
 .m-drawer-sync-error { margin-left: 44px !important; color: #963e49; font: inherit; }
 
 .m-cloud-warning {

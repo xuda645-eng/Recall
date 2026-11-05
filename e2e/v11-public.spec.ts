@@ -25,10 +25,16 @@ test('V1.1 公网缓存完整与持久化，Chromium 断网重开；WebKit 公�
     await page.addInitScript(data => { if (!localStorage.getItem('recall.snapshot.v1')) localStorage.setItem('recall.snapshot.v1', JSON.stringify(data)); }, initial);
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 120000 });
     await expect(page.locator('.m-paper-review-card')).toBeVisible();
+    const dock = page.locator('.m-paper-home-dock');
+    await expect(dock.getByRole('button', { name: '开始复习', exact: true })).toBeVisible();
+    await expect(dock.getByRole('button')).toHaveCount(1);
+    await expect(dock.locator('small')).toHaveCount(0);
+    expect(await dock.evaluate(element => ({ background: getComputedStyle(element).backgroundColor, events: getComputedStyle(element).pointerEvents }))).toEqual({ background: 'rgba(0, 0, 0, 0)', events: 'none' });
     await page.getByRole('button', { name: '打开项目菜单', exact: true }).click();
     await expect(page.locator('[data-app-version]')).toHaveText(build.releaseVersion ?? build.version);
     await expect(page.locator('#memory-drawer').getByRole('button', { name: '同步并检查更新', exact: true })).toBeVisible();
     await expect(page.locator('.m-drawer-sync').getByRole('button')).toHaveCount(0);
+    expect(await page.locator('.m-drawer-info').evaluate(element => ['.m-drawer-sync-status', '.m-drawer-sync > small', '.m-app-version > small'].map(selector => getComputedStyle(element.querySelector(selector)!).fontSize))).toEqual(['14px', '12px', '12px']);
     const geometry = await page.locator('.m-app-version.is-compact').evaluate(element => { const version = element.querySelector('small')!.getBoundingClientRect(); const action = element.querySelector('button')!.getBoundingClientRect(); return { versionCenter: version.top + version.height / 2, actionCenter: action.top + action.height / 2, width: action.width, height: action.height, text: element.querySelector('button')!.textContent }; });
     expect(geometry.actionCenter).toBeCloseTo(geometry.versionCenter, 4);
     expect(geometry).toMatchObject({ width: 44, height: 44, text: '' });

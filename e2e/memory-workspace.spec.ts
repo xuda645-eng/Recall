@@ -161,6 +161,76 @@ test('新用户从空卡组开始，不自动展示个人或示例数据', async
   await noOverflow(page);
 });
 
+test('首页只悬浮开始复习按钮，透明区域透传且末尾内容不被遮挡', async ({ page, browserName }) => {
+  await seedPage(page);
+  const before = await snapshot(page);
+  const dock = page.locator('.m-paper-home-dock');
+  const start = dock.getByRole('button', { name: '开始复习', exact: true });
+  await expect(dock.getByRole('button')).toHaveCount(1);
+  await expect(dock.locator('small')).toHaveCount(0);
+  for (const scenario of [
+    { width: 393, height: 852, top: 0, bottom: 0 },
+    { width: 525, height: 824, top: 0, bottom: 0 },
+    { width: 320, height: 852, top: 59, bottom: 34 },
+    { width: 760, height: 852, top: 59, bottom: 34 },
+    { width: 761, height: 852, top: 59, bottom: 34 },
+    { width: 1280, height: 900, top: 0, bottom: 0 },
+    { width: 852, height: 393, top: 0, bottom: 34 },
+  ]) {
+    await page.setViewportSize({ width: scenario.width, height: scenario.height });
+    await page.locator('.memory-app').evaluate((element, insets) => {
+      const app = element as HTMLElement;
+      app.style.setProperty('--safe-top', `${insets.top}px`);
+      app.style.setProperty('--safe-bottom', `${insets.bottom}px`);
+    }, scenario);
+    await expect.poll(() => dock.evaluate(element => parseFloat((element.parentElement as HTMLElement).style.getPropertyValue('--home-dock-height')) === (element as HTMLElement).offsetHeight)).toBe(true);
+    const surface = await dock.evaluate(element => ({ background: getComputedStyle(element).backgroundColor, border: getComputedStyle(element).borderTopWidth, events: getComputedStyle(element).pointerEvents }));
+    expect(surface).toEqual({ background: 'rgba(0, 0, 0, 0)', border: '0px', events: 'none' });
+    const bounds = (await start.boundingBox())!;
+    const dockBounds = (await dock.boundingBox())!;
+    expect(bounds.width).toBeGreaterThanOrEqual(44);
+    expect(bounds.height).toBeGreaterThanOrEqual(44);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(scenario.height - scenario.bottom - 15);
+    expect(bounds.x + bounds.width / 2).toBeCloseTo(dockBounds.x + dockBounds.width / 2, 3);
+    expect(await dock.evaluate(element => {
+      const button = element.querySelector('button')!.getBoundingClientRect();
+      const bounds = element.getBoundingClientRect();
+      return element.contains(document.elementFromPoint(bounds.left + 4, button.top + button.height / 2));
+    })).toBe(false);
+    await page.evaluate(() => {
+      const scrolling = innerWidth > 760 ? document.scrollingElement! : document.querySelector('.memory-content')!;
+      scrolling.scrollTop = scrolling.scrollHeight;
+    });
+    const last = (await page.locator('.m-recent > button').last().boundingBox())!;
+    expect(last.y + last.height, `${scenario.width}px end-of-content clearance`).toBeLessThanOrEqual(bounds.y - 8);
+    await noOverflow(page);
+  }
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.locator('.memory-content').evaluate(element => { element.scrollTop = 0; });
+  const dockBounds = (await dock.boundingBox())!;
+  const bounds = (await start.boundingBox())!;
+  if (browserName === 'webkit') {
+    await page.touchscreen.tap(dockBounds.x + 4, bounds.y + bounds.height / 2);
+    await page.locator('.memory-content').evaluate(element => { element.scrollTop = 300; });
+  } else {
+    await page.mouse.move(dockBounds.x + 4, bounds.y + bounds.height / 2);
+    await page.mouse.wheel(0, 300);
+  }
+  await expect.poll(() => page.locator('.memory-content').evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  expect(await snapshot(page)).toEqual(before);
+  await saveShot(page, 'home-floating-review');
+  await start.click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(await snapshot(page)).toEqual(before);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.locator('html').evaluate(element => element.classList.add('dark'));
+  await expect(start).toBeVisible();
+  expect(await dock.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  await noOverflow(page);
+});
+
 test('正式应用仅iPhone主屏幕启用系统安全框，标签页和其他设备保留cover', async ({ page }) => {
   test.skip(!!process.env.RECALL_URL, 'Device identity emulation and reload stress are local-only');
   const userAgent = await page.evaluate(() => navigator.userAgent);
@@ -489,7 +559,8 @@ test('抽屉采用确认的整版设计，文字同轴同行距，版本与唯�
       const icon = action.querySelector('svg')!.getBoundingClientRect();
       return { fields, statusGap: time.top - status.bottom, versionGap: row.top - sync.bottom, versionCenter: label.top + label.height / 2, actionCenter: button.top + button.height / 2, icon: icon.width, text: action.textContent, background: getComputedStyle(action).backgroundColor };
     });
-    expect(layout.fields.every(field => field.left === layout.fields[0].left && field.font === '14px')).toBe(true);
+    expect(layout.fields.every(field => field.left === layout.fields[0].left)).toBe(true);
+    expect(layout.fields.map(field => field.font)).toEqual(['14px', '14px', '12px', '12px']);
     expect(layout.statusGap).toBe(8);
     expect(layout.versionGap).toBe(8);
     expect(layout.actionCenter).toBeCloseTo(layout.versionCenter, 4);

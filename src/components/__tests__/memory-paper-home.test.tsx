@@ -25,21 +25,28 @@ describe('paper home', () => {
   it('reserves the measured dock height, responds to resize and cleans up on navigation', () => {
     let measure = () => {};
     const disconnect = vi.fn();
+    const observe = vi.fn();
     vi.stubGlobal('ResizeObserver', class {
       constructor(callback: () => void) { measure = callback; }
-      observe() {}
+      observe = observe;
       disconnect = disconnect;
     });
     const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(120);
-    const onStart = vi.fn(), onPlan = vi.fn();
-    const view = render(<div className="memory-content"><MemoryPaperHomeDock caption="上次选择 · 真实卡组" busy={false} onStart={onStart} onPlan={onPlan}/></div>);
+    const onStart = vi.fn();
+    const view = render(<div className="memory-content"><MemoryPaperHomeDock busy={false} onStart={onStart}/></div>);
     const content = view.container.querySelector<HTMLElement>('.memory-content')!;
+    expect(observe).toHaveBeenCalledWith(view.container.querySelector('.m-paper-home-dock'), { box: 'border-box' });
     expect(content.style.getPropertyValue('--home-dock-height')).toBe('120px');
     height.mockReturnValue(160); measure();
     expect(content.style.getPropertyValue('--home-dock-height')).toBe('160px');
     fireEvent.click(screen.getByRole('button', { name: '开始复习' }));
-    fireEvent.click(screen.getByRole('button', { name: '复习计划' }));
-    expect(onStart).toHaveBeenCalledOnce(); expect(onPlan).toHaveBeenCalledOnce();
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.queryByText('复习计划')).not.toBeInTheDocument();
+    expect(onStart).toHaveBeenCalledOnce();
+    view.rerender(<div className="memory-content"><MemoryPaperHomeDock busy onStart={onStart}/></div>);
+    expect(screen.getByRole('button', { name: '开始复习' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '开始复习' }));
+    expect(onStart).toHaveBeenCalledOnce();
     view.unmount();
     expect(disconnect).toHaveBeenCalledOnce();
     expect(content.style.getPropertyValue('--home-dock-height')).toBe('');

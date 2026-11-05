@@ -241,7 +241,6 @@ export function MemoryWorkspace(): JSX.Element {
   const visibleCards = contentType === '仅卡组' ? [] : route === 'archived' ? matching.filter(card => contentType === '仅卡片' || card.deckId === archivedFolder || !archiveFolders.ids.has(card.deckId)) : matching.filter(card => expanded || card.deckId === folder);
   const children = contentType === '仅卡片' ? [] : route === 'folders' ? arranged(activeDecks.filter(deck => (deck.parentId || null) === folder && (!keyword && status === '全部' || keyword && deck.name.toLowerCase().includes(keyword) && status === '全部' || matching.some(card => subtreeIds(store.decks, deck.id).has(card.deckId))))) : route === 'archived' ? arranged(store.decks.filter(deck => archiveFolders.ids.has(deck.id) && (!archivedFolder || archivedScope.has(deck.id) && deck.id !== archivedFolder) && (deck.parentId === archivedFolder || !deck.parentId || !archiveFolders.ids.has(deck.parentId)) && matchesArchivedFolder(deck))) : [];
   const studyPreferences = normalizeMemoryStudyPreferences(store.settings.studyPreferences);
-  const lastStudyDeck = activeDecks.find(deck => deck.id === studyDeck);
   const progress = memoryProgressCounts(available);
   const libraryRecommendation = selectMemoryStudyCards(matching, studyPreferences, new Date(), store.settings);
   const activeQueue = queue.filter(id => available.some(card => card.id === id));
@@ -644,7 +643,7 @@ export function MemoryWorkspace(): JSX.Element {
           </Suspense>
         </main>
         {route === 'import' && plan && <MemoryImportFooter busy={busy} onCancel={() => { setPlan(null); setImportAssets([]); }} onConfirm={() => void confirmImport()}/>}
-        {route === 'home' && <MemoryPaperHomeDock busy={busy} caption={lastStudyDeck ? `上次选择 · ${lastStudyDeck.name}` : studyDeck === '__all' ? '上次选择 · 混合全部卡组' : '选好卡组，再开始这一轮'} onStart={() => { setDrawer(false); setSheet({ kind: 'review-deck' }); }} onPlan={() => setSheet({ kind: 'review-plan' })}/>}
+        {route === 'home' && <MemoryPaperHomeDock busy={busy} onStart={() => { setDrawer(false); setSheet({ kind: 'review-deck' }); }}/>}
         {['folders', 'cards'].includes(route) && libraryPool.length > 0 && <div className="m-library-dock"><button className="m-secondary" disabled={!matching.length || busy} onClick={() => read(matching, false)}>浏览<span>{matching.length}</span></button><button className="m-primary" disabled={!libraryRecommendation.cards.length || busy} onClick={() => read(matching, true)}>本轮温习<span>{libraryRecommendation.cards.length}</span><ChevronRight size={16}/></button></div>}
       </div>
       {route !== 'read' && archiveNotice}
