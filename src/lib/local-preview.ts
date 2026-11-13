@@ -1,8 +1,14 @@
 import { validateImportSnapshot } from '@/services/repository';
 import type { RecallExportPayload, RecallStateSnapshot } from '@/types';
 
+export function isMiaodaLearningPreview(): boolean {
+  return import.meta.env.VITE_RECALL_MIAODA_LEARNING === '1'
+    && (window.location.protocol === 'https:'
+      || ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname));
+}
+
 export function isLocalPreview(): boolean {
-  return import.meta.env.VITE_RECALL_LOCAL_PREVIEW === '1'
+  return isMiaodaLearningPreview() || import.meta.env.VITE_RECALL_LOCAL_PREVIEW === '1'
     && ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
 }
 

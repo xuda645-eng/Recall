@@ -97,7 +97,12 @@ export async function postSync(request: Request, env: ServerEnv, auth: Authentic
     env.DB.prepare(`INSERT INTO mutation_receipts
       (space_id, id, payload_hash, base_revision, revision, device_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
       .bind(space, mutation.id, hash, mutation.baseRevision, revision, auth.session.device.id, Date.now()),
-    ...changeChunks(mutation).map(chunk => env.DB.prepare(`INSERT INTO cloud_entities (space_id, kind, id, value_json, revision)
+    ...changeChunks(mutation).map(chunk => env.DB.prepare(env.DB.dialect === 'postgresql'
+      ? `INSERT INTO cloud_entities (space_id, kind, id, value_json, revision)
+      SELECT ?, value->>'kind', value->>'id', value->>'value_json', ?
+      FROM jsonb_array_elements(?::jsonb) AS entries(value)
+      ON CONFLICT (space_id, kind, id) DO UPDATE SET value_json = excluded.value_json, revision = excluded.revision`
+      : `INSERT INTO cloud_entities (space_id, kind, id, value_json, revision)
       SELECT ?, json_extract(value, '$.kind'), json_extract(value, '$.id'), json_extract(value, '$.value_json'), ?
       FROM json_each(?) WHERE 1
       ON CONFLICT (space_id, kind, id) DO UPDATE SET value_json = excluded.value_json, revision = excluded.revision`)

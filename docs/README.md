@@ -16,6 +16,7 @@ Quick map of the documentation in this folder and the repo root.
 | [`./ARCHITECTURE.md`](./ARCHITECTURE.md) | System overview, data flow, dual runtime, FSRS, repository layer. |
 | [`./DESIGN.md`](../DESIGN.md) | Design tokens, color, typography, layout, motion. |
 | [`./SYNC.md`](./SYNC.md) | Encrypted relay protocol, folder sync, import safety. |
+| [`./MIAODA.md`](./MIAODA.md) | Miaoda runtime boundaries, public resource mapping and separate native acceptance commands. |
 | [`./i18n.md`](./i18n.md) | How to add/edit translated strings (en, id). |
 
 ## Reference

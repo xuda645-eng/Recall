@@ -11,6 +11,7 @@ export interface MemoryFolderSelectorProps {
   onChange: (id: string) => void;
   label: string;
   rootLabel: string;
+  missingLabel?: string;
   disabled?: boolean;
 }
 
@@ -19,7 +20,7 @@ function timestamp(value: string | undefined): number | undefined {
   return Number.isFinite(time) ? time : undefined;
 }
 
-export function MemoryFolderSelector({ decks, value, onChange, label, rootLabel, disabled = false }: MemoryFolderSelectorProps): JSX.Element {
+export function MemoryFolderSelector({ decks, value, onChange, label, rootLabel, missingLabel, disabled = false }: MemoryFolderSelectorProps): JSX.Element {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const items = useRef(new Map<string, HTMLLIElement>());
@@ -44,6 +45,7 @@ export function MemoryFolderSelector({ decks, value, onChange, label, rootLabel,
     return result;
   }, [decks, path]);
   const selectedId = path.length ? value : '';
+  const missingSelection = !!value && !path.length && !!missingLabel;
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(() => new Set(path.slice(0, -1).map(deck => deck.id)));
   const [focusedId, setFocusedId] = useState(selectedId);
@@ -123,7 +125,7 @@ export function MemoryFolderSelector({ decks, value, onChange, label, rootLabel,
     const branchOpen = expanded.has(deckId);
     const nameId = `${id}-name-${deckId}`;
     const groupId = `${id}-children-${deckId}`;
-    return <li key={deckId} role="treeitem" aria-labelledby={nameId} aria-selected={selectedId === deckId}
+    return <li key={deckId} role="treeitem" aria-labelledby={nameId} aria-selected={!missingSelection && selectedId === deckId}
       aria-expanded={hasChildren ? branchOpen : undefined} aria-level={level} aria-posinset={position} aria-setsize={size}
       tabIndex={tabStop === deckId ? 0 : -1}
       ref={element => { if (element) items.current.set(deckId, element); else items.current.delete(deckId); }}
@@ -131,9 +133,9 @@ export function MemoryFolderSelector({ decks, value, onChange, label, rootLabel,
       onKeyDown={event => navigate(event, deckId)}>
       <div className="m-folder-selector-row" style={{ '--folder-indent': `${Math.min(level - 1, 4) * 10}px` } as CSSProperties}>
         <button type="button" className="m-folder-selector-select" tabIndex={-1} disabled={disabled}
-          aria-label={`选择目录：${name}`} aria-pressed={selectedId === deckId} onClick={() => choose(deckId)}>
+          aria-label={`选择目录：${name}`} aria-pressed={!missingSelection && selectedId === deckId} onClick={() => choose(deckId)}>
           <Folder size={18} aria-hidden="true"/><span id={nameId}>{name}</span>
-          {selectedId === deckId && <Check size={18} aria-hidden="true"/>}
+          {!missingSelection && selectedId === deckId && <Check size={18} aria-hidden="true"/>}
         </button>
         {hasChildren && <button type="button" className="m-folder-selector-expand" tabIndex={-1} disabled={disabled}
           aria-label={`${branchOpen ? '收起' : '展开'}${name}的子目录`} aria-expanded={branchOpen} aria-controls={groupId}
@@ -156,7 +158,7 @@ export function MemoryFolderSelector({ decks, value, onChange, label, rootLabel,
         setFocusedId(selectedId);
         setOpen(previous => !previous);
       }}>
-      <span id={`${id}-value`}>{path.length ? path.map(deck => deck.name).join(' / ') : rootLabel}</span>
+      <span id={`${id}-value`}>{path.length ? path.map(deck => deck.name).join(' / ') : missingSelection ? missingLabel : rootLabel}</span>
       {panelOpen ? <ChevronDown size={18} aria-hidden="true"/> : <ChevronRight size={18} aria-hidden="true"/>}
     </button>
     <div id={`${id}-panel`} className="m-folder-selector-panel" hidden={!panelOpen}>

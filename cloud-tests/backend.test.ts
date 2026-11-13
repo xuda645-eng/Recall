@@ -514,7 +514,7 @@ describe('Recall Pages auth and D1 sync', () => {
   it('does not list devices after revocation between authentication and the list query', async () => {
     const owner = await paired();
     db.beforeAll = async query => {
-      if (query.includes('created_at AS createdAt')) db.sqlite.prepare('UPDATE trusted_devices SET revoked_at = ?').run(Date.now());
+      if (query.includes('created_at AS "createdAt"')) db.sqlite.prepare('UPDATE trusted_devices SET revoked_at = ?').run(Date.now());
     };
     const response = await api('/api/auth/devices', { cookie: owner.cookie });
     expect(response.status).toBe(401);

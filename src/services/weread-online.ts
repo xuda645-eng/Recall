@@ -2,7 +2,8 @@ import { parseWereadExport, type WereadBook } from '@/lib/memory-weread';
 import { validateQuestion } from '../../shared/weread-ai';
 import { validateMergeBatch, validateMergeGroups, wereadRangeStart } from '../../shared/weread-merge';
 import type { MergeBatch, MergeGroup } from '../../shared/weread-merge';
-import { isLocalPreview } from '@/lib/local-preview';
+import { fetchWeread, WereadCapabilityError, wereadServiceError } from './miaoda-weread';
+import type { WereadOperation } from '../../shared/weread-api';
 
 export type WereadOnlineHighlight = WereadBook['highlights'][number] & { chapterIdx?: number; range?: string };
 export type WereadOnlineLoadedBook = Omit<WereadBook, 'highlights'> & { highlights: WereadOnlineHighlight[] };
@@ -44,24 +45,17 @@ function onlineDate(value: unknown): string | null {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? value : null;
 }
 
-async function request(path: 'books' | 'book' | 'progress' | 'question' | 'merge', input: unknown, signal: AbortSignal): Promise<unknown> {
-  if (isLocalPreview()) throw new Error('本地隔离预览不连接在线服务，请导入划线文件');
+async function request(path: Exclude<WereadOperation, 'budget'>, input: unknown, signal: AbortSignal): Promise<unknown> {
   let response: Response;
   try {
-    response = await fetch(`/api/weread/${path}`, {
-      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input), signal,
-    });
+    response = await fetchWeread(path, input, signal);
   } catch (failure) {
-    if (signal.aborted) throw failure;
+    if (signal.aborted || failure instanceof WereadCapabilityError) throw failure;
     throw new Error('网络连接失败，请检查网络后重试，或使用划线文件导入；已有草稿保留', { cause: failure });
   }
   if (!response.ok) {
     await response.body?.cancel();
-    throw new Error(response.status === 401 ? '请先在“设置与数据 > 云同步”授权当前设备，再连接微信读书'
-      : response.status === 429 ? '已达到在线调用上限，请稍后重试或手动出题'
-        : response.status === 503 ? '在线连接尚未配置或需要维护，请使用本地文件导入'
-          : '在线服务超时或响应无效，请重试；已有草稿不会自动导入');
+    throw new Error(wereadServiceError(response.status, path));
   }
   return response.json();
 }

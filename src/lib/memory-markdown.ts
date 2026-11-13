@@ -1,11 +1,18 @@
 import type { Card, RecallStateSnapshot } from '@/types';
 import { createId } from '@/lib/utils';
-import { newMemoryCard } from '@/lib/memory-folders';
+import { folderPath, newMemoryCard } from '@/lib/memory-folders';
+import { memoryArchiveFolderState } from '@/lib/memory-archive';
 export interface MarkdownEntry { id: string; generated: boolean; path: string[]; front: string; back: string; kind: 'qa' | 'excerpt'; importedAt: string; bookTitle: string; chapter: string; line: number; meta: Record<string,string>; }
 export interface MarkdownDocument { text: string; entries: MarkdownEntry[]; batchAt: string; }
 export interface ImportRow { entry: MarkdownEntry; status: 'new' | 'duplicate' | 'change'; existing?: Card; }
 export interface MarkdownPlan { document: MarkdownDocument; parentId: string | null; rows: ImportRow[]; fingerprint: string; }
 export const snapshotFingerprint = (s: RecallStateSnapshot): string => JSON.stringify([s.decks.map(d=>({...d,parentId:d.parentId??null})),s.cards,s.reviewLogs,s.studySessions]);
+export function memoryImportTargetAvailable(snapshot: RecallStateSnapshot, parentId: string | null): boolean {
+  if (!parentId) return true;
+  const archived = memoryArchiveFolderState(snapshot.decks, snapshot.cards).ids;
+  try { return folderPath(snapshot.decks, parentId).every(deck => !archived.has(deck.id)); }
+  catch { return false; }
+}
 export function importDate(value: string): string {
   const m=value.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/);
   if(m){const d=new Date(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0),+(m[6]||0));if(d.getFullYear()===+m[1]&&d.getMonth()===+m[2]-1&&d.getDate()===+m[3]&&d.getHours()===+(m[4]||0)&&d.getMinutes()===+(m[5]||0)&&d.getSeconds()===+(m[6]||0))return d.toISOString();}
@@ -27,11 +34,12 @@ export function parseMemoryMarkdown(raw: string, at=new Date().toISOString()): M
 function pathId(s:RecallStateSnapshot,path:string[],parent:string|null):string|null{let id=parent;for(const name of path){const d=s.decks.find(d=>(d.parentId??null)===id&&d.name===name);if(!d)return null;id=d.id;}return id;}
 function markdownAnswer(card: Card): string { return card.sourceRef?.highlights ? card.back.replace(/\r\n?/g, '\n').trim() : card.back; }
 export function planMemoryImport(s:RecallStateSnapshot,document:MarkdownDocument,parentId:string|null):MarkdownPlan {
-  if(parentId&&!s.decks.some(d=>d.id===parentId))throw new Error('目标卡组不存在');
+  if(!memoryImportTargetAvailable(s,parentId))throw new Error('导入位置已归档或删除，请重新选择目录');
   const seen=new Set<string>();const rows=document.entries.map(entry=>{const dest=pathId(s,entry.path,parentId);const existing=entry.generated?s.cards.find(c=>c.deckId===dest&&c.front===entry.front&&c.back===entry.back):s.cards.find(c=>c.id===entry.id);const key=existing?.id??entry.id;if(seen.has(key))throw new Error('文件中多条内容对应同一卡片');seen.add(key);const change=existing&&(existing.deckId!==dest||existing.front!==entry.front||markdownAnswer(existing)!==entry.back||(existing.contentKind??'qa')!==entry.kind||(existing.bookTitle||'')!==entry.bookTitle||(existing.chapter||'')!==entry.chapter);return {entry,existing,status:existing?(change?'change':'duplicate'):'new'} as ImportRow;});
   return {document,parentId,rows,fingerprint:snapshotFingerprint(s)};
 }
 export function applyMemoryImport(s:RecallStateSnapshot,plan:MarkdownPlan,updates:Set<string>):{snapshot:RecallStateSnapshot;text:string;added:number;updated:number;skipped:number} {
+  if(!memoryImportTargetAvailable(s,plan.parentId))throw new Error('导入位置已归档或删除，请重新选择目录');
   if(snapshotFingerprint(s)!==plan.fingerprint)throw new Error('数据已变化，请重新校验后导入');
   if(plan.rows.some(row=>row.existing?.sourceRef?.highlights&&row.status==='change'&&updates.has(row.entry.id)&&row.entry.back!==markdownAnswer(row.existing)))throw new Error('合并划线原文不能由 Markdown 改写，请保留原文并只修改问题');
   const next={...s,decks:[...s.decks],cards:[...s.cards]},lines=plan.document.text.split('\n');let added=0,updated=0,skipped=0;

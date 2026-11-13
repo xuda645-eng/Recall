@@ -159,6 +159,18 @@ describe('MemoryFolderSelector', () => {
     expect(screen.getByRole('button', { name: '收起child的子目录' })).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it('requires an explicit replacement for an unavailable import target rather than selecting root silently', () => {
+    const { rerender, props, onChange } = selector({ value: 'child', missingLabel: '请选择目录' });
+    openSelector();
+    rerender(createElement(MemoryFolderSelector, { ...props, decks: [] }));
+    expect(screen.getByRole('button', { name: '统计范围 请选择目录' })).toBeInTheDocument();
+    expect(screen.getByRole('treeitem', { name: '全部卡片' })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('button', { name: '选择目录：全部卡片' })).toHaveAttribute('aria-pressed', 'false');
+    expect(onChange).not.toHaveBeenCalled();
+    select('全部卡片');
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('');
+  });
+
   it('supports roving tree focus, arrows, Home/End, independent keyboard expansion and selection', () => {
     const { onChange } = selector();
     openSelector();

@@ -40,6 +40,16 @@ describe("validateImportSnapshot", () => {
     expect(() => validateImportSnapshot(baseSnapshot)).not.toThrow();
   });
 
+  it('accepts optional valid deck archive timestamps before persistence', () => {
+    const snapshot = { ...baseSnapshot, decks: [{ ...baseSnapshot.decks[0], archivedAt: '2026-11-13T00:00:00.000Z' }] };
+    expect(() => validateImportSnapshot(snapshot)).not.toThrow();
+  });
+
+  it.each([null, '', 'invalid', 123, false, {}, []])('rejects invalid deck archive metadata %j before persistence', archivedAt => {
+    const snapshot = { ...baseSnapshot, decks: [{ ...baseSnapshot.decks[0], archivedAt: archivedAt as never }] };
+    expect(() => validateImportSnapshot(snapshot)).toThrow('Deck d1: invalid archivedAt');
+  });
+
   it("rejects duplicate deck ids", () => {
     const snap = {
       ...baseSnapshot,

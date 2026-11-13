@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { typeClass } from "@/lib/surface";
 import { APP_BUILD } from "@/lib/app-build";
 import { refreshMemoryPWA } from "@/services/pwa-refresh";
+import { isMiaodaLearningPreview } from '@/lib/local-preview';
 
 export interface PWAUpdatePromptProps {
   className?: string;
@@ -46,7 +47,12 @@ export function PWAAppVersion({ disabled = false, combined = false, compact = fa
     }
   }
   const message = error ? <small className="m-version-message" role="status">{error}</small> : needRefresh && <small className="m-version-message" role="status">{combined ? compact ? '有新版本，点击右侧图标同步并更新。' : '有新版本，点击下方按钮同步并更新。' : '有新版本，点击右侧图标刷新。'}</small>;
+  if (isMiaodaLearningPreview()) return <MiaodaVersion />;
   return <><div className={`m-app-version ${combined ? 'is-combined' : ''} ${compact ? 'is-compact' : ''}`}><small aria-label="当前版本" title="构建时间使用北京时间，精确到分钟">{!compact && 'Recall · '}V<span data-app-version={APP_BUILD.version}>{APP_BUILD.version}</span></small>{combined && !compact && message}<button className="m-version-refresh" type="button" aria-label={refreshing ? busyLabel : actionLabel} title={actionLabel} disabled={disabled || refreshing} onClick={() => void refresh()}>{refreshing ? <Loader2 size={compact ? 18 : 15} className="animate-spin" aria-hidden="true"/> : compact ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19.5 8A8 8 0 1 0 20 14M19.5 3.5V8H15"/></svg> : <RefreshCw size={15} aria-hidden="true"/>}{combined && !compact && <span>{refreshing ? busyLabel : actionLabel}</span>}</button></div>{(!combined || compact) && message}</>;
+}
+
+function MiaodaVersion(): JSX.Element {
+  return <div className="m-app-version is-compact"><small aria-label="当前版本">V<span data-app-version={APP_BUILD.version}>{APP_BUILD.version}</span></small></div>;
 }
 
 export function PWAUpdateProvider({ children }: { children: ReactNode }): JSX.Element {

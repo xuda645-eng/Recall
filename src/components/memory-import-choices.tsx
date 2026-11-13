@@ -6,7 +6,7 @@ import './memory-import-choices.css';
 interface MemoryImportChoicesProps {
   busy: boolean;
   onFile: (file?: File) => void;
-  onWeread: () => void;
+  onWeread?: () => void;
   onManual: () => void;
   onOther: () => void;
   onHelp: () => void;
@@ -37,11 +37,11 @@ export function MemoryImportChoices({ busy, onFile, onWeread, onManual, onOther,
         <span className="m-import-source-copy"><strong>带图卡片文件</strong><small>卡片与来源截图 · .recall-media.json</small></span>
         <ChevronRight size={18} aria-hidden="true"/>
       </button>
-      <button type="button" className="m-import-source" disabled={busy} aria-label="导入划线" onClick={onWeread}>
+      {onWeread && <button type="button" className="m-import-source" disabled={busy} aria-label="导入划线" onClick={onWeread}>
         <span className="m-import-source-icon" aria-hidden="true"><BookOpen size={23}/></span>
         <span className="m-import-source-copy"><strong>微信读书</strong><small>导入书籍划线，保留原文</small></span>
         <ChevronRight size={18} aria-hidden="true"/>
-      </button>
+      </button>}
     </div>
     <div className="m-import-help"><button type="button" disabled={busy} onClick={onHelp}>格式说明</button><button type="button" disabled={busy} onClick={onExample}>下载 Markdown 示例</button></div>
     <p className="m-import-package-note">带图卡片文件包含卡片与来源图片，可由制卡工具生成；不是单张图片，也不是完整数据备份。</p>

@@ -10,7 +10,7 @@ export default defineConfig({
   },
   test: {
     environment: "happy-dom",
-    exclude: ["e2e/**", "prototypes/**", "cloud-tests/**", "node_modules/**", "**/node_modules/**", "sync-relay/**"],
+    exclude: ["e2e/**", "prototypes/**", "cloud-tests/**", "node_modules/**", "**/node_modules/**", "sync-relay/**", "scripts/miaoda-icons.raster.test.ts"],
     setupFiles: ["./src/test-setup.ts"],
     coverage: {
       provider: "v8",

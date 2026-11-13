@@ -135,6 +135,9 @@ export function validateImportSnapshot(snapshot: RecallStateSnapshot): void {
     if (!isDeckColor(deck.color)) {
       throw new Error("Invalid deck color");
     }
+    if (deck.archivedAt !== undefined && (typeof deck.archivedAt !== 'string' || !Number.isFinite(Date.parse(deck.archivedAt)))) {
+      throw new Error(`Deck ${deck.id}: invalid archivedAt`);
+    }
     deckIds.add(deck.id);
     deckNames.add(deckName);
   }

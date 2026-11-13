@@ -542,6 +542,7 @@ function isDeck(value: unknown): value is Deck {
     typeof value.name === "string" &&
     typeof value.description === "string" &&
     isDeckColor(value.color) &&
+    (value.archivedAt === undefined || (typeof value.archivedAt === "string" && Number.isFinite(Date.parse(value.archivedAt)))) &&
     typeof value.createdAt === "string" &&
     typeof value.updatedAt === "string"
   );

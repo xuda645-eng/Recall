@@ -1,15 +1,18 @@
 import { useRef, useState } from 'react';
 import { useRecallStore } from '@/stores/recall-store';
 import { dataState } from '@/stores/store-helpers';
-import { localPreviewSnapshot } from '@/lib/local-preview';
+import { localPreviewSnapshot, isMiaodaLearningPreview } from '@/lib/local-preview';
 import { parseMediaPackage } from '@/services/media-package';
 import { commitMemory } from '@/services/memory-actions';
 import { saveMedia } from '@/services/media-storage';
+import { MiaodaPersonalSync } from './miaoda-personal-sync';
+import { usePersonalSync } from '@/services/personal-sync';
 
 type ParsedBackup = Awaited<ReturnType<typeof parseMediaPackage>>;
 
 export function MemoryLocalPreview(): JSX.Element {
   const empty = useRecallStore(state => !state.cards.length && !state.decks.length && !state.reviewLogs.length && !state.studySessions.length);
+  const personal = usePersonalSync(state => state.available);
   const input = useRef<HTMLInputElement>(null);
   const locked = useRef(false);
   const [parsed, setParsed] = useState<ParsedBackup | null>(null);
@@ -42,11 +45,11 @@ export function MemoryLocalPreview(): JSX.Element {
     finally { locked.current = false; setBusy(false); }
   }
 
-  return <section className="m-local-preview" aria-label="本地验收副本">
+  return <><MiaodaPersonalSync /><section className="m-local-preview" aria-label="本地验收副本">
     <h2>本地验收副本</h2>
-    <p>只写当前本地浏览器，云同步已关闭。保留卡片、图片和进度，不去重、不发布；微信读书书籍首次整理到同名根卡组下。</p>
+    <p>{personal ? '副本先保留在当前浏览器；确认连接个人同步后，卡片、来源图片和进度才会上传。图片失败会暂停同步，请保留完整带图备份。' : isMiaodaLearningPreview() ? '只写当前浏览器，云同步已关闭。保留卡片、图片和进度，不上传到云端；微信读书书籍首次整理到同名根卡组下。' : '只写当前本地浏览器，云同步已关闭。保留卡片、图片和进度，不去重、不发布；微信读书书籍首次整理到同名根卡组下。'}</p>
     {empty ? <><button className="m-secondary" disabled={busy} onClick={() => input.current?.click()}>选择完整备份副本</button><input ref={input} type="file" accept=".json" hidden onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void select(file); }}/>
-      {backup && <div className="m-local-preview-confirm"><p>{backup.decks.length} 个卡组 · {backup.cards.length} 张卡片 · {backup.reviewLogs.length} 条复习记录 · {parsed!.assets.length} 张图片</p><button className="m-primary" disabled={busy} onClick={() => void restore()}>确认载入本地副本</button><button className="m-text" disabled={busy} onClick={() => setParsed(null)}>取消</button></div>}</> : <p role="status">已载入内容。此入口不覆盖已有卡库；后续评分和编辑仅影响本地副本。</p>}
+      {backup && <div className="m-local-preview-confirm"><p>{backup.decks.length} 个卡组 · {backup.cards.length} 张卡片 · {backup.reviewLogs.length} 条复习记录 · {parsed!.assets.length} 张图片</p><button className="m-primary" disabled={busy} onClick={() => void restore()}>确认载入本地副本</button><button className="m-text" disabled={busy} onClick={() => setParsed(null)}>取消</button></div>}</> : <p role="status">{personal ? '已载入内容。此入口不覆盖已有卡库；未确认连接前不会上传。' : '已载入内容。此入口不覆盖已有卡库；后续评分和编辑仅影响本地副本。'}</p>}
     {busy && <p role="status">正在校验和载入，请稍候。</p>}{error && <p className="m-error" role="alert">{error}</p>}
-  </section>;
+  </section></>;
 }

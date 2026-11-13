@@ -3,8 +3,8 @@ import { Archive, ArrowLeft, BarChart3, BookOpen, ChevronRight, Home, Layers, Li
 import { useTranslation } from 'react-i18next';
 import { useRecallStore } from '@/stores/recall-store';
 import { folderPath, subtreeIds, createFolder, changeFolder, moveMemoryCard, newMemoryCard, memoryImportLocations } from '@/lib/memory-folders';
-import { parseMemoryMarkdown, planMemoryImport, applyMemoryImport, type MarkdownPlan } from '@/lib/memory-markdown';
-import { archiveMemoryCard, archiveMemoryFolder, deleteArchivedMemoryCard, deleteArchivedMemoryFolder, memoryArchiveFolderState, restoreMemoryCard, restoreMemoryCards, restoreMemoryFolder } from '@/lib/memory-archive';
+import { parseMemoryMarkdown, planMemoryImport, applyMemoryImport, memoryImportTargetAvailable, type MarkdownPlan } from '@/lib/memory-markdown';
+import { archiveMemoryCard, archiveMemoryFolder, deleteArchivedMemoryCard, deleteArchivedMemoryFolder, memoryArchiveFolderState, restoreMemoryCard, undoMemoryFolderArchive, restoreMemoryFolder } from '@/lib/memory-archive';
 import { commitMemory, downloadMemoryText } from '@/services/memory-actions';
 import { memoryCardSummary } from '@/lib/memory-card-summary';
 import { memoryProgressCounts } from '@/services/memory-statistics';
@@ -15,7 +15,10 @@ import { isMemoryNewCard, normalizeMemoryStudyPreferences, selectMemoryStudyCard
 import { MemoryFolderRows } from '@/components/memory-folder-rows';
 import { MemoryPaperHome, MemoryPaperHomeDock } from '@/components/memory-paper-home';
 import { MemoryLocalPreview } from '@/components/memory-local-preview';
-import { isLocalPreview } from '@/lib/local-preview';
+import { isLocalPreview, isMiaodaLearningPreview } from '@/lib/local-preview';
+import { usePersonalSync } from '@/services/personal-sync';
+import { useMiaodaWeread } from '@/services/miaoda-weread';
+import { MiaodaPersonalDrawer, MiaodaPersonalSync } from '@/components/miaoda-personal-sync';
 import { MemoryReviewDeckPicker } from '@/components/memory-review-deck-picker';
 import { MemoryStatusEdge } from '@/components/memory-status-edge';
 import { MemoryDisplayDiagnostics } from '@/components/memory-display-diagnostics';
@@ -54,13 +57,15 @@ const loadingView = <p className="m-note" role="status">正在加载，请稍候
 const titles = { home: '今日复习', folders: '卡组目录', cards: '全部卡片', archived: '已归档', stats: '统计', import: '导入', weread: '微信读书', settings: '设置与数据', advanced: '更多设置', compat: '其他导入' };
 type Route = MemoryRoute;
 type Sheet = { kind: 'folder' | 'folder-archive' | 'folder-restore' | 'archived-folder-menu' | 'archived-card-menu' | 'archived-folder-delete' | 'archived-card-delete' | 'card' | 'move' | 'help' | 'filter' | 'path' | 'add' | 'card-menu' | 'reader-options' | 'review-plan' | 'review-deck' | 'font' | 'archived-detail' | 'backup' | 'cloud'; id?: string };
-interface ArchiveUndo { ids: string[]; archivedAt: string; expiresAt: number; reading: boolean; }
+interface ArchiveUndo { ids: string[]; deckIds?: string[]; archivedAt: string; expiresAt: number; reading: boolean; }
 const template = '# 知识整理\n\n## 回忆方法\n\n<!-- recall:card {} -->\n问题：怎样确认理解？\n\n合上材料，用自己的话说明结论、依据与适用条件。\n\n<!-- recall:end -->\n\n<!-- recall:card {"type":"excerpt","title":"阅读段落"} -->\n\n没有问题的一段内容也可以是一张卡片。\n\n<!-- recall:end -->\n';
 const date = (value?: string) => value && Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '首次导入时间未知';
 const currentTime = () => Date.now();
 
 export function MemoryWorkspace(): JSX.Element {
   const store = useRecallStore();
+  const personalSync = usePersonalSync();
+  const wereadCapability = useMiaodaWeread();
   const { t } = useTranslation();
   const [initialContext] = useState(() => loadWorkspaceContext(store, window.location.hash));
   const [draft, setDraft] = useState(loadEditorDraft);
@@ -257,7 +262,8 @@ export function MemoryWorkspace(): JSX.Element {
       if (previousSheet.current !== sheet) sheetDirty.current = draftRef.current?.kind === sheet.kind && draftRef.current.id === sheet.id;
       sheetRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
     } else if (drawer) drawerRef.current?.querySelector<HTMLButtonElement>('[aria-current="page"],button')?.focus();
-    else if (restoreFocus.current?.isConnected) restoreFocus.current.focus({ preventScroll: true });
+    else if (restoreFocus.current?.isConnected && (!mobile || !drawerRef.current?.contains(restoreFocus.current))) restoreFocus.current.focus({ preventScroll: true });
+    else if (previousSheet.current) brand.current?.focus({ preventScroll: true });
     previousSheet.current = sheet;
   }, [drawer, sheet, mobile]);
   useEffect(() => {
@@ -318,6 +324,7 @@ export function MemoryWorkspace(): JSX.Element {
 
   const archiveFolders = useMemo(() => memoryArchiveFolderState(store.decks, store.cards), [store.decks, store.cards]);
   const activeDecks = store.decks.filter(deck => !archiveFolders.ids.has(deck.id));
+  const importTargetUnavailable = !!plan && !memoryImportTargetAvailable(store, plan.parentId);
   useEffect(() => {
     if (!folder || !archiveFolders.ids.has(folder)) return;
     const parent = folderPath(store.decks, folder).slice(0, -1).reverse().find(deck => !archiveFolders.ids.has(deck.id));
@@ -484,6 +491,7 @@ export function MemoryWorkspace(): JSX.Element {
   async function confirmImport(): Promise<void> {
     if (!plan || busy) return;
     await run(async () => {
+      if (!memoryImportTargetAvailable(useRecallStore.getState(), plan.parentId)) throw new Error('导入位置已归档或删除，请重新选择目录');
       let result: ReturnType<typeof applyMemoryImport> | undefined;
       if (importAssets.length) await saveMedia(importAssets);
       await commitMemory(snapshot => { result = applyMemoryImport(snapshot, plan, selected); return result.snapshot; });
@@ -506,21 +514,23 @@ export function MemoryWorkspace(): JSX.Element {
   async function archiveFolder(id: string): Promise<void> {
     const archivedAt = new Date().toISOString();
     let ids: string[] = [];
+    let deckIds: string[] = [];
     await commitMemory(snapshot => {
       const result = archiveMemoryFolder(snapshot, id, archivedAt);
       ids = result.ids;
+      deckIds = result.deckIds;
       return result.snapshot;
     });
     if (!mounted.current) return;
     setRemaining(3);
-    setArchiveUndo({ ids, archivedAt, expiresAt: currentTime() + 3000, reading: false });
+    setArchiveUndo({ ids, deckIds, archivedAt, expiresAt: currentTime() + 3000, reading: false });
     setSheet(null);
   }
   async function undoArchive(): Promise<void> {
     const operation = archiveUndo;
     if (!operation || currentTime() >= operation.expiresAt) { setArchiveUndo(null); return; }
     await run(async () => {
-      await commitMemory(snapshot => restoreMemoryCards(snapshot, operation.ids, operation.archivedAt));
+      await commitMemory(snapshot => undoMemoryFolderArchive(snapshot, operation.ids, operation.deckIds || [], operation.archivedAt));
       if (route === 'read' && operation.reading) setRestoreRequest({ id: operation.ids[0], token: createId('restore') });
       setArchiveUndo(null);
     });
@@ -596,6 +606,7 @@ export function MemoryWorkspace(): JSX.Element {
     const field = (name: string, fallback: string) => draft && draft.kind === sheet?.kind && draft.id === sheet?.id ? draft.fields[name] ?? fallback : fallback;
     const archiveFolders = sheet?.kind === 'folder' && sheet.id ? subtreeIds(store.decks, sheet.id) : new Set<string>();
     const archiveCount = available.filter(card => archiveFolders.has(card.deckId)).length;
+    const emptyArchive = !store.cards.some(card => archiveFolders.has(card.deckId));
     return <form onChange={captureDraft} onSubmit={event => {
       event.preventDefault();
       const expectedBase = sheet && ['card', 'folder', 'move'].includes(sheet.kind) ? editorBase(sheet.kind as MemoryEditorDraft['kind'], sheet.id, useRecallStore.getState()) : '';
@@ -625,7 +636,7 @@ export function MemoryWorkspace(): JSX.Element {
         {sheet?.kind === 'folder' && <option value="">根目录</option>}{store.decks.filter(deck => sheet?.kind !== 'folder' || !sheet.id || !subtreeIds(store.decks, sheet.id).has(deck.id)).map(deck => <option key={deck.id} value={deck.id}>{folderPath(store.decks, deck.id).map(item => item.name).join(' / ')}</option>)}
       </select></label>
       {sheet?.kind === 'card' && <><p className="m-note">{editing?.sourceRef?.highlights ? '合并划线原文只读，可修改问题；来源与复习进度保留。' : editing?.contentKind === 'excerpt' ? '阅读摘录 · 保留原文与复习进度' : '问答卡 · 先回忆问题，再查看答案'}</p><div className="m-editor-tabs"><button type="button" aria-pressed={!editorPreview} onClick={() => setEditorPreview(false)}>编辑</button><button type="button" aria-pressed={editorPreview} onClick={() => setEditorPreview(true)}>预览</button></div><div hidden={editorPreview} className="m-editor-fields"><label>{editing?.contentKind === 'excerpt' ? '段落标题（可选）' : '问题'}<textarea name="front" required={!editorPreview && editing?.contentKind !== 'excerpt'} maxLength={10000} defaultValue={field('front', editing?.front || '')}/></label><label>{editing?.contentKind === 'excerpt' ? '划线原文' : '答案'}<textarea className={expandedAnswer ? 'is-expanded' : ''} name="back" required={!editorPreview} readOnly={!!editing?.sourceRef?.highlights} maxLength={20000} defaultValue={field('back', editing?.back || '')}/></label><button className="m-text" type="button" aria-pressed={expandedAnswer} onClick={() => setExpandedAnswer(value => !value)}>{expandedAnswer ? '收起答案编辑' : '展开答案编辑'}</button></div>{editorPreview && <section className="m-editor-preview" aria-label="卡片排版预览"><RichCard content={editorContent.front} allowHtml={false}/><hr/><RichCard content={editorContent.back} allowHtml={false} collapseSourceEvidence/></section>}<details className="m-card-source-fields"><summary>来源信息（可选）</summary><label>书名<input name="bookTitle" defaultValue={field('bookTitle', editing?.bookTitle || '')}/></label><label>章节<input name="chapter" defaultValue={field('chapter', editing?.chapter || '')}/></label><label>来源<input name="source" defaultValue={field('source', editing?.source || '')}/></label></details></>}
-      {sheet?.kind === 'folder' && sheet.id && <><button className="m-secondary" type="button" disabled={busy || !archiveCount} onClick={() => { if (sheetDirty.current && !window.confirm('归档前放弃未保存的修改？')) return; if (sheetDirty.current) clearDraft(); sheetDirty.current = false; setSheet({ kind: 'folder-archive', id: sheet.id }); }}><Archive size={20}/>归档整个卡组</button><small>{archiveCount ? `包含所有子卡组，共 ${archiveCount} 张在学卡片。原文与进度保留。` : '本卡组及子卡组没有在学卡片。'}</small></>}
+      {sheet?.kind === 'folder' && sheet.id && <><button className="m-secondary" type="button" disabled={busy || !archiveCount && !emptyArchive} onClick={() => { if (sheetDirty.current && !window.confirm('归档前放弃未保存的修改？')) return; if (sheetDirty.current) clearDraft(); sheetDirty.current = false; setSheet({ kind: 'folder-archive', id: sheet.id }); }}><Archive size={20}/>归档整个卡组</button><small>{archiveCount ? `包含所有子卡组，共 ${archiveCount} 张在学卡片。原文与进度保留。` : emptyArchive ? '空卡组及子卡组可归档；归档后可恢复或彻底删除。' : '本卡组及子卡组没有在学卡片。'}</small></>}
       {sheet?.kind === 'card' && !editing?.sourceRef?.highlights && <MediaEditor onBusy={setBusy} onDirty={captureDraft}/>}
       {editing && <small>首次导入：{date(editing.importedAt)} · 最近修改：{date(editing.updatedAt)}</small>}
       <button className="m-primary" disabled={busy} type="submit">{sheet?.kind === 'card' && !editing ? '保存卡片' : '保存修改'}</button>
@@ -639,12 +650,12 @@ export function MemoryWorkspace(): JSX.Element {
       read(mode ? cards : arranged(cards), mode);
     }}/>;
     if (sheet.kind === 'backup') return <MediaBackupControls onBusy={setBusy} onRestorePlain={() => navigate('compat')}/>;
-    if (sheet.kind === 'cloud') return <MemoryCloudSettings/>;
+    if (sheet.kind === 'cloud') return personalSync.available ? <MiaodaPersonalSync/> : <MemoryCloudSettings/>;
     if (sheet.kind === 'archived-folder-menu' || sheet.kind === 'archived-card-menu') {
       const isFolder = sheet.kind === 'archived-folder-menu';
       const entity = isFolder ? store.decks.find(deck => deck.id === sheet.id) : store.cards.find(card => card.id === sheet.id);
       const folders = subtreeIds(store.decks, sheet.id || null);
-      const canRestore = isFolder ? store.cards.some(card => card.archivedAt && folders.has(card.deckId)) : !!(entity as Card | undefined)?.archivedAt;
+      const canRestore = isFolder ? archiveFolders.ids.has(sheet.id || '') : !!(entity as Card | undefined)?.archivedAt;
       return <div className="m-sheet-list"><button disabled={busy || !canRestore} onClick={() => isFolder ? setSheet({ kind: 'folder-restore', id: sheet.id }) : restoreArchive(sheet.id!)}><Undo2 size={18}/>移出归档（恢复）</button><button className="m-danger" disabled={busy || !entity} onClick={() => {
         setDeleteConfirmation('');
         setDeleteTarget({ id: sheet.id!, deckIds: isFolder ? [...folders] : [], cardIds: isFolder ? store.cards.filter(card => folders.has(card.deckId)).map(card => card.id) : [sheet.id!], archivedAt: isFolder ? undefined : store.cards.find(card => card.id === sheet.id)?.archivedAt });
@@ -667,7 +678,7 @@ export function MemoryWorkspace(): JSX.Element {
         const target = sheet.id!;
         void run(async () => {
           await commitMemory(snapshot => isFolder ? deleteArchivedMemoryFolder(snapshot, target, deleteTarget!) : deleteArchivedMemoryCard(snapshot, target, deleteTarget!.archivedAt!));
-          setArchiveUndo(operation => operation?.ids.some(id => expectedCards.has(id)) ? null : operation);
+          setArchiveUndo(operation => operation && (operation.ids.some(id => expectedCards.has(id)) || operation.deckIds?.some(id => expectedDecks.has(id))) ? null : operation);
           setDeleteConfirmation('');
           setDeleteTarget(null);
           setSheet(null);
@@ -679,13 +690,14 @@ export function MemoryWorkspace(): JSX.Element {
       const deck = store.decks.find(candidate => candidate.id === sheet.id);
       const folders = subtreeIds(store.decks, sheet.id || null);
       const count = available.filter(card => folders.has(card.deckId)).length;
-      return <form onSubmit={event => { event.preventDefault(); void run(() => archiveFolder(sheet.id!)); }}><p>将归档“{deck?.name}”及所有子卡组中的 {count} 张在学卡片，不再安排复习。</p><p className="m-note">完全归档的卡组将移到“已归档”，层级、原文、复习进度和历史记录仍保留。已归档卡片不受影响；操作后 3 秒内可撤销，之后可整组或逐张移出归档。</p><button className="m-secondary" type="button" disabled={busy} onClick={() => setSheet({ kind: 'folder', id: sheet.id })}>取消，返回管理</button><button className="m-primary" type="submit" disabled={busy || !deck || !count}>确认归档 {count} 张卡片</button></form>;
+      const empty = !store.cards.some(card => folders.has(card.deckId));
+      return <form onSubmit={event => { event.preventDefault(); void run(() => archiveFolder(sheet.id!)); }}><p>{empty ? `将归档空卡组“${deck?.name}”及其所有子卡组。` : `将归档“${deck?.name}”及所有子卡组中的 ${count} 张在学卡片，不再安排复习。`}</p><p className="m-note">完全归档的卡组将移到“已归档”，层级、原文、复习进度和历史记录仍保留。已归档卡片不受影响；操作后 3 秒内可撤销，之后可整组或逐张移出归档。</p><button className="m-secondary" type="button" disabled={busy} onClick={() => setSheet({ kind: 'folder', id: sheet.id })}>取消，返回管理</button><button className="m-primary" type="submit" disabled={busy || !deck || !count && !empty || archiveFolders.ids.has(sheet.id || '')}>{empty ? '确认归档空卡组' : `确认归档 ${count} 张卡片`}</button></form>;
     }
     if (sheet.kind === 'folder-restore') {
       const deck = store.decks.find(candidate => candidate.id === sheet.id);
       const folders = subtreeIds(store.decks, sheet.id || null);
       const count = store.cards.filter(card => card.archivedAt && folders.has(card.deckId)).length;
-      return <form onSubmit={event => { event.preventDefault(); void run(() => restoreArchiveFolder(sheet.id!)); }}><p>将“{deck?.name}”及所有子卡组中的 {count} 张归档卡片移出归档，重新进入在学卡片库。</p><p className="m-note">保留卡组层级、原文、已有排期和复习历史，不重新评分。包括之前已归档的卡片；其他卡组不受影响。</p><button className="m-secondary" type="button" disabled={busy} onClick={closeSheet}>取消</button><button className="m-primary" type="submit" disabled={busy || !deck || !count}>确认移出归档 {count} 张卡片</button></form>;
+      return <form onSubmit={event => { event.preventDefault(); void run(() => restoreArchiveFolder(sheet.id!)); }}><p>{count ? `将“${deck?.name}”及所有子卡组中的 ${count} 张归档卡片移出归档，重新进入在学卡片库。` : `将空卡组“${deck?.name}”及其子卡组移出归档，恢复到卡组目录。`}</p><p className="m-note">保留卡组层级、原文、已有排期和复习历史，不重新评分。包括之前已归档的卡片；其他卡组不受影响。</p><button className="m-secondary" type="button" disabled={busy} onClick={closeSheet}>取消</button><button className="m-primary" type="submit" disabled={busy || !deck || !archiveFolders.ids.has(sheet.id || '')}>{count ? `确认移出归档 ${count} 张卡片` : '确认移出归档空卡组'}</button></form>;
     }
     if (sheet.kind === 'review-plan') return <MemoryReviewPlanEditor onClose={() => setSheet(null)} onBusy={setBusy}/>;
     if (sheet.kind === 'help') return <div className="m-about"><p>#、##、### 是卡组；卡片块里的标题仍是正文。编号和时间可以先留空，导入时会校验重复与变化。</p><pre>{template}</pre><button onClick={() => downloadMemoryText(template, 'Recall-知识卡片示例.md')}>下载完整示例</button></div>;
@@ -725,11 +737,11 @@ export function MemoryWorkspace(): JSX.Element {
     }
   }}>
     <MemoryStatusEdge/>
-    {isLocalPreview() && <span className="sr-only">纸感编辑本地预览，数据仅保存在当前浏览器，未发布线上。</span>}
+    {isLocalPreview() && <span className="sr-only">{personalSync.available ? '妙搭个人资料库，确认连接后同步卡片、来源图片和进度。' : isMiaodaLearningPreview() ? '妙搭本机学习测试版，数据仅保存在当前浏览器，云同步尚未开放。' : '纸感编辑本地预览，数据仅保存在当前浏览器，未发布线上。'}</span>}
     <aside id="memory-drawer" className="memory-drawer" ref={drawerRef} data-visible={drawer || drawerVisible} aria-label="项目菜单" aria-hidden={mobile && !drawer}>
       <div className="m-drawer-brand"><strong>Recall</strong><span>记忆卡片</span><small>{titles[navRoute as keyof typeof titles]}</small></div>
       <nav>{navEntries.map(([target, label, Icon]) => <button key={target} aria-current={navRoute === target ? 'page' : undefined} onClick={() => { if (target === 'folders') setFolder(null); navigate(target); }}><span className="m-nav-icon"><Icon size={22}/></span>{target === 'folders' ? label : t(`memory.routes.${target}`, label)}</button>)}</nav>
-      <div className="m-drawer-footer"><button className="m-drawer-settings" type="button" onClick={() => navigate('settings')}><span className="m-nav-icon"><SlidersHorizontal size={22} aria-hidden="true"/></span><span>设置与数据</span></button><div className="m-drawer-info">{isLocalPreview() ? <p className="m-paper-preview-label" role="status">本地验收副本 · 云同步已关闭</p> : <MemoryCloudDrawerStatus/>}<PWAAppVersion compact disabled={busy} combined={!isLocalPreview()} beforeRefresh={synchronizeBeforePWARefresh}/></div></div>
+      <div className="m-drawer-footer"><button className="m-drawer-settings" type="button" onClick={() => navigate('settings')}><span className="m-nav-icon"><SlidersHorizontal size={22} aria-hidden="true"/></span><span>设置与数据</span></button><div className="m-drawer-info">{personalSync.available ? <MiaodaPersonalDrawer disabled={busy} onManage={() => { setDrawer(false); setSheet({ kind: 'cloud' }); }}/> : <>{isLocalPreview() ? <p className="m-paper-preview-label" role="status">本地验收副本 · 云同步已关闭</p> : <MemoryCloudDrawerStatus/>}<PWAAppVersion compact disabled={busy} combined={!isLocalPreview()} beforeRefresh={synchronizeBeforePWARefresh}/></>}</div></div>
     </aside>
     <div ref={shellRef} className={`memory-shell ${drawer ? 'is-open' : ''} ${route === 'read' ? 'is-reading' : ''} ${archiveUndo ? 'has-archive-undo' : ''}`}>
       <header className="memory-bar"><button ref={brand} className="m-brand" aria-expanded={drawer} aria-controls="memory-drawer" aria-label={drawer ? '关闭项目菜单' : '打开项目菜单'} disabled={busy} onClick={() => { if (sheet) { closeSheet(); return; } setDrawer(value => !value); }}><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M23 15h32c27 0 34 32 12 45l19 25H64L43 57v28H23z" fill="white"/><path d="M54 23c-1 10-4 14-14 15 10 1 13 5 14 15 1-10 4-14 14-15-10-1-13-5-14-15" fill="currentColor"/></svg></button>{route === 'folders' && folder ? <button className="m-context" onClick={() => setSheet({ kind: 'path' })} aria-label={`查看卡组路径：${shellTitle}`}>{shellTitle}</button> : <div className="m-context">{shellTitle}</div>}{hasTopAction ? <button className="m-top-action" aria-label={topLabel} disabled={busy || drawer || !!sheet} onClick={topAction}>{route === 'read' ? '退出' : topBack ? <ArrowLeft size={20}/> : route === 'settings' ? <MoreHorizontal size={20}/> : <Plus size={22}/>}</button> : <span className="m-top-action-placeholder" aria-hidden="true"/>}</header>
@@ -765,19 +777,20 @@ export function MemoryWorkspace(): JSX.Element {
           {route === 'import' && <>
             {(plan || receipt) && <div className="m-step">选择 / 校验 / 完成</div>}
             {plan && <MediaPackagePreview assets={importAssets}/>}
-            {!plan && !receipt && <MemoryImportChoices busy={busy} onFile={file => { void loadFile(file); }} onWeread={() => { setLocalWereadFile(null); navigate('weread'); }} onManual={() => setSheet({ kind: 'card' })} onOther={() => navigate('compat')} onHelp={() => setSheet({ kind: 'help' })} onExample={() => downloadMemoryText(template, 'Recall-知识卡片示例.md')}/>}
+            {!plan && !receipt && <MemoryImportChoices busy={busy} onFile={file => { void loadFile(file); }} onWeread={isMiaodaLearningPreview() && !wereadCapability.available ? undefined : () => { setLocalWereadFile(null); navigate('weread'); }} onManual={() => setSheet({ kind: 'card' })} onOther={() => navigate('compat')} onHelp={() => setSheet({ kind: 'help' })} onExample={() => downloadMemoryText(template, 'Recall-知识卡片示例.md')}/>}
+            {!plan && !receipt && isMiaodaLearningPreview() && wereadCapability.phase !== 'disabled' && !wereadCapability.available && <p className="m-note" role="status">{wereadCapability.phase === 'loading' ? '正在检查微信读书授权…' : wereadCapability.error}</p>}
             {plan && <>
-              <section className="m-panel"><strong>{filename}</strong><MemoryFolderSelector decks={store.decks} value={plan.parentId || ''} label="导入到" rootLabel="根目录" disabled={busy} onChange={id => { try { setPlan(planMemoryImport(useRecallStore.getState(), plan.document, id || null)); setSelected(new Set()); setError(''); } catch (failure) { setError(String(failure)); } }}/></section>
+              <section className="m-panel"><strong>{filename}</strong><MemoryFolderSelector decks={activeDecks} value={plan.parentId || ''} label="导入到" rootLabel="根目录" missingLabel="请选择目录" disabled={busy} onChange={id => { try { setPlan(planMemoryImport(useRecallStore.getState(), plan.document, id || null)); setSelected(new Set()); setError(''); } catch (failure) { setError(String(failure)); } }}/>{importTargetUnavailable && <p className="m-note" role="alert">导入位置已归档或删除，请重新选择目录。</p>}</section>
               <p className="m-counts">新增 {plan.rows.filter(row => row.status === 'new').length} · 重复 {plan.rows.filter(row => row.status === 'duplicate').length} · 变更 {plan.rows.filter(row => row.status === 'change').length}</p>
               {plan.rows.map(row => <article key={row.entry.id} className="m-panel"><div className="m-spread"><strong>{row.status === 'new' ? '新增' : row.status === 'duplicate' ? '跳过重复' : '检测到变化'}</strong>{row.status === 'change' && <label className="m-check"><input type="checkbox" checked={selected.has(row.entry.id)} onChange={event => setSelected(previous => { const next = new Set(previous); if (event.target.checked) next.add(row.entry.id); else next.delete(row.entry.id); return next; })}/>更新</label>}</div><small>{row.entry.path.join(' / ')}</small><h3>{row.entry.front || row.entry.bookTitle || '阅读摘录'}</h3><p>{row.entry.back.slice(0, 240)}</p>{row.existing && row.status === 'change' && <details><summary>查看差异</summary><p>当前：</p><pre>{row.existing.front + '\n' + row.existing.back}</pre><p>文件：</p><pre>{row.entry.front + '\n' + row.entry.back}</pre><small>保留首次导入时间、归档状态与复习进度。</small></details>}</article>)}
-              {error.includes('重新校验') && <button className="m-secondary" onClick={() => { setPlan(planMemoryImport(useRecallStore.getState(), plan.document, plan.parentId)); setSelected(new Set()); setError(''); }}>重新校验</button>}
+              {error.includes('重新校验') && !importTargetUnavailable && <button className="m-secondary" onClick={() => { setPlan(planMemoryImport(useRecallStore.getState(), plan.document, plan.parentId)); setSelected(new Set()); setError(''); }}>重新校验</button>}
             </>}
             {receipt && <MemoryImportCompletion source={`${importFormat} · ${filename}`} added={receipt.added} updated={receipt.updated} skipped={receipt.skipped} locations={memoryImportLocations(store.decks, receipt.deckIds)} onView={() => { const destination = receipt.deckIds.length === 1 ? receipt.deckIds[0] : receipt.parentId; setReceipt(null); openFolder(store.decks.some(deck => deck.id === destination) ? destination : null); }} onContinue={() => setReceipt(null)}/>}
           </>}
-          {route === 'read' && <MemoryReader key={readerKey} ids={queue} scopeIds={reviewScope} onQueueChange={setQueue} onContinue={completedIds => read(store.cards.filter(card => reviewScope.includes(card.id) && !completedIds.includes(card.id)), true)} initialIndex={index} reviewMode={reviewMode} onEdit={id => setSheet({ kind: 'card', id })} onOptions={id => setSheet({ kind: 'reader-options', id })} onArchive={archiveCard} restoreRequest={restoreRequest} archiveNotice={archiveNotice} fontSize={font} onIndex={setIndex} onExit={exitReading} onBusy={setBusy} resumeState={resumeState} onResumeChange={onReaderResume}/>}
+          {route === 'read' && <MemoryReader key={readerKey} ids={queue} scopeIds={reviewScope} onQueueChange={setQueue} onContinue={completedIds => read(store.cards.filter(card => reviewScope.includes(card.id) && !completedIds.includes(card.id)), true)} initialIndex={index} reviewMode={reviewMode} defaultBrowseScoring={isMiaodaLearningPreview()} onEdit={id => setSheet({ kind: 'card', id })} onOptions={id => setSheet({ kind: 'reader-options', id })} onArchive={archiveCard} restoreRequest={restoreRequest} archiveNotice={archiveNotice} fontSize={font} onIndex={setIndex} onExit={exitReading} onBusy={setBusy} resumeState={resumeState} onResumeChange={onReaderResume}/>}
           </Suspense>
         </main>
-        {route === 'import' && plan && <MemoryImportFooter busy={busy} onCancel={() => { setPlan(null); setImportAssets([]); }} onConfirm={() => void confirmImport()}/>}
+        {route === 'import' && plan && <MemoryImportFooter busy={busy} confirmDisabled={importTargetUnavailable} onCancel={() => { setPlan(null); setImportAssets([]); }} onConfirm={() => void confirmImport()}/>}
         {route === 'home' && <MemoryPaperHomeDock busy={busy} onStart={() => { setDrawer(false); setSheet({ kind: 'review-deck' }); }}/>}
         {['folders', 'cards'].includes(route) && libraryPool.length > 0 && <div className="m-library-dock"><button className="m-secondary" disabled={!matching.length || busy} onClick={() => read(matching, false)}>浏览<span>{matching.length}</span></button><button className="m-primary" disabled={!libraryRecommendation.cards.length || busy} onClick={() => read(matching, true)}>本轮温习<span>{libraryRecommendation.cards.length}</span><ChevronRight size={16}/></button></div>}
       </div>

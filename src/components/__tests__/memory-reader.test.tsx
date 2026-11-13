@@ -49,6 +49,23 @@ function watchScroll(panel: HTMLElement, initial = 500) {
 }
 
 describe('MemoryReader reading position', () => {
+  it('allows Miaoda browsing to show four ratings by default without writing before a rating', async () => {
+    const before = useRecallStore.getState().cards;
+    const { active } = reader({ reviewMode: false, defaultBrowseScoring: true });
+    fireEvent.click(screen.getByRole('button', { name: '显示答案' }));
+    for (const rating of ['忘记了', '有点难', '记住了', '很熟悉']) expect(screen.getByRole('button', { name: rating })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: '开启评分（更新排期）' })).toBeNull();
+    active().scrollTop = 240;
+    fireEvent.scroll(active());
+    expect(commitMemory).not.toHaveBeenCalled();
+    expect(useRecallStore.getState().cards).toEqual(before);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '记住了' })); });
+    expect(useRecallStore.getState().reviewLogs).toHaveLength(1);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /撤销/ })); });
+    expect(useRecallStore.getState().reviewLogs).toHaveLength(0);
+    expect(useRecallStore.getState().cards).toEqual(before.map(card => card.id === cards[0].id ? { ...card, updatedAt: expect.any(String) } : card));
+  });
+
   it('only resets when the answer is revealed for the first time', () => {
     const { active } = reader();
     active().scrollTop = 250;

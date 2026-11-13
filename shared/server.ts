@@ -1,3 +1,5 @@
+import type { MediaRepository } from './server-media-repository';
+
 export interface D1Result<Row = Record<string, unknown>> {
   success: boolean;
   results: Row[];
@@ -12,12 +14,15 @@ export interface D1Statement {
 }
 
 export interface RecallDatabase {
+  readonly dialect?: 'sqlite' | 'postgresql';
   prepare(query: string): D1Statement;
   batch<Row = Record<string, unknown>>(statements: D1Statement[]): Promise<D1Result<Row>[]>;
 }
 
 export interface ServerEnv {
   DB: RecallDatabase;
+  MEDIA?: MediaRepository;
+  CLIENT_IP?: string;
   RECALL_BOOTSTRAP_CODE?: string;
   RECALL_SPACE_ID?: string;
   WEREAD_API_KEY?: string;

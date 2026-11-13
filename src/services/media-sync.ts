@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { useRecallStore } from '@/stores/recall-store';
 import { localMedia, saveMedia, downloadMedia } from '@/services/media-storage';
 import { mediaRefs } from '../../shared/media';
+import { backendFetch } from '../../shared/client-http';
 
 export const useMediaSync = create<{ pending: number; running: boolean; error: string; completed: number }>(() => ({ pending: 0, running: false, error: '', completed: 0 }));
 let active: Promise<void> | undefined;
@@ -27,8 +28,8 @@ export function synchronizeMedia(space: string): Promise<void> {
           }
           if (asset.uploadedSpace !== currentSpace) {
             const options = { credentials: 'same-origin' as const, cache: 'no-store' as const, signal: AbortSignal.timeout(20000) };
-            let response = await fetch(`/api/media/${id}`, { ...options, method: 'HEAD' });
-            if (response.status === 404 && spaceId === currentSpace) response = await fetch(`/api/media/${id}`, { ...options, signal: AbortSignal.timeout(20000), method: 'PUT', headers: { 'Content-Type': asset.mime }, body: asset.bytes });
+            let response = await backendFetch(`/api/media/${id}`, { ...options, method: 'HEAD' });
+            if (response.status === 404 && spaceId === currentSpace) response = await backendFetch(`/api/media/${id}`, { ...options, signal: AbortSignal.timeout(20000), method: 'PUT', headers: { 'Content-Type': asset.mime }, body: asset.bytes });
             if (response.status === 401) { pauseMediaSync(); throw new Error('图片同步需要重新授权，本机图片仍保留'); }
             if (!response.ok) throw new Error(`图片同步未完成 (${response.status})，本机图片仍保留`);
             if (spaceId === currentSpace) await saveMedia([asset], currentSpace);

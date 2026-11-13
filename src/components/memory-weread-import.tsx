@@ -14,6 +14,7 @@ import { createMergeSession } from '@/lib/weread-merge-session';
 import { MemoryImportCompletion } from '@/components/memory-import-completion';
 import { memoryImportLocations } from '@/lib/memory-folders';
 import { isLocalPreview } from '@/lib/local-preview';
+import { useMiaodaWeread } from '@/services/miaoda-weread';
 
 export interface MemoryWereadImportProps {
   onClose: () => void;
@@ -36,16 +37,25 @@ const originalSample = {
 };
 
 export function MemoryWereadImport(props: MemoryWereadImportProps): JSX.Element {
-  if (isLocalPreview()) return <MemoryWereadManualImport {...props}/>;
+  const capability = useMiaodaWeread();
+  if (isLocalPreview() && capability.phase === 'loading') return <section aria-label="微信读书导入">
+    <p role="status">正在检查微信读书授权…</p>
+    <button className="m-secondary" onClick={props.onClose}>返回导入</button>
+  </section>;
+  if (isLocalPreview() && !capability.available) return <>
+    {capability.phase !== 'disabled' && <p role="status">{capability.error}</p>}
+    <MemoryWereadManualImport {...props}/>
+  </>;
   return <MemoryWereadOnlineImport {...props}/>;
 }
-export function MemoryWereadManualImport({ onClose, onComplete, onBusy, initialFile }: MemoryWereadImportProps & { initialFile?: File }): JSX.Element {
+export function MemoryWereadManualImport({ onClose, onComplete, onBusy, initialFile, initialDrafts, manualOnly = false }: MemoryWereadImportProps & { initialFile?: File; initialDrafts?: WereadDraft[]; manualOnly?: boolean }): JSX.Element {
   const { t } = useTranslation();
   const localPreview = isLocalPreview();
-  const [stage, setStage] = useState<Stage>('load');
-  const [books, setBooks] = useState<WereadBook[]>([]);
-  const [selection, setSelection] = useState<Set<string>>(new Set());
-  const [drafts, setDrafts] = useState<WereadDraft[]>([]);
+  const aiEnabled = !localPreview && !manualOnly;
+  const [stage, setStage] = useState<Stage>(initialDrafts ? 'drafts' : 'load');
+  const [books, setBooks] = useState<WereadBook[]>(() => [...new Map((initialDrafts || []).map(draft => [draft.book.bookId, { ...draft.book, highlights: initialDrafts!.filter(item => item.book.bookId === draft.book.bookId).map(item => item.highlight) }])).values()]);
+  const [selection, setSelection] = useState<Set<string>>(() => new Set(initialDrafts?.map(draft => draft.book.bookId)));
+  const [drafts, setDrafts] = useState<WereadDraft[]>(initialDrafts || []);
   const [plan, setPlan] = useState<WereadImportPlan | null>(null);
   const [updates, setUpdates] = useState<Set<string>>(new Set());
   const [receipt, setReceipt] = useState<WereadImportResult | null>(null);
@@ -187,7 +197,7 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy, initialF
     setPlan(null);
   }
   async function generate(): Promise<void> {
-    if (busy.current || lock.current || demo) return;
+    if (busy.current || lock.current || demo || !aiEnabled) return;
     const candidates = drafts.filter(draft => draft.include && draft.kind !== 'excerpt' && !draft.originalUnchanged
       && !draft.highlight.question?.trim() && !aiStatus[draft.id]?.startsWith('AI 已生成') && !aiStatus[draft.id]?.startsWith('手动'));
     if (!candidates.length) { setProgress('没有需要生成的问题：已有问题和手动编辑均保留'); return; }
@@ -240,7 +250,8 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy, initialF
       if (mounted.current) { setPending(false); reportBusy(false); }
     }
   }
-  const notice = localPreview ? '本地隔离预览不连接微信读书或 AI 服务。可导入划线导出文件，使用已有问题或手动编辑；原文与进度保留。'
+  const notice = manualOnly ? '手动整理所选划线，不调用 AI。使用已有问题、手动编辑或保留摘录；检查变化后明确确认才会导入，原文与进度保留。'
+    : localPreview ? '本地隔离预览不连接微信读书或 AI 服务。可导入划线导出文件，使用已有问题或手动编辑；原文与进度保留。'
     : demo ? t('memory.weread.demoNotice', '原创预置书架和问题，仅用于流程演示，不是你的微信读书数据，也不是 AI 输出。')
     : '可在线连接真实微信读书笔记本，或载入本地文件。AI 逐条生成问题，划线原文始终作为答案。密钥仅在服务端，必须先授权当前设备。';
   const statusLabel = (status: 'new' | 'change' | 'duplicate') => status === 'new' ? t('memory.weread.newCard', '新增卡片') : status === 'change' ? t('memory.weread.changedCard', '有变化，默认保留已有内容') : t('memory.weread.duplicateCard', '重复，保留已有卡片');
@@ -255,7 +266,7 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy, initialF
   return <section aria-label={t('memory.weread.importTitle', '微信读书 Skill 导出导入')} aria-busy={loading || pending}>
     <header className="m-weread-heading">
       <h2>{t('memory.weread.importTitle', '微信读书 Skill 导出导入')}</h2>
-      <p>{localPreview ? '载入文件 → 选书与划线 → 手动编辑 → 检查变化 → 确认导入' : '连接或载入 → 选书与划线 → AI 问题 / 手动编辑 → 检查变化 → 确认导入'}</p>
+      <p>{manualOnly ? '所选划线 → 手动编辑 / 摘录 → 检查变化 → 确认导入' : localPreview ? '载入文件 → 选书与划线 → 手动编辑 → 检查变化 → 确认导入' : '连接或载入 → 选书与划线 → AI 问题 / 手动编辑 → 检查变化 → 确认导入'}</p>
     </header>
     <p className="m-source-notice">{notice}</p>
     <p>书籍默认保存在“微信读书”根卡组下，每本书一个子卡组。章节只作来源信息；原文不改写，摘要单独保留。</p>
@@ -263,7 +274,7 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy, initialF
     <fieldset disabled={pending} style={{ minWidth: 0, border: 0, padding: 0, margin: 0 }}>
       {(stage === 'load' || stage === 'books') && <>
         <div className="m-panel">
-          {!localPreview && <><button type="button" className="m-primary" disabled={loading} onClick={() => void connect()}>连接微信读书</button>
+          {aiEnabled && <><button type="button" className="m-primary" disabled={loading} onClick={() => void connect()}>连接微信读书</button>
           <small>读取你的有笔记书籍列表；首版不导入想法、书签或有声书。点击 AI 生成时，仅所选划线会发送到火山模型。</small></>}
           <label>{t('memory.weread.loadFile', '载入本地 Skill 导出文件')}
             <input type="file" accept=".json,application/json" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; void load(file); }}/>
@@ -288,9 +299,9 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy, initialF
         </>}
       </>}
       {stage === 'drafts' && <>
-        <p className="m-source-notice">{localPreview ? '已有问题保留，也可以手动编辑或仅保留摘录。确认前不会导入；划线原文保持不变。' : '每条划线生成一个问题；已有问题和手动编辑保留。AI 可能出错，请核对；默认回忆任务不是 AI 输出。停止或失败时保留已生成草稿，不自动导入。'}</p>
-        {!demo && !localPreview && <div className="wr-merge-choice"><strong>也可以按关联合并新划线</strong><p>需要 chapterIdx 与 range 定位信息。先分组预览，再确认导入；不会重组旧卡片。</p><button className="m-secondary" disabled={generating || !!mergeError} onClick={() => setMerging(true)}>智能合并划线</button>{mergeError && <small>{mergeError}。仍可逐条导入。</small>}</div>}
-        {!demo && !localPreview && <div className="m-panel">
+        <p className="m-source-notice">{!aiEnabled ? '已有问题保留，也可以手动编辑或仅保留摘录。确认前不会导入；划线原文保持不变。' : '每条划线生成一个问题；已有问题和手动编辑保留。AI 可能出错，请核对；默认回忆任务不是 AI 输出。停止或失败时保留已生成草稿，不自动导入。'}</p>
+        {!demo && aiEnabled && <div className="wr-merge-choice"><strong>也可以按关联合并新划线</strong><p>需要 chapterIdx 与 range 定位信息。先分组预览，再确认导入；不会重组旧卡片。</p><button className="m-secondary" disabled={generating || !!mergeError} onClick={() => setMerging(true)}>智能合并划线</button>{mergeError && <small>{mergeError}。仍可逐条导入。</small>}</div>}
+        {!demo && aiEnabled && <div className="m-panel">
           <label><input type="checkbox" disabled={generating} checked={aiSummary} onChange={event => setAiSummary(event.target.checked)}/>同时生成辅助摘要（不是原文答案）</label>
           <button type="button" disabled={generating} onClick={() => void generate()}>AI 生成所选问题</button>
           {generating && <button type="button" onClick={() => controller.current?.abort()}>停止生成</button>}
@@ -314,10 +325,6 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy, initialF
           <div className="m-original-highlight"><small>{t('memory.weread.originalBack', '背面 · 划线原文，保持不变')}</small><p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{draft.highlight.markText}</p></div>
           {draft.aiSummary && <aside><small>AI / 导入辅助摘要（非划线原文，不代替答案）</small><p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{draft.aiSummary}</p></aside>}
         </article>)}
-        <div className="m-actions m-import-footer">
-          <button type="button" disabled={generating} onClick={() => { if (!lock.current) setStage('books'); }}>{t('memory.weread.backToBooks', '返回选书')}</button>
-          <button type="button" className="m-primary" onClick={preview} disabled={generating || !drafts.some(draft => draft.include)}>{t('memory.weread.previewChanges', '检查导入变化')}</button>
-        </div>
       </>}
       {stage === 'changes' && plan && <>
         <p>{t('memory.weread.previewCounts', { defaultValue: '新增 {{added}}，变化 {{changed}}，重复 {{duplicates}}', added: plan.rows.filter(row => row.status === 'new').length, changed: plan.rows.filter(row => row.status === 'change').length, duplicates: plan.rows.filter(row => row.status === 'duplicate').length })}</p>
@@ -341,12 +348,16 @@ export function MemoryWereadManualImport({ onClose, onComplete, onBusy, initialF
             }}/>{t('memory.weread.explicitUpdate', '明确更新这张卡片的内容与来源')}</label>
           </>}
         </article>)}
-        <div className="m-actions m-import-footer">
-          <button type="button" onClick={() => { if (!lock.current) { setPlan(null); setStage('drafts'); } }}>{t('memory.weread.backToEdit', '返回编辑 / 重新检查')}</button>
-          <button type="button" className="m-primary" disabled={pending} onClick={() => void confirm()}>{pending ? t('memory.weread.committing', '正在保存，请勿离开…') : t('memory.weread.confirmImport', '确认导入')}</button>
-        </div>
       </>}
-      <div className="m-actions"><button type="button" disabled={pending || loading || generating} onClick={close}>{t('memory.weread.close', '返回导入')}</button></div>
     </fieldset>
+    {stage === 'drafts' && <div className="m-actions m-import-footer">
+      <button type="button" disabled={pending || generating} onClick={() => { if (!lock.current) setStage('books'); }}>{t('memory.weread.backToBooks', '返回选书')}</button>
+      <button type="button" className="m-primary" onClick={preview} disabled={pending || generating || !drafts.some(draft => draft.include)}>{t('memory.weread.previewChanges', '检查导入变化')}</button>
+    </div>}
+    {stage === 'changes' && plan && <div className="m-actions m-import-footer">
+      <button type="button" disabled={pending} onClick={() => { if (!lock.current) { setPlan(null); setStage('drafts'); } }}>{t('memory.weread.backToEdit', '返回编辑 / 重新检查')}</button>
+      <button type="button" className="m-primary" disabled={pending} onClick={() => void confirm()}>{pending ? t('memory.weread.committing', '正在保存，请勿离开…') : t('memory.weread.confirmImport', '确认导入')}</button>
+    </div>}
+    <div className="m-actions"><button type="button" disabled={pending || loading || generating} onClick={close}>{t('memory.weread.close', '返回导入')}</button></div>
   </section>;
 }

@@ -7,6 +7,16 @@ function actions() {
 }
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
+it('hides an unavailable WeRead entry without removing file import or manual actions', () => {
+  const handlers = actions();
+  render(<MemoryImportChoices {...handlers} onWeread={undefined}/>);
+  expect(screen.getByRole('group', { name: '常用导入' }).querySelectorAll('button')).toHaveLength(2);
+  expect(screen.queryByRole('button', { name: '导入划线' })).toBeNull();
+  expect(screen.getByRole('button', { name: '选择 Markdown 文件' })).toBeDefined();
+  expect(screen.getByRole('button', { name: '选择带图卡片文件' })).toBeDefined();
+  expect(handlers.onFile).not.toHaveBeenCalled();
+});
+
 it('presents exactly three equal primary sources and collapses infrequent actions', () => {
   render(<MemoryImportChoices {...actions()}/>);
   expect(screen.getByRole('group', { name: '常用导入' }).querySelectorAll('button')).toHaveLength(3);

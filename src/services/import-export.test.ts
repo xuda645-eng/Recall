@@ -69,6 +69,18 @@ const snapshot: RecallStateSnapshot = {
 };
 
 describe("import/export", () => {
+  it('round-trips optional deck archive metadata without changing legacy decks', () => {
+    const archivedAt = '2026-11-13T00:00:00.000Z';
+    const archived = { ...snapshot, decks: [{ ...snapshot.decks[0], archivedAt }], cards: [] };
+    expect(parseImportPayload(JSON.stringify(buildExportPayload(archived))).decks).toEqual(archived.decks);
+    expect(parseImportPayload(JSON.stringify(buildExportPayload(snapshot))).decks).toEqual(snapshot.decks);
+  });
+
+  it.each([null, '', 'invalid', 123, false, {}, []])('rejects invalid deck archive metadata %j at the import boundary', archivedAt => {
+    const payload = { ...buildExportPayload(snapshot), decks: [{ ...snapshot.decks[0], archivedAt }] };
+    expect(() => parseImportPayload(JSON.stringify(payload))).toThrow('Invalid import file');
+  });
+
   it('round-trips ordered grouped originals, IDs and archived progress without allowing singleton reimport', async () => {
     const empty = { ...snapshot, cards: [], decks: [], studySessions: [], reviewLogs: [] };
     const book = { bookId: 'roundtrip-book', title: 'Original roundtrip book' };

@@ -7,6 +7,7 @@ import { validateImportSnapshot } from '@/services/repository';
 import { acknowledgeMutation, backupKey, pendingChanges, readJournal, reconcileCloud, type CloudJournal } from '@/services/cloud-cache';
 import { applyEntities, type CloudState, type DeviceSession, type TrustedDevice } from '../../shared/cloud';
 import { pauseMediaSync, synchronizeMedia } from '@/services/media-sync';
+import { backendFetch } from '../../shared/client-http';
 
 type SyncPhase = 'checking' | 'local' | 'unauthorized' | 'syncing' | 'synced' | 'offline' | 'pending' | 'conflict' | 'error';
 interface CloudStatus {
@@ -22,7 +23,7 @@ const sessionKey = 'recall.cloud.session.v1';
 class ApiError extends Error { constructor(message: string, readonly status: number) { super(message); } }
 
 async function api<Result>(path: string, method = 'GET', body?: unknown): Promise<Result> {
-  const response = await fetch(`/api/${path}`, {
+  const response = await backendFetch(`/api/${path}`, {
     method, credentials: 'same-origin', cache: 'no-store',
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),

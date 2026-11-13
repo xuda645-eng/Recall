@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { createSeedSnapshot } from '@/data/seed';
-import { archiveMemoryCard, archiveMemoryFolder, deleteArchivedMemoryCard, deleteArchivedMemoryFolder, memoryArchiveFolderState, restoreMemoryCard, restoreMemoryCards, restoreMemoryFolder } from './memory-archive';
+import { archiveMemoryCard, archiveMemoryFolder, deleteArchivedMemoryCard, deleteArchivedMemoryFolder, memoryArchiveFolderState, restoreMemoryCard, restoreMemoryCards, restoreMemoryFolder, undoMemoryFolderArchive } from './memory-archive';
 import { pendingChanges, type CloudJournal } from '@/services/cloud-cache';
-import { snapshotEntities } from '../../shared/cloud';
+import { applyEntities, snapshotEntities } from '../../shared/cloud';
 import { isCardDue, isCardDueToday } from './stats';
 import { getDueCards } from '@/services/fsrs-engine';
+import { migrateFolders } from './memory-folders';
+import { buildExportPayload, mergeImportPayload, parseImportPayload } from '@/services/import-export';
+import { validateImportSnapshot } from '@/services/repository';
+import { validateEntity } from '../../shared/server-validation';
 
 describe('memory archive lifecycle', () => {
   it('archives without changing content, review fields or history', () => {
@@ -56,6 +60,7 @@ describe('folder archive lifecycle', () => {
     const before = fixture();
     const result = archiveMemoryFolder(before, 'root', archivedAt);
     expect(result.ids).toEqual(['root', 'child', 'deep']);
+    expect(result.deckIds).toEqual([]);
     expect(result.snapshot.decks).toBe(before.decks);
     expect(result.snapshot.reviewLogs).toBe(before.reviewLogs);
     expect(result.snapshot.studySessions).toBe(before.studySessions);
@@ -66,6 +71,7 @@ describe('folder archive lifecycle', () => {
     expect(getDueCards(result.snapshot.cards).map(card => card.id)).toEqual(['outside']);
     expect(before.cards[0].archivedAt).toBeUndefined();
     expect(restoreMemoryCards(result.snapshot, result.ids, archivedAt)).toEqual(before);
+    expect(undoMemoryFolderArchive(result.snapshot, result.ids, result.deckIds, archivedAt)).toEqual(before);
   });
   it('archiving a child does not include parents or siblings', () => {
     const result = archiveMemoryFolder(fixture(), 'child', archivedAt);
@@ -147,7 +153,6 @@ describe('folder archive lifecycle', () => {
     expect(() => archiveMemoryFolder(before, 'root', 'invalid')).toThrow('归档时间无效');
     const result = archiveMemoryFolder(before, 'root', archivedAt);
     expect(() => archiveMemoryFolder(result.snapshot, 'root', archivedAt)).toThrow('没有在学卡片');
-    expect(() => archiveMemoryFolder({ ...before, cards: [] }, 'root', archivedAt)).toThrow('没有在学卡片');
   });
   it('undo preserves edits and review updates made after the operation', () => {
     const before = fixture();
@@ -167,6 +172,187 @@ describe('folder archive lifecycle', () => {
       expect(changed).toEqual(before);
     }
     expect(() => restoreMemoryCards(result.snapshot, [...result.ids, 'missing'], archivedAt)).toThrow('状态已变化');
+  });
+});
+
+describe('empty folder archive lifecycle', () => {
+  const archivedAt = '2026-11-13T00:00:00.000Z';
+  const previousAt = '2026-11-12T00:00:00.000Z';
+  function fixture() {
+    const seed = createSeedSnapshot();
+    const decks = [
+      { ...seed.decks[0], id: 'root', name: 'Root', parentId: null },
+      { ...seed.decks[0], id: 'deep', name: 'Deep', parentId: 'child' },
+      { ...seed.decks[0], id: 'child', name: 'Child', parentId: 'root' },
+      { ...seed.decks[0], id: 'sibling', name: 'Sibling', parentId: 'root' },
+      { ...seed.decks[0], id: 'outside', name: 'Outside', parentId: null },
+    ];
+    return { ...seed, decks, cards: [], reviewLogs: [], studySessions: [] };
+  }
+  it('marks an entirely empty subtree without changing content, history, or the input', () => {
+    const before = fixture();
+    const original = structuredClone(before);
+    expect(memoryArchiveFolderState(before.decks, before.cards).ids.size).toBe(0);
+    const result = archiveMemoryFolder(before, 'root', archivedAt);
+    expect(result.ids).toEqual([]);
+    expect(result.deckIds).toEqual(['root', 'deep', 'child', 'sibling']);
+    expect(result.snapshot.decks).toEqual(before.decks.map(deck => deck.id === 'outside' ? deck : { ...deck, archivedAt }));
+    expect(result.snapshot.cards).toBe(before.cards);
+    expect(result.snapshot.reviewLogs).toBe(before.reviewLogs);
+    expect(result.snapshot.studySessions).toBe(before.studySessions);
+    expect(result.snapshot.settings).toBe(before.settings);
+    const state = memoryArchiveFolderState(result.snapshot.decks, result.snapshot.cards);
+    expect([...state.ids].sort()).toEqual(['child', 'deep', 'root', 'sibling']);
+    expect(state.times.get('deep')).toBe(archivedAt);
+    expect(before).toEqual(original);
+    expect(() => archiveMemoryFolder(result.snapshot, 'root', archivedAt)).toThrow('没有在学卡片');
+    expect(undoMemoryFolderArchive(result.snapshot, result.ids, result.deckIds, archivedAt)).toEqual(before);
+    const restored = restoreMemoryFolder(result.snapshot, 'root');
+    expect(restored.ids).toEqual([]);
+    expect(restored.deckIds).toEqual(result.deckIds);
+    expect(restored.snapshot).toEqual(before);
+    expect(memoryArchiveFolderState(restored.snapshot.decks, restored.snapshot.cards).ids.size).toBe(0);
+  });
+  it('keeps unmarked empty parents and siblings visible when archiving only a child', () => {
+    const before = fixture();
+    const result = archiveMemoryFolder(before, 'child', archivedAt);
+    expect(result.deckIds).toEqual(['deep', 'child']);
+    expect([...memoryArchiveFolderState(result.snapshot.decks, []).ids].sort()).toEqual(['child', 'deep']);
+    expect(result.snapshot.decks[0]).toBe(before.decks[0]);
+    expect(result.snapshot.decks[3]).toBe(before.decks[3]);
+    expect(restoreMemoryFolder(result.snapshot, 'child').snapshot).toEqual(before);
+  });
+  it('restores an empty child with visible ancestors while keeping archived siblings', () => {
+    const before = fixture();
+    const archived = archiveMemoryFolder(before, 'root', archivedAt).snapshot;
+    const result = restoreMemoryFolder(archived, 'child');
+    expect(result.deckIds).toEqual(['deep', 'child']);
+    expect(result.snapshot.decks[0]).toBe(archived.decks[0]);
+    expect(result.snapshot.decks[3]).toBe(archived.decks[3]);
+    expect([...memoryArchiveFolderState(result.snapshot.decks, []).ids]).toEqual(['sibling']);
+    expect(() => deleteArchivedMemoryFolder(result.snapshot, 'root', { deckIds: ['root', 'deep', 'child', 'sibling'], cardIds: [] })).toThrow('不在归档中');
+    expect(restoreMemoryFolder(result.snapshot, 'root').snapshot).toEqual(before);
+    expect(() => restoreMemoryFolder(before, 'root')).toThrow('没有归档卡片');
+  });
+  it('does not overwrite previous empty archives and undoes only newly added markers', () => {
+    const before = fixture();
+    before.decks[1] = { ...before.decks[1], archivedAt: previousAt };
+    const result = archiveMemoryFolder(before, 'root', archivedAt);
+    expect(result.deckIds).toEqual(['root', 'child', 'sibling']);
+    expect(result.snapshot.decks[1]).toBe(before.decks[1]);
+    expect(undoMemoryFolderArchive(result.snapshot, result.ids, result.deckIds, archivedAt)).toEqual(before);
+    expect(restoreMemoryFolder(result.snapshot, 'root').snapshot).toEqual(fixture());
+  });
+  it('allows completing a partially restored empty archive without replacing old markers', () => {
+    const first = archiveMemoryFolder(fixture(), 'root', previousAt);
+    const partial = restoreMemoryFolder(first.snapshot, 'child').snapshot;
+    const second = archiveMemoryFolder(partial, 'root', archivedAt);
+    expect(second.deckIds).toEqual(['deep', 'child']);
+    const state = memoryArchiveFolderState(second.snapshot.decks, []);
+    expect([...state.ids].sort()).toEqual(['child', 'deep', 'root', 'sibling']);
+    expect(state.times.get('root')).toBe(archivedAt);
+    expect(undoMemoryFolderArchive(second.snapshot, second.ids, second.deckIds, archivedAt)).toEqual(partial);
+  });
+  it('supports empty branches in a tree with active cards without marking the nonempty ancestor', () => {
+    const seed = createSeedSnapshot();
+    const before = { ...fixture(), cards: [{ ...seed.cards[0], id: 'active', deckId: 'sibling' }] };
+    const child = archiveMemoryFolder(before, 'child', previousAt);
+    expect(child.ids).toEqual([]);
+    expect([...memoryArchiveFolderState(child.snapshot.decks, child.snapshot.cards).ids].sort()).toEqual(['child', 'deep']);
+    const root = archiveMemoryFolder(child.snapshot, 'root', archivedAt);
+    expect(root.ids).toEqual(['active']);
+    expect(root.deckIds).toEqual([]);
+    expect(root.snapshot.decks).toBe(child.snapshot.decks);
+    expect(restoreMemoryCards(root.snapshot, root.ids, archivedAt)).toEqual(child.snapshot);
+    const restoredCard = restoreMemoryCard(root.snapshot, 'active');
+    expect([...memoryArchiveFolderState(restoredCard.decks, restoredCard.cards).ids].sort()).toEqual(['child', 'deep']);
+    const restoredRoot = restoreMemoryFolder(root.snapshot, 'root');
+    expect(restoredRoot.ids).toEqual(['active']);
+    expect(restoredRoot.deckIds).toEqual(['deep', 'child']);
+    expect(restoredRoot.snapshot).toEqual(before);
+  });
+  it('makes new active cards and unmarked empty children visible despite existing markers', () => {
+    const result = archiveMemoryFolder(fixture(), 'root', archivedAt);
+    const seed = createSeedSnapshot();
+    const withCard = { ...result.snapshot, cards: [{ ...seed.cards[0], id: 'new', deckId: 'deep' }] };
+    expect([...memoryArchiveFolderState(withCard.decks, withCard.cards).ids]).toEqual(['sibling']);
+    const withChild = { ...result.snapshot, decks: [...result.snapshot.decks, { ...fixture().decks[1], id: 'new-child', parentId: 'deep' }] };
+    expect([...memoryArchiveFolderState(withChild.decks, []).ids]).toEqual(['sibling']);
+  });
+  it('undo preserves folder edits, moved markers, newly added entities, and independent archives', () => {
+    const before = fixture();
+    const result = archiveMemoryFolder(before, 'child', archivedAt);
+    const current = {
+      ...result.snapshot,
+      decks: [...result.snapshot.decks.map(deck => deck.id === 'child' ? { ...deck, name: 'Edited', parentId: null, updatedAt: archivedAt } : deck),
+        { ...before.decks[4], id: 'new-archive', name: 'New', archivedAt }],
+    };
+    const restored = undoMemoryFolderArchive(current, result.ids, result.deckIds, archivedAt);
+    expect(restored.decks[2]).toEqual({ ...before.decks[2], name: 'Edited', parentId: null, updatedAt: archivedAt });
+    expect(restored.decks[5]).toBe(current.decks[5]);
+    expect(restored.settings).toBe(current.settings);
+  });
+  it('guards combined card and marker undo atomically against missing, restored, or newer archives', () => {
+    const seed = createSeedSnapshot();
+    const before = { ...fixture(), cards: [{ ...seed.cards[0], id: 'outside-card', deckId: 'outside' }] };
+    const result = archiveMemoryFolder(before, 'child', archivedAt);
+    const combined = archiveMemoryCard(result.snapshot, 'outside-card', archivedAt);
+    expect(undoMemoryFolderArchive(combined, ['outside-card'], result.deckIds, archivedAt)).toEqual(before);
+    for (const replacement of [undefined, '2026-11-13T01:00:00.000Z']) {
+      const changed = { ...combined, decks: combined.decks.map(deck => deck.id === 'deep' ? { ...deck, archivedAt: replacement } : deck) };
+      const original = structuredClone(changed);
+      expect(() => undoMemoryFolderArchive(changed, ['outside-card'], result.deckIds, archivedAt)).toThrow('状态已变化');
+      expect(changed).toEqual(original);
+    }
+    expect(() => undoMemoryFolderArchive(combined, ['outside-card'], [...result.deckIds, 'missing'], archivedAt)).toThrow('状态已变化');
+    expect(() => undoMemoryFolderArchive(combined, ['missing'], result.deckIds, archivedAt)).toThrow('状态已变化');
+    expect(() => undoMemoryFolderArchive(restoreMemoryCard(combined, 'outside-card'), ['outside-card'], result.deckIds, archivedAt)).toThrow('状态已变化');
+    const missing = { ...combined, decks: combined.decks.filter(deck => deck.id !== 'deep') };
+    expect(() => undoMemoryFolderArchive(missing, ['outside-card'], result.deckIds, archivedAt)).toThrow('状态已变化');
+  });
+  it('deletes explicitly archived empty subtrees with exact scope and leaves outside data intact', () => {
+    const result = archiveMemoryFolder(fixture(), 'root', archivedAt);
+    const before = { ...result.snapshot, studySessions: result.snapshot.decks.map(deck => ({ id: `session-${deck.id}`, deckId: deck.id, startedAt: archivedAt, endedAt: archivedAt, cardsStudied: 0 })) };
+    const original = structuredClone(before);
+    const scope = { deckIds: result.deckIds, cardIds: [] };
+    const after = deleteArchivedMemoryFolder(before, 'root', scope);
+    expect(after.decks).toEqual([before.decks[4]]);
+    expect(after.studySessions).toEqual([before.studySessions[4]]);
+    expect(after.cards).toEqual([]);
+    expect(after.reviewLogs).toEqual([]);
+    expect(after.settings).toBe(before.settings);
+    expect(before).toEqual(original);
+    const child = deleteArchivedMemoryFolder(before, 'child', { deckIds: ['child', 'deep'], cardIds: [] });
+    expect(child.decks.map(deck => deck.id)).toEqual(['root', 'sibling', 'outside']);
+    expect(() => deleteArchivedMemoryFolder(before, 'root', { ...scope, deckIds: ['root'] })).toThrow('内容已变化');
+    expect(() => deleteArchivedMemoryFolder(before, 'root', { ...scope, cardIds: ['missing'] })).toThrow('内容已变化');
+    const added = { ...before, decks: [...before.decks, { ...before.decks[1], id: 'added', archivedAt }] };
+    expect(() => deleteArchivedMemoryFolder(added, 'root', scope)).toThrow('内容已变化');
+    expect(() => deleteArchivedMemoryFolder(restoreMemoryFolder(before, 'root').snapshot, 'root', scope)).toThrow('不在归档中');
+    expect(() => deleteArchivedMemoryFolder(after, 'root', scope)).toThrow('不在归档中');
+  });
+  it('preserves markers through plain JSON, folder normalization, import merge, and cloud entity serialization', () => {
+    const result = archiveMemoryFolder(fixture(), 'root', archivedAt);
+    const plain = JSON.parse(JSON.stringify(result.snapshot));
+    expect(() => validateImportSnapshot(plain)).not.toThrow();
+    expect(migrateFolders(plain)).toEqual(result.snapshot);
+    const parsed = parseImportPayload(JSON.stringify(buildExportPayload(result.snapshot)));
+    expect(parsed.decks).toEqual(result.snapshot.decks);
+    const empty = { ...fixture(), decks: [] };
+    const merged = mergeImportPayload(empty, parsed);
+    expect([...memoryArchiveFolderState(merged.decks, merged.cards).ids].sort()).toEqual(['child', 'deep', 'root', 'sibling']);
+    expect(applyEntities(empty, snapshotEntities(result.snapshot)).decks).toEqual(result.snapshot.decks);
+    const current = fixture();
+    expect(mergeImportPayload(current, parsed).decks).toEqual(current.decks);
+  });
+  it('keeps nonempty folder archives compatible with existing cloud validation', () => {
+    const seed = createSeedSnapshot();
+    const before = { ...fixture(), cards: [{ ...seed.cards[0], id: 'card', deckId: 'root' }] };
+    const result = archiveMemoryFolder(before, 'root', archivedAt);
+    expect(result.deckIds).toEqual([]);
+    for (const entity of snapshotEntities(result.snapshot).filter(entity => entity.kind === 'deck' || entity.kind === 'card')) {
+      expect(() => validateEntity(entity)).not.toThrow();
+    }
   });
 });
 

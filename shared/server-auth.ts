@@ -56,12 +56,12 @@ export async function authenticate(request: Request, env: ServerEnv): Promise<Au
 }
 
 async function limitPairing(request: Request, env: ServerEnv, now: number): Promise<void> {
-  const ipHash = await sha256(`recall-pair:${request.headers.get('CF-Connecting-IP') ?? 'unknown'}`);
+  const ipHash = await sha256(`recall-pair:${env.CLIENT_IP ?? request.headers.get('CF-Connecting-IP') ?? 'unknown'}`);
   const statements = [
     env.DB.prepare('DELETE FROM pair_rate_limits WHERE space_id = ? AND window_start <= ?')
       .bind(spaceId(env), now - PAIR_WINDOW),
     env.DB.prepare(`INSERT INTO pair_rate_limits (space_id, ip_hash, window_start, attempts) VALUES (?, ?, ?, 1)
-      ON CONFLICT (space_id, ip_hash) DO UPDATE SET attempts = attempts + 1 WHERE attempts < ?
+      ON CONFLICT (space_id, ip_hash) DO UPDATE SET attempts = pair_rate_limits.attempts + 1 WHERE pair_rate_limits.attempts < ?
       RETURNING attempts`).bind(spaceId(env), ipHash, now, PAIR_ATTEMPTS),
   ];
   const results = await env.DB.batch<{ attempts: number }>(statements);
@@ -129,8 +129,8 @@ export async function issueCode(env: ServerEnv, auth: AuthenticatedDevice): Prom
 }
 
 export async function listDevices(env: ServerEnv, auth: AuthenticatedDevice): Promise<Response> {
-  const result = await env.DB.prepare(`SELECT id, label, created_at AS createdAt, last_seen_at AS lastSeenAt,
-    revoked_at AS revokedAt FROM trusted_devices WHERE space_id = ?
+  const result = await env.DB.prepare(`SELECT id, label, created_at AS "createdAt", last_seen_at AS "lastSeenAt",
+    revoked_at AS "revokedAt" FROM trusted_devices WHERE space_id = ?
     AND EXISTS (SELECT 1 FROM trusted_devices AS caller WHERE caller.id = ? AND caller.space_id = ? AND caller.revoked_at IS NULL)
     ORDER BY created_at, id`)
     .bind(auth.session.spaceId, auth.session.device.id, auth.session.spaceId).all<TrustedDevice>();

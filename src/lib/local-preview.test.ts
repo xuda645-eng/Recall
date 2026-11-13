@@ -1,11 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createSeedSnapshot } from '@/data/seed';
 import { buildExportPayload } from '@/services/import-export';
-import { isLocalPreview, localPreviewSnapshot } from './local-preview';
+import { isLocalPreview, isMiaodaLearningPreview, localPreviewSnapshot } from './local-preview';
 
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe('local paper preview', () => {
+  it('keeps a flagged HTTPS learning build local-first but does not permit arbitrary HTTP', () => {
+    vi.stubEnv('VITE_RECALL_MIAODA_LEARNING', '1');
+    vi.stubGlobal('window', { location: { hostname: 'synthetic.invalid', protocol: 'https:' } });
+    expect(isMiaodaLearningPreview()).toBe(true);
+    expect(isLocalPreview()).toBe(true);
+    vi.stubGlobal('window', { location: { hostname: 'synthetic.invalid', protocol: 'http:' } });
+    expect(isMiaodaLearningPreview()).toBe(false);
+    expect(isLocalPreview()).toBe(false);
+  });
   it('requires both an explicit build flag and a loopback origin', () => {
     for (const enabled of ['0', '1']) for (const hostname of ['127.0.0.1', 'localhost', '[::1]', 'recall-memory.pages.dev']) {
       vi.stubEnv('VITE_RECALL_LOCAL_PREVIEW', enabled);

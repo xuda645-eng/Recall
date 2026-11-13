@@ -53,6 +53,7 @@ export interface Deck {
   examDeadline?: string;
   parentId?: string | null;
   importedAt?: string;
+  archivedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

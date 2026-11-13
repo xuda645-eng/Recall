@@ -1,0 +1,7 @@
+[data-miaoda-local="1"] .memory-app {
+  --safe-bottom: max(16px, env(safe-area-inset-bottom, 0px), var(--miaoda-bottom-clearance, 0px));
+}
+
+[data-miaoda-local="1"] .memory-app .m-import-footer {
+  padding-bottom: calc(var(--safe-bottom) + 8px);
+}

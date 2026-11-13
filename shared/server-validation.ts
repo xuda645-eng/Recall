@@ -133,12 +133,12 @@ export function validateEntity(entity: Pick<CloudEntity, 'kind' | 'id' | 'value'
   switch (entity.kind) {
     case 'deck':
       value = record(entity.value, ['id', 'name', 'description', 'color', 'createdAt', 'updatedAt'],
-        ['parentId', 'examDeadline', 'importedAt']);
+        ['parentId', 'examDeadline', 'importedAt', 'archivedAt']);
       text(value.name, 80, true);
       text(value.description, 20_000);
       choice(value.color, deckColors);
       if (Object.hasOwn(value, 'parentId') && value.parentId !== null) identifier(value.parentId);
-      optionalDates(value, ['examDeadline', 'importedAt']);
+      optionalDates(value, ['examDeadline', 'importedAt', 'archivedAt']);
       break;
     case 'card':
       value = record(entity.value, ['id', 'deckId', 'front', 'back', 'hint', 'source', 'tags', 'cardType',

@@ -11,16 +11,21 @@ import { commitMemory } from '@/services/memory-actions';
 import { MERGE_MAX_MEMBERS } from '../../shared/weread-merge';
 import { MemoryImportCompletion } from '@/components/memory-import-completion';
 import { memoryImportLocations } from '@/lib/memory-folders';
+import { isLocalPreview } from '@/lib/local-preview';
+import { useMiaodaWeread } from '@/services/miaoda-weread';
 
 interface Props {
   drafts: WereadDraft[];
   onClose: () => void;
   onComplete: (ids: string[]) => void;
   onImported?: () => void;
+  onManual?: (drafts: WereadDraft[]) => void;
   onBusy?: (busy: boolean) => void;
 }
 
-export function MemoryWereadMergeImport({ drafts, onClose, onComplete, onImported, onBusy }: Props): JSX.Element {
+export function MemoryWereadMergeImport({ drafts, onClose, onComplete, onImported, onManual, onBusy }: Props): JSX.Element {
+  const capability = useMiaodaWeread();
+  const aiAvailable = !isLocalPreview() || capability.aiAvailable;
   const [session, setSession] = useState<WereadMergeSession | null>(null);
   const [initializing, setInitializing] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -65,7 +70,7 @@ export function MemoryWereadMergeImport({ drafts, onClose, onComplete, onImporte
   }
 
   async function generate(): Promise<void> {
-    if (running.current || !current.current) return;
+    if (running.current || !current.current || !aiAvailable) return;
     report(true); setError('');
     const abort = new AbortController(); controller.current = abort;
     let next = current.current;
@@ -177,6 +182,8 @@ export function MemoryWereadMergeImport({ drafts, onClose, onComplete, onImporte
     {initializing ? <p role="status">正在检查本机合并草稿…</p> : session ? <>
       <section className="wr-merge-summary" aria-label="划线整理进度"><div className="wr-merge-progress-heading"><span>原划线整理进度</span><strong>{percentage}%</strong></div><div className="wr-merge-progress-count"><strong>{session.cursor}</strong><span>/ {session.sources.length} 条原划线已整理</span></div><div className="wr-merge-progress" role="progressbar" aria-label="原划线整理进度" aria-valuemin={0} aria-valuemax={session.sources.length} aria-valuenow={session.cursor} aria-valuetext={`已整理 ${session.cursor} / ${session.sources.length} 条原划线，${percentage}%`}><i style={{ width: `${percentage}%` }}/></div><p role="status">{session.status === 'importing' ? '整理已完成，正在保存卡片。' : complete ? `已整理为 ${session.cards.length} 张卡片，待确认导入。` : session.status === 'paused' ? `已暂停，${session.cards.length} 张卡片草稿与进度保存在本机。` : `已形成 ${session.cards.length} 张卡片草稿，尚未写入卡片库。`}</p></section>
       <p className="wr-consent">{session.demo ? '这是原创合成示例与预置分组，不是你的微信读书数据，也不是现场 AI 输出；没有模型调用。确认导入只保存到当前设备。' : '仅合并同章、原文有序的相邻划线；一张最多 4 条。已有卡片不重组。每批最多 12 条、6000 字，批次边界保留末组上下文。点击生成后发送所选原文到已配置的 AI，每日额度仍为全空间 300 次。'}</p>
+      {!aiAvailable && !complete && <p role="status">AI 尚未配置，合并草稿保留。可手动整理原划线，不调用模型。</p>}
+      {!busy && onManual && <button className="m-secondary wr-more" onClick={() => onManual(session.sources)}>手动整理原划线</button>}
       {!complete && <details className="wr-merge-sources"><summary>查看按原文排序的划线</summary>{session.sources.map((source, index) => <article key={source.id}><small>H{String(index + 1).padStart(3, '0')} · {source.book.title} · {source.highlight.chapterTitle}</small><p>{source.highlight.markText}</p></article>)}</details>}
       <div className="wr-merge-cards">{session.cards.map((card, index) => {
         const members = card.members || [card.highlight];
@@ -193,7 +200,7 @@ export function MemoryWereadMergeImport({ drafts, onClose, onComplete, onImporte
           {complete && <div className="wr-merge-actions"><button className="m-secondary" disabled={busy || members.length < 2} onClick={() => void split(index)}>拆分为单条</button>{canCombine && <button className="m-secondary" disabled={busy} onClick={() => void combine(index)}>与下一张合并</button>}</div>}
         </article>;
       })}</div>
-      <div className="wr-dock">{busy ? <button className="m-secondary" disabled={session.status === 'importing'} onClick={() => controller.current?.abort()}><Pause size={17}/>暂停，保留进度</button> : complete ? <button className="m-primary" onClick={() => void importCards()}>确认导入 {session.cards.length} 张卡片<ArrowRight size={17}/></button> : <button className="m-primary" onClick={() => void generate()}>{session.cursor ? '继续智能分组' : '生成分组与问题'}<ArrowRight size={17}/></button>}
+      <div className="wr-dock">{busy ? <button className="m-secondary" disabled={session.status === 'importing'} onClick={() => controller.current?.abort()}><Pause size={17}/>暂停，保留进度</button> : complete ? <button className="m-primary" onClick={() => void importCards()}>确认导入 {session.cards.length} 张卡片<ArrowRight size={17}/></button> : <button className="m-primary" disabled={!aiAvailable} onClick={() => void generate()}>{session.cursor ? '继续智能分组' : '生成分组与问题'}<ArrowRight size={17}/></button>}
         {!busy && <button className="m-text" onClick={() => void cancel()}>取消合并草稿</button>}
       </div>
     </> : <button className="m-secondary" onClick={() => void cancel()}>取消无法恢复的合并草稿</button>}

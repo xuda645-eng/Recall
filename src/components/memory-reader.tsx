@@ -11,9 +11,9 @@ import { decodeReaderResume, type MemoryReaderResume, type MemoryReaderUndo } fr
 import type { Card, ReviewRating } from '@/types';
 
 const labels: Record<ReviewRating, string> = { again: '忘记了', hard: '有点难', good: '记住了', easy: '很熟悉' };
-interface Props { ids: string[]; scopeIds?: string[]; onQueueChange?: (ids: string[]) => void; onContinue?: (completedIds: string[]) => void; initialIndex: number; reviewMode: boolean; onEdit: (id: string) => void; onOptions: (id: string) => void; onArchive: (id: string) => Promise<void>; restoreRequest: { id: string; token: string } | null; archiveNotice: ReactNode; fontSize: number; onIndex: (n: number) => void; onExit: () => void; onBusy: (busy: boolean) => void; resumeState?: MemoryReaderResume | null; onResumeChange?: (state: MemoryReaderResume) => void; }
+interface Props { ids: string[]; scopeIds?: string[]; onQueueChange?: (ids: string[]) => void; onContinue?: (completedIds: string[]) => void; initialIndex: number; reviewMode: boolean; defaultBrowseScoring?: boolean; onEdit: (id: string) => void; onOptions: (id: string) => void; onArchive: (id: string) => Promise<void>; restoreRequest: { id: string; token: string } | null; archiveNotice: ReactNode; fontSize: number; onIndex: (n: number) => void; onExit: () => void; onBusy: (busy: boolean) => void; resumeState?: MemoryReaderResume | null; onResumeChange?: (state: MemoryReaderResume) => void; }
 interface ReadingPosition { revealed: boolean; scroll: number; }
-export function MemoryReader({ ids: initialIds, scopeIds = initialIds, onQueueChange, onContinue, initialIndex, reviewMode, onOptions, onArchive, restoreRequest, archiveNotice, fontSize: font, onIndex, onExit, onBusy, resumeState, onResumeChange }: Props): JSX.Element {
+export function MemoryReader({ ids: initialIds, scopeIds = initialIds, onQueueChange, onContinue, initialIndex, reviewMode, defaultBrowseScoring = false, onOptions, onArchive, restoreRequest, archiveNotice, fontSize: font, onIndex, onExit, onBusy, resumeState, onResumeChange }: Props): JSX.Element {
   const cards = useRecallStore(s => s.cards), decks = useRecallStore(s => s.decks);
   const settings = useRecallStore(s => s.settings);
   const preferences = useMemo(() => normalizeMemoryStudyPreferences(settings.studyPreferences), [settings.studyPreferences]);
@@ -24,7 +24,7 @@ export function MemoryReader({ ids: initialIds, scopeIds = initialIds, onQueueCh
   const [resumed] = useState(() => decodeReaderResume(resumeState, useRecallStore.getState()));
   const [index, setIndex] = useState(initialIndex), [revision, setRevision] = useState(0), [rated, setRated] = useState<Record<string, ReviewRating>>(() => Object.fromEntries((resumed?.undo || []).map(entry => [entry.card.id, entry.rating])));
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [undo, setUndo] = useState<MemoryReaderUndo[]>(resumed?.undo || []);
-  const [browseScoring, setBrowseScoring] = useState(false);
+  const [browseScoring, setBrowseScoring] = useState(defaultBrowseScoring);
   const viewport = useRef<HTMLDivElement>(null), rail = useRef<HTMLDivElement>(null), indexRef = useRef(initialIndex), views = useRef<Record<string, ReadingPosition>>(resumed?.views || {});
   const mountedPanels = useRef(new WeakSet<HTMLElement>()), layoutIndex = useRef<number | null>(null);
   const ratedRef = useRef<Record<string, ReviewRating>>(rated), undoRef = useRef(undo), pending = useRef(false), switching = useRef(false), scheduled = useRef(0), token = useRef(0), timer = useRef<ReturnType<typeof setTimeout>|null>(null);

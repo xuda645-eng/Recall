@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.cloud.json",
+  "include": ["server/**/*.ts", "cloud-tests/**/*.ts", "shared/**/*.ts", "functions/**/*.ts"]
+}

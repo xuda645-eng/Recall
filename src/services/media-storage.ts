@@ -1,4 +1,5 @@
 import { boundedImageBody, MAX_IMAGE_PIXELS, MEDIA_ID, validateMedia, type MediaAsset } from '../../shared/media';
+import { backendFetch } from '../../shared/client-http';
 
 export async function decodeMedia(asset: MediaAsset): Promise<void> {
   const url = URL.createObjectURL(new Blob([asset.bytes], { type: asset.mime }));
@@ -54,7 +55,7 @@ const downloads = new Map<string, Promise<MediaAsset>>();
 async function fetchMedia(id: string): Promise<MediaAsset> {
   const existing = await localMedia(id);
   if (existing) return existing;
-  const response = await fetch(`/api/media/${id}`, { credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(20000) });
+  const response = await backendFetch(`/api/media/${id}`, { credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(20000) });
   if (!response.ok) throw Object.assign(new Error(response.status === 401 ? '图片需要设备授权；已下载的图片仍可离线查看' : response.status === 404 ? '来源图片尚未上传，请在原设备同步后重试' : '图片下载失败，请重试'), { status: response.status });
   const length = Number(response.headers.get('Content-Length'));
   if (length > 512 * 1024) throw new Error('云端图片过大，已停止下载');

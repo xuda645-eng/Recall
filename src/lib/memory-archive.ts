@@ -37,6 +37,28 @@ export function memoryArchiveFolderState(decks: Deck[], cards: Card[]): { ids: S
       parentId = parents.get(parentId);
     }
   }
+  const marked = new Set<string>();
+  for (const deck of decks) {
+    if (deck.archivedAt && Number.isFinite(Date.parse(deck.archivedAt))) {
+      marked.add(deck.id);
+      let folderId: string | null = deck.id;
+      const seen = new Set<string>();
+      while (folderId && !seen.has(folderId)) {
+        seen.add(folderId);
+        const previous = times.get(folderId);
+        if (!previous || Date.parse(previous) < Date.parse(deck.archivedAt)) times.set(folderId, deck.archivedAt);
+        folderId = parents.get(folderId) ?? null;
+      }
+    } else if (!ids.has(deck.id)) {
+      let folderId: string | null = deck.id;
+      while (folderId && !active.has(folderId)) {
+        active.add(folderId);
+        folderId = parents.get(folderId) ?? null;
+      }
+    }
+  }
+  for (const id of marked) ids.add(id);
+  for (const id of active) ids.delete(id);
   return { ids, times };
 }
 
@@ -60,14 +82,20 @@ export function restoreMemoryCard(snapshot: RecallStateSnapshot, id: string, exp
   }) };
 }
 
-export function archiveMemoryFolder(snapshot: RecallStateSnapshot, id: string, archivedAt = new Date().toISOString()): { snapshot: RecallStateSnapshot; ids: string[] } {
+export function archiveMemoryFolder(snapshot: RecallStateSnapshot, id: string, archivedAt = new Date().toISOString()): { snapshot: RecallStateSnapshot; ids: string[]; deckIds: string[] } {
   if (!snapshot.decks.some(deck => deck.id === id)) throw new Error('卡组不存在');
   if (!Number.isFinite(Date.parse(archivedAt))) throw new Error('归档时间无效');
   const folders = subtreeIds(snapshot.decks, id);
-  const ids = snapshot.cards.filter(card => folders.has(card.deckId) && !card.archivedAt).map(card => card.id);
+  const cards = snapshot.cards.filter(card => folders.has(card.deckId));
+  const ids = cards.filter(card => !card.archivedAt).map(card => card.id);
+  if (!cards.length && !memoryArchiveFolderState(snapshot.decks, snapshot.cards).ids.has(id)) {
+    const deckIds = snapshot.decks.filter(deck => folders.has(deck.id) && !deck.archivedAt).map(deck => deck.id);
+    const affected = new Set(deckIds);
+    return { ids, deckIds, snapshot: { ...snapshot, decks: snapshot.decks.map(deck => affected.has(deck.id) ? { ...deck, archivedAt } : deck) } };
+  }
   if (!ids.length) throw new Error('这个卡组及子卡组没有在学卡片');
   const affected = new Set(ids);
-  return { ids, snapshot: { ...snapshot, cards: snapshot.cards.map(card => affected.has(card.id) ? { ...card, archivedAt } : card) } };
+  return { ids, deckIds: [], snapshot: { ...snapshot, cards: snapshot.cards.map(card => affected.has(card.id) ? { ...card, archivedAt } : card) } };
 }
 
 export function restoreMemoryCards(snapshot: RecallStateSnapshot, ids: string[], expectedArchivedAt: string): RecallStateSnapshot {
@@ -85,13 +113,37 @@ export function restoreMemoryCards(snapshot: RecallStateSnapshot, ids: string[],
   }) };
 }
 
-export function restoreMemoryFolder(snapshot: RecallStateSnapshot, id: string): { snapshot: RecallStateSnapshot; ids: string[] } {
+export function undoMemoryFolderArchive(snapshot: RecallStateSnapshot, ids: string[], deckIds: string[], expectedArchivedAt: string): RecallStateSnapshot {
+  const affected = new Set(deckIds);
+  const decks = new Map(snapshot.decks.map(deck => [deck.id, deck]));
+  for (const id of affected) {
+    const deck = decks.get(id);
+    if (!deck?.archivedAt || deck.archivedAt !== expectedArchivedAt) throw new Error('归档状态已变化，请从已归档列表恢复');
+  }
+  const restored = restoreMemoryCards(snapshot, ids, expectedArchivedAt);
+  if (!affected.size) return restored;
+  return { ...restored, decks: snapshot.decks.map(deck => {
+    if (!affected.has(deck.id)) return deck;
+    const restoredDeck = { ...deck };
+    delete restoredDeck.archivedAt;
+    return restoredDeck;
+  }) };
+}
+
+export function restoreMemoryFolder(snapshot: RecallStateSnapshot, id: string): { snapshot: RecallStateSnapshot; ids: string[]; deckIds: string[] } {
   if (!snapshot.decks.some(deck => deck.id === id)) throw new Error('卡组不存在');
   const folders = subtreeIds(snapshot.decks, id);
   const ids = snapshot.cards.filter(card => folders.has(card.deckId) && card.archivedAt).map(card => card.id);
-  if (!ids.length) throw new Error('这个卡组及子卡组没有归档卡片');
+  const deckIds = snapshot.decks.filter(deck => folders.has(deck.id) && deck.archivedAt).map(deck => deck.id);
+  if (!ids.length && !deckIds.length) throw new Error('这个卡组及子卡组没有归档卡片');
   const affected = new Set(ids);
-  return { ids, snapshot: { ...snapshot, cards: snapshot.cards.map(card => {
+  const affectedDecks = new Set(deckIds);
+  return { ids, deckIds, snapshot: { ...snapshot, decks: affectedDecks.size ? snapshot.decks.map(deck => {
+    if (!affectedDecks.has(deck.id)) return deck;
+    const restored = { ...deck };
+    delete restored.archivedAt;
+    return restored;
+  }) : snapshot.decks, cards: snapshot.cards.map(card => {
     if (!affected.has(card.id)) return card;
     const restored = { ...card };
     delete restored.archivedAt;

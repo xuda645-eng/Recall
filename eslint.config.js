@@ -5,7 +5,12 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "src-tauri/target", "coverage", "sync-relay"] },
+  { ignores: ["dist", "dist-server", "dist-miaoda-client", "dist-miaoda-learning", "src-tauri/target", "coverage", "sync-relay"] },
+  {
+    ...js.configs.recommended,
+    files: ['miaoda/worker/sw.js'],
+    languageOptions: { globals: globals.serviceworker },
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

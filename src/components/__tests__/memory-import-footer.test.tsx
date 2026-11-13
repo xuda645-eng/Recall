@@ -38,3 +38,14 @@ it('keeps confirm and cancel independent and blocks both while saving', () => {
   expect(screen.getByRole('button', { name: '取消' })).toBeDisabled();
   expect(screen.getByRole('button', { name: '确认导入' })).toBeDisabled();
 });
+
+it('blocks an unavailable import target without blocking cancellation', () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  const actions = { onCancel: vi.fn(), onConfirm: vi.fn() };
+  render(<div className="memory-content"><MemoryImportFooter busy={false} confirmDisabled {...actions}/></div>);
+  expect(screen.getByRole('button', { name: '确认导入' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: '确认导入' }));
+  fireEvent.click(screen.getByRole('button', { name: '取消' }));
+  expect(actions.onConfirm).not.toHaveBeenCalled();
+  expect(actions.onCancel).toHaveBeenCalledOnce();
+});
